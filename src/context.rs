@@ -44,7 +44,6 @@ impl<'a> Context<'a> {
 
     pub fn call(&mut self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<(), Box<dyn std::error::Error>> {
         let name = name.as_ref();
-
         let object = self
             .scope
             .get(name)
@@ -58,15 +57,19 @@ impl<'a> Context<'a> {
             }
         };
 
-        let previous = std::mem::replace(&mut self.args, args.into());
-        let result = action.invoke(self);
-        self.args = previous;
-        result
+        let mut ctx = Self {
+            trace_id: self.trace_id,
+            args: args.into(),
+            env: self.env,
+            scope: self.scope.fork(),
+            diagnostics: vec![],
+        };
+
+        action.invoke(&mut ctx)
     }
 
-    pub fn eval(&mut self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn eval(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<bool, Box<dyn std::error::Error>> {
         let name = name.as_ref();
-
         let object = self
             .scope
             .get(name)
@@ -80,10 +83,15 @@ impl<'a> Context<'a> {
             }
         };
 
-        let previous = std::mem::replace(&mut self.args, args.into());
-        let result = predicate.invoke(self);
-        self.args = previous;
-        result
+        let ctx = Self {
+            trace_id: self.trace_id,
+            args: args.into(),
+            env: self.env,
+            scope: self.scope.fork(),
+            diagnostics: vec![],
+        };
+
+        predicate.invoke(&ctx)
     }
 }
 
