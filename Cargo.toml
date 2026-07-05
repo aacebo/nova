@@ -1,0 +1,30 @@
+[package]
+name = "nova"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+readme = "README.md"
+documentation = "https://www.docs.rs/nova"
+homepage = "https://www.github.com/aacebo/nova"
+repository = "https://www.github.com/aacebo/nova"
+
+[lib]
+doctest = false
+
+[features]
+default = []
+
+[workspace.lints.clippy]
+type_complexity = "allow"
+
+[patch.crates-io]
+ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
+
+[dependencies]
+ulid = { version = "1", features = ["serde"] }
+ort = { version = "1.16.3", features = ["download-binaries"] }
+tch = { version = "0.17" }
+console = { version = "0.16" }
+rust-bert = { version = "0.23", features = ["onnx", "remote"] }
+serde = { version = "1", features = ["derive", "rc"] }
+minijinja = { version = "2", features = ["serde"] }
