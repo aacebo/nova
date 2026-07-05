@@ -15,3 +15,7 @@ doctest = false
 workspace = true
 
 [dependencies]
+ort = { version = "1.16.3", features = ["download-binaries"] }
+tch = { version = "0.17" }
+console = { version = "0.16" }
+rust-bert = { version = "0.23", features = ["onnx", "remote"] }

@@ -8,12 +8,13 @@ pub use annotation::*;
 pub use artifact::*;
 pub use var::*;
 
-use crate::{Action, Predicate};
+use crate::{Action, Map, Predicate};
 
 #[derive(Clone)]
 pub enum Object {
     Action(Arc<dyn Action>),
     Predicate(Arc<dyn Predicate>),
+    Map(Arc<dyn Map>),
     Artifact(Artifact),
     Annotation(Annotation),
     Var(Var),
@@ -24,12 +25,20 @@ impl Object {
         Self::Predicate(Arc::new(predicate))
     }
 
+    pub fn map(map: impl Map + 'static) -> Self {
+        Self::Map(Arc::new(map))
+    }
+
     pub fn is_action(&self) -> bool {
         matches!(self, Self::Action(_))
     }
 
     pub fn is_predicate(&self) -> bool {
         matches!(self, Self::Predicate(_))
+    }
+
+    pub fn is_map(&self) -> bool {
+        matches!(self, Self::Map(_))
     }
 
     pub fn is_artifact(&self) -> bool {
@@ -54,6 +63,13 @@ impl Object {
     pub fn as_predicate(&self) -> Option<&dyn Predicate> {
         match self {
             Self::Predicate(v) => Some(v.as_ref()),
+            _ => None,
+        }
+    }
+
+    pub fn as_map(&self) -> Option<&dyn Map> {
+        match self {
+            Self::Map(v) => Some(v.as_ref()),
             _ => None,
         }
     }

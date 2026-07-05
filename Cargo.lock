@@ -159,9 +159,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.65"
+version = "1.2.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e228eec9be7c17ccb640b59b36a5cd805ea2a564a4c5e162c2f659fea30d3b96"
+checksum = "f5d6cac793997bd970000024b2934968efe83b382de4fdcf4fcb46b6ee4ad996"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -982,10 +982,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ncore"
-version = "0.1.0"
-
-[[package]]
 name = "ndarray"
 version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1002,12 +998,26 @@ dependencies = [
 name = "nova"
 version = "0.0.0"
 dependencies = [
+ "nova-ai",
+ "nova-core",
+]
+
+[[package]]
+name = "nova-ai"
+version = "0.0.0"
+dependencies = [
  "console",
- "minijinja",
  "ort",
  "rust-bert",
- "serde",
  "tch",
+]
+
+[[package]]
+name = "nova-core"
+version = "0.0.0"
+dependencies = [
+ "minijinja",
+ "serde",
  "ulid",
 ]
 
@@ -1783,7 +1793,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

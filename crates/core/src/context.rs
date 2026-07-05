@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{Args, Diagnostic, Environment, Error, Object, Scope};
+use crate::{Args, Diagnostic, Environment, Error, Object, Scope, Value};
 
 pub struct Context<'a> {
     trace_id: ulid::Ulid,
@@ -92,6 +92,32 @@ impl<'a> Context<'a> {
         };
 
         predicate.invoke(&ctx)
+    }
+
+    pub fn map(&mut self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        let name = name.as_ref();
+        let object = self
+            .scope
+            .get(name)
+            .ok_or_else(|| Error::action(self.trace_id, name, "map not found"))?;
+
+        let map = {
+            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
+            match &*guard {
+                Object::Map(map) => Arc::clone(map),
+                _ => return Err(Box::new(Error::action(self.trace_id, name, "map not found"))),
+            }
+        };
+
+        let mut ctx = Self {
+            trace_id: self.trace_id,
+            args: args.into(),
+            env: self.env,
+            scope: self.scope.fork(),
+            diagnostics: vec![],
+        };
+
+        map.invoke(&mut ctx)
     }
 }
 

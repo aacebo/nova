@@ -4,6 +4,7 @@ members = ["crates/*"]
 default-members = ["crates/*"]
 
 [workspace.package]
+version = "0.0.0"
 edition = "2024"
 license = "MIT"
 readme = "README.md"
@@ -13,7 +14,7 @@ repository = "https://www.github.com/aacebo/nova"
 
 [package]
 name = "nova"
-version = "0.0.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 readme.workspace = true
@@ -24,8 +25,12 @@ repository.workspace = true
 [lib]
 doctest = false
 
+[lints]
+workspace = true
+
 [features]
 default = []
+ai = ["dep:nova-ai"]
 
 [workspace.lints.clippy]
 type_complexity = "allow"
@@ -34,10 +39,5 @@ type_complexity = "allow"
 ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
 
 [dependencies]
-ulid = { version = "1", features = ["serde"] }
-ort = { version = "1.16.3", features = ["download-binaries"] }
-tch = { version = "0.17" }
-console = { version = "0.16" }
-rust-bert = { version = "0.23", features = ["onnx", "remote"] }
-serde = { version = "1", features = ["derive", "rc"] }
-minijinja = { version = "2", features = ["serde"] }
+nova-core = { path = "crates/core" }
+nova-ai = { path = "crates/ai", optional = true }
