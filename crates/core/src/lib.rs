@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 
 mod arena;
 mod args;
@@ -8,6 +7,7 @@ mod context;
 mod diagnostic;
 mod error;
 mod object;
+mod output;
 mod routine;
 mod scope;
 mod span;
@@ -19,6 +19,7 @@ pub use diagnostic::*;
 pub use error::*;
 pub use minijinja::context;
 pub use object::*;
+pub use output::*;
 pub use routine::*;
 pub use scope::*;
 pub use span::*;
@@ -52,73 +53,29 @@ impl<'a> Runtime<'a> {
         &self.scope
     }
 
-    /// Top-level entry point: invoke a registered action by name.
-    ///
-    /// Resolves `name` against the runtime's scope, forks a fresh scope for the call,
-    /// and mints a new `trace_id` for the resulting invocation.
-    pub fn invoke(&self, name: &str, args: impl Into<Args>) -> Result<(), Box<dyn std::error::Error>> {
-        let trace_id = ulid::Ulid::new();
-        let object = self
-            .scope
-            .get(name)
-            .ok_or_else(|| Error::action(trace_id, name, "action not found"))?;
-
-        let action = {
-            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
-            match &*guard {
-                Object::Action(action) => Arc::clone(action),
-                _ => return Err(Box::new(Error::action(trace_id, name, "action not found"))),
-            }
-        };
-
-        let mut ctx = Context::new(trace_id, args.into(), &self.env, self.scope.fork());
-        action.invoke(&mut ctx)
+    pub fn call(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+        let args = args.into();
+        let mut ctx = Context::new(ulid::Ulid::new(), args.clone(), &self.env, self.scope.fork());
+        ctx.call(name, args)?;
+        Ok(ctx.into())
     }
 
-    /// Top-level entry point: evaluate a registered predicate by name.
-    ///
-    /// Resolves `name` against the runtime's scope, forks a fresh scope for the call,
-    /// and mints a new `trace_id` for the resulting evaluation.
-    pub fn eval(&self, name: &str, args: impl Into<Args>) -> Result<bool, Box<dyn std::error::Error>> {
-        let trace_id = ulid::Ulid::new();
-        let object = self
-            .scope
-            .get(name)
-            .ok_or_else(|| Error::action(trace_id, name, "predicate not found"))?;
-
-        let predicate = {
-            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
-            match &*guard {
-                Object::Predicate(predicate) => Arc::clone(predicate),
-                _ => return Err(Box::new(Error::action(trace_id, name, "predicate not found"))),
-            }
-        };
-
-        let ctx = Context::new(trace_id, args.into(), &self.env, self.scope.fork());
-        predicate.invoke(&ctx)
+    pub fn eval(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+        let args = args.into();
+        let ctx = Context::new(ulid::Ulid::new(), args.clone(), &self.env, self.scope.fork());
+        let value = ctx.eval(name, args)?;
+        let mut output = Output::from(ctx);
+        output.value = Some(value.into());
+        Ok(output)
     }
 
-    /// Top-level entry point: invoke a registered map by name and return its value.
-    ///
-    /// Resolves `name` against the runtime's scope, forks a fresh scope for the call,
-    /// and mints a new `trace_id` for the resulting invocation.
-    pub fn map(&self, name: &str, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        let trace_id = ulid::Ulid::new();
-        let object = self
-            .scope
-            .get(name)
-            .ok_or_else(|| Error::action(trace_id, name, "map not found"))?;
-
-        let map = {
-            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
-            match &*guard {
-                Object::Map(map) => Arc::clone(map),
-                _ => return Err(Box::new(Error::action(trace_id, name, "map not found"))),
-            }
-        };
-
-        let mut ctx = Context::new(trace_id, args.into(), &self.env, self.scope.fork());
-        map.invoke(&mut ctx)
+    pub fn map(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+        let args = args.into();
+        let mut ctx = Context::new(ulid::Ulid::new(), args.clone(), &self.env, self.scope.fork());
+        let value = ctx.map(name, args)?;
+        let mut output = Output::from(ctx);
+        output.value = value;
+        Ok(output)
     }
 }
 

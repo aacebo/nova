@@ -1,15 +1,8 @@
-//! Integration tests driving the public `nova` API through `Runtime` as the frontend.
-//!
-//! Each case builds a `Runtime` via `Builder`, registers actions/predicates/routines/vars, then
-//! evaluates behaviour holistically through `runtime.invoke(...)` and observable side effects.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use nova::{Action, Args, Builder, Context, Map, Predicate, Value, builtin};
+use nova::{Action, Args, Builder, Context, Diagnostic, Map, Predicate, Severity, Value, builtin};
 
-/// Action that records every set of args it was invoked with, so a test can assert on what the
-/// runtime dispatched without reaching into `Context` internals.
 struct Recorder(Arc<Mutex<Vec<Args>>>);
 
 impl Action for Recorder {
@@ -24,15 +17,57 @@ fn invokes_registered_action_by_name() {
     let calls = Arc::new(Mutex::new(Vec::new()));
     let runtime = Builder::new().action("bump", Recorder(calls.clone())).build();
 
-    runtime.invoke("bump", Args::new()).unwrap();
-
+    runtime.call("bump", Args::new()).unwrap();
     assert_eq!(calls.lock().unwrap().len(), 1);
+}
+
+#[test]
+fn diagnostics_emitted_by_actions_propagate_to_the_frontend() {
+    struct Parent;
+
+    impl Action for Parent {
+        fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
+            ctx.emit(Diagnostic::new(*ctx.trace_id()).sev(Severity::Warn).message("from parent"));
+            ctx.call("child", Args::new())?;
+            Ok(())
+        }
+    }
+
+    struct Child;
+
+    impl Action for Child {
+        fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
+            ctx.emit(Diagnostic::new(*ctx.trace_id()).sev(Severity::Info).message("from child"));
+            Ok(())
+        }
+    }
+
+    let runtime = Builder::new().action("parent", Parent).action("child", Child).build();
+
+    let output = runtime.call("parent", Args::new()).unwrap();
+
+    assert_eq!(output.value, None);
+    assert_eq!(output.diagnostics.len(), 1);
+
+    let parent_node = &output.diagnostics[0];
+
+    assert_eq!(parent_node.message.as_deref(), Some("parent"));
+    assert_eq!(parent_node.severity(), Severity::Warn);
+    assert_eq!(parent_node.children.len(), 2);
+    assert_eq!(parent_node.children[0].message.as_deref(), Some("from parent"));
+
+    let child_node = &parent_node.children[1];
+
+    assert_eq!(child_node.message.as_deref(), Some("child"));
+    assert_eq!(child_node.severity(), Severity::Info);
+    assert_eq!(child_node.children.len(), 1);
+    assert_eq!(child_node.children[0].message.as_deref(), Some("from child"));
 }
 
 #[test]
 fn invoking_unknown_name_errors() {
     let runtime = Builder::new().build();
-    assert!(runtime.invoke("missing", Args::new()).is_err());
+    assert!(runtime.call("missing", Args::new()).is_err());
 }
 
 #[test]
@@ -40,9 +75,9 @@ fn action_receives_the_args_it_was_invoked_with() {
     let calls = Arc::new(Mutex::new(Vec::new()));
     let runtime = Builder::new().action("echo", Recorder(calls.clone())).build();
 
-    runtime.invoke("echo", [("n", 7)]).unwrap();
-
+    runtime.call("echo", [("n", 7)]).unwrap();
     let recorded = calls.lock().unwrap();
+
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].get("n"), Some(&Value::from(7)));
 }
@@ -55,10 +90,8 @@ fn action_chains_into_another_action_with_fresh_args() {
 
     impl Action for Caller {
         fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
-            // the caller sees its own args, then chains with new args
             assert_eq!(ctx.args().get("n"), Some(&Value::from(1)));
             ctx.call("callee", [("n", 2)])?;
-            // chaining does not disturb the caller's own args
             assert_eq!(ctx.args().get("n"), Some(&Value::from(1)));
             Ok(())
         }
@@ -69,9 +102,9 @@ fn action_chains_into_another_action_with_fresh_args() {
         .action("callee", Recorder(seen.clone()))
         .build();
 
-    runtime.invoke("caller", [("n", 1)]).unwrap();
-
+    runtime.call("caller", [("n", 1)]).unwrap();
     let recorded = seen.lock().unwrap();
+
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].get("n"), Some(&Value::from(2)));
 }
@@ -91,14 +124,13 @@ fn runtime_evaluates_predicate_by_name() {
         .predicate("no", Always(false))
         .build();
 
-    assert!(runtime.eval("yes", Args::new()).unwrap());
-    assert!(!runtime.eval("no", Args::new()).unwrap());
+    assert_eq!(runtime.eval("yes", Args::new()).unwrap().value, Some(Value::from(true)));
+    assert_eq!(runtime.eval("no", Args::new()).unwrap().value, Some(Value::from(false)));
     assert!(runtime.eval("missing", Args::new()).is_err());
 }
 
 #[test]
 fn runtime_invokes_a_map_by_name_and_returns_its_value() {
-    // a Map doubles its `n` arg and returns the result
     struct Double;
 
     impl Map for Double {
@@ -109,9 +141,10 @@ fn runtime_invokes_a_map_by_name_and_returns_its_value() {
     }
 
     let runtime = Builder::new().map("double", Double).build();
+    let output = runtime.map("double", [("n", 21)]).unwrap();
 
-    assert_eq!(runtime.map("double", [("n", 21)]).unwrap(), Some(Value::from(42)));
-    // a Map that is not registered surfaces an error
+    assert_eq!(output.value, Some(Value::from(42)));
+    assert!(output.diagnostics.is_empty());
     assert!(runtime.map("missing", Args::new()).is_err());
 }
 
@@ -155,9 +188,8 @@ fn if_builtin_dispatches_the_matching_branch() {
         .action("branch", builtin::If::new("gt_zero", "then").or_else("else"))
         .build();
 
-    runtime.invoke("branch", [("n", 1)]).unwrap();
-    runtime.invoke("branch", [("n", 0)]).unwrap();
-
+    runtime.call("branch", [("n", 1)]).unwrap();
+    runtime.call("branch", [("n", 0)]).unwrap();
     assert_eq!(THEN.load(Ordering::SeqCst), 1);
     assert_eq!(ELSE.load(Ordering::SeqCst), 1);
 }
@@ -177,8 +209,11 @@ fn not_builtin_negates_a_named_predicate() {
         .predicate("not_truthy", builtin::Not::new("truthy"))
         .build();
 
-    assert!(runtime.eval("truthy", Args::new()).unwrap());
-    assert!(!runtime.eval("not_truthy", Args::new()).unwrap());
+    assert_eq!(runtime.eval("truthy", Args::new()).unwrap().value, Some(Value::from(true)));
+    assert_eq!(
+        runtime.eval("not_truthy", Args::new()).unwrap().value,
+        Some(Value::from(false))
+    );
 }
 
 #[test]
@@ -189,8 +224,7 @@ fn routine_delegates_to_its_entrypoint() {
         .routine("greet", "impl")
         .build();
 
-    runtime.invoke("greet", [("n", 5)]).unwrap();
-
+    runtime.call("greet", [("n", 5)]).unwrap();
     let recorded = calls.lock().unwrap();
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].get("n"), Some(&Value::from(5)));
@@ -216,8 +250,7 @@ fn globals_and_templates_render() {
         .action("render", Render(out.clone()))
         .build();
 
-    runtime.invoke("render", Args::new()).unwrap();
-
+    runtime.call("render", Args::new()).unwrap();
     assert_eq!(*out.lock().unwrap(), "hello world");
 }
 
@@ -242,7 +275,6 @@ fn filters_and_functions_render() {
         .action("render", Render(out.clone()))
         .build();
 
-    runtime.invoke("render", Args::new()).unwrap();
-
+    runtime.call("render", Args::new()).unwrap();
     assert_eq!(*out.lock().unwrap(), "HI-nova");
 }

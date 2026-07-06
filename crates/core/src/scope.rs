@@ -131,7 +131,6 @@ mod tests {
         scope.set("x", Var::new("x", 1));
         scope.set("x", Var::new("x", 2));
 
-        // still a single symbol/arena entry
         assert_eq!(scope.len(), 1);
         assert_eq!(scope.0.arena.lock().unwrap().len(), 1);
 
@@ -159,12 +158,10 @@ mod tests {
         let child = parent.fork();
         child.set("x", Var::new("x", 2));
 
-        // recursive set mutated the parent's binding, not a new child binding
         let from_parent = parent.get("x").unwrap();
         let parent_value = from_parent.read().unwrap().as_var().unwrap().value.clone();
         assert_eq!(parent_value, Value::from(2));
 
-        // no new symbol was created in the child scope
         assert!(child.0.symbols.lock().unwrap().is_empty());
     }
 
@@ -174,7 +171,6 @@ mod tests {
         let child = root.fork().fork();
         child.set("y", Var::new("y", 7));
 
-        // brand-new name was created at the root, resolvable from the child
         assert!(!root.0.symbols.lock().unwrap().is_empty());
         assert!(child.0.symbols.lock().unwrap().is_empty());
 

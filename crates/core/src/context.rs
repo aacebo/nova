@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{Args, Diagnostic, Environment, Error, Object, Scope, Value};
+use crate::{Args, Diagnostic, Environment, Error, Object, Output, Scope, Value};
 
 pub struct Context<'a> {
     trace_id: ulid::Ulid,
@@ -37,9 +37,27 @@ impl<'a> Context<'a> {
         &self.scope
     }
 
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
+    pub fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
+        self.diagnostics.drain(..).collect()
+    }
+
     pub fn emit(&mut self, diagnostic: Diagnostic) -> &mut Self {
         self.diagnostics.push(diagnostic);
         self
+    }
+
+    fn child(&self, args: impl Into<Args>) -> Self {
+        Self {
+            trace_id: self.trace_id,
+            args: args.into(),
+            env: self.env,
+            scope: self.scope.fork(),
+            diagnostics: vec![],
+        }
     }
 
     pub fn call(&mut self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<(), Box<dyn std::error::Error>> {
@@ -57,15 +75,18 @@ impl<'a> Context<'a> {
             }
         };
 
-        let mut ctx = Self {
-            trace_id: self.trace_id,
-            args: args.into(),
-            env: self.env,
-            scope: self.scope.fork(),
-            diagnostics: vec![],
-        };
+        let mut ctx = self.child(args);
+        let result = action.invoke(&mut ctx);
+        let output = Output::from(ctx);
 
-        action.invoke(&mut ctx)
+        if !output.diagnostics.is_empty() {
+            let mut node = Diagnostic::new(output.trace_id).message(name);
+            node.id = output.id;
+            node.children = output.diagnostics;
+            self.diagnostics.push(node);
+        }
+
+        result
     }
 
     pub fn eval(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<bool, Box<dyn std::error::Error>> {
@@ -83,14 +104,7 @@ impl<'a> Context<'a> {
             }
         };
 
-        let ctx = Self {
-            trace_id: self.trace_id,
-            args: args.into(),
-            env: self.env,
-            scope: self.scope.fork(),
-            diagnostics: vec![],
-        };
-
+        let ctx = self.child(args);
         predicate.invoke(&ctx)
     }
 
@@ -109,15 +123,18 @@ impl<'a> Context<'a> {
             }
         };
 
-        let mut ctx = Self {
-            trace_id: self.trace_id,
-            args: args.into(),
-            env: self.env,
-            scope: self.scope.fork(),
-            diagnostics: vec![],
-        };
+        let mut ctx = self.child(args);
+        let result = map.invoke(&mut ctx);
+        let output = Output::from(ctx);
 
-        map.invoke(&mut ctx)
+        if !output.diagnostics.is_empty() {
+            let mut node = Diagnostic::new(output.trace_id).message(name);
+            node.id = output.id;
+            node.children = output.diagnostics;
+            self.diagnostics.push(node);
+        }
+
+        result
     }
 }
 
