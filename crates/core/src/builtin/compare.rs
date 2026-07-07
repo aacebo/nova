@@ -1,4 +1,4 @@
-use crate::{Context, Predicate, context};
+use crate::{Context, Predicate};
 
 pub enum Cmp {
     Eq,
@@ -34,8 +34,8 @@ impl Compare {
 
 impl Predicate for Compare {
     fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>> {
-        let a = ctx.env().compile_expression(&self.a)?.eval(context! { args => ctx.args() })?;
-        let b = ctx.env().compile_expression(&self.b)?.eval(context! { args => ctx.args() })?;
+        let a = ctx.eval_expr(&self.a)?;
+        let b = ctx.eval_expr(&self.b)?;
 
         Ok(match self.style {
             Cmp::Eq => a == b,

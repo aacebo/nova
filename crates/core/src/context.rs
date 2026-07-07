@@ -1,144 +1,125 @@
+use std::fmt;
 use std::sync::Arc;
 
-use crate::{Args, Diagnostic, Environment, Error, Object, Output, Scope, Value};
+use crate::{Args, Diagnostic, Environment, Object, Scope, Value};
 
-pub struct Context<'a> {
-    trace_id: ulid::Ulid,
-    args: Args,
-    env: &'a Environment<'a>,
+#[derive(Clone)]
+pub struct Context {
+    env: Arc<Environment<'static>>,
     scope: Scope,
-    diagnostics: Vec<Diagnostic>,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(trace_id: ulid::Ulid, args: Args, env: &'a Environment<'a>, scope: Scope) -> Self {
-        Self {
-            trace_id,
-            args,
-            env,
-            scope,
-            diagnostics: vec![],
-        }
+impl Context {
+    pub const KEY: &'static str = "__$ctx__";
+
+    pub fn new(env: Arc<Environment<'static>>, scope: Scope) -> Self {
+        Self { env, scope }
     }
 
     pub fn trace_id(&self) -> &ulid::Ulid {
-        &self.trace_id
+        self.scope.trace_id()
     }
 
     pub fn args(&self) -> &Args {
-        &self.args
+        self.scope.args()
     }
 
-    pub fn env(&self) -> &Environment<'a> {
-        self.env
+    pub fn env(&self) -> &Environment<'static> {
+        &self.env
     }
 
     pub fn scope(&self) -> &Scope {
         &self.scope
     }
 
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
-    }
-
-    pub fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-        self.diagnostics.drain(..).collect()
+    pub fn take_diagnostics(&self) -> Vec<Diagnostic> {
+        self.scope.take_diagnostics()
     }
 
     pub fn emit(&mut self, diagnostic: Diagnostic) -> &mut Self {
-        self.diagnostics.push(diagnostic);
+        self.scope.emit(diagnostic);
         self
     }
 
-    fn child(&self, args: impl Into<Args>) -> Self {
+    pub fn child(&self, args: impl Into<Args>) -> Self {
         Self {
-            trace_id: self.trace_id,
-            args: args.into(),
-            env: self.env,
-            scope: self.scope.fork(),
-            diagnostics: vec![],
+            env: self.env.clone(),
+            scope: self.scope.fork(args),
         }
     }
 
-    pub fn call(&mut self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn call(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<(), Box<dyn std::error::Error>> {
         let name = name.as_ref();
-        let object = self
-            .scope
-            .get(name)
-            .ok_or_else(|| Error::action(self.trace_id, name, "action not found"))?;
-
-        let action = {
-            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
-            match &*guard {
-                Object::Action(action) => Arc::clone(action),
-                _ => return Err(Box::new(Error::action(self.trace_id, name, "action not found"))),
-            }
-        };
-
+        let func = self.scope.get_func(name)?;
         let mut ctx = self.child(args);
-        let result = action.invoke(&mut ctx);
-        let output = Output::from(ctx);
-
-        if !output.diagnostics.is_empty() {
-            let mut node = Diagnostic::new(output.trace_id).message(name);
-            node.id = output.id;
-            node.children = output.diagnostics;
-            self.diagnostics.push(node);
-        }
-
-        result
+        let result = func.invoke(&mut ctx);
+        self.scope.merge(name, ctx.scope());
+        result.map(|_| ())
     }
 
     pub fn eval(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<bool, Box<dyn std::error::Error>> {
         let name = name.as_ref();
-        let object = self
-            .scope
-            .get(name)
-            .ok_or_else(|| Error::action(self.trace_id, name, "predicate not found"))?;
-
-        let predicate = {
-            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
-            match &*guard {
-                Object::Predicate(predicate) => Arc::clone(predicate),
-                _ => return Err(Box::new(Error::action(self.trace_id, name, "predicate not found"))),
-            }
-        };
-
-        let ctx = self.child(args);
-        predicate.invoke(&ctx)
+        let func = self.scope.get_func(name)?;
+        let mut ctx = self.child(args);
+        let value = func.invoke(&mut ctx)?;
+        Ok(value.map(|v| v.is_true()).unwrap_or(false))
     }
 
-    pub fn map(&mut self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn func(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         let name = name.as_ref();
-        let object = self
-            .scope
-            .get(name)
-            .ok_or_else(|| Error::action(self.trace_id, name, "map not found"))?;
-
-        let map = {
-            let guard = object.read().map_err(|_| Error::message("scope lock poisoned"))?;
-            match &*guard {
-                Object::Map(map) => Arc::clone(map),
-                _ => return Err(Box::new(Error::action(self.trace_id, name, "map not found"))),
-            }
-        };
-
+        let func = self.scope.get_func(name)?;
         let mut ctx = self.child(args);
-        let result = map.invoke(&mut ctx);
-        let output = Output::from(ctx);
-
-        if !output.diagnostics.is_empty() {
-            let mut node = Diagnostic::new(output.trace_id).message(name);
-            node.id = output.id;
-            node.children = output.diagnostics;
-            self.diagnostics.push(node);
-        }
-
+        let result = func.invoke(&mut ctx);
+        self.scope.merge(name, ctx.scope());
         result
+    }
+
+    pub fn eval_expr(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {
+        let expr = self.env().compile_expression(src)?;
+        Ok(expr.eval(Value::from_object(self.clone()))?)
+    }
+
+    pub fn render(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let tmpl = self.env().get_template(name)?;
+        Ok(tmpl.render(Value::from_object(self.clone()))?)
+    }
+
+    pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
+        Ok(self.env().render_str(source, Value::from_object(self.clone()))?)
     }
 }
 
-impl<'a> std::ops::Deref for Context<'a> {
+impl minijinja::value::Object for Context {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
+
+        if name == Context::KEY {
+            return Some(Value::from_object(Context::clone(self)));
+        }
+
+        if let Some(value) = self.scope.args().get(name) {
+            return Some(value.clone());
+        }
+
+        let slot = self.scope.get(name)?;
+
+        match &*slot {
+            Object::Var(var) => Some(var.value.clone()),
+            Object::Func(func) => Some(Value::from_object(func.clone())),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Debug for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Context")
+            .field("trace_id", self.trace_id())
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::ops::Deref for Context {
     type Target = Scope;
 
     fn deref(&self) -> &Self::Target {

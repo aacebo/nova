@@ -29,8 +29,8 @@ impl Output {
     }
 }
 
-impl From<Context<'_>> for Output {
-    fn from(mut ctx: Context<'_>) -> Self {
+impl From<Context> for Output {
+    fn from(ctx: Context) -> Self {
         Self::new(*ctx.trace_id()).diagnostics(ctx.take_diagnostics())
     }
 }

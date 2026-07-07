@@ -1,44 +1,38 @@
 mod annotation;
 mod artifact;
+mod function;
 mod var;
-
-use std::sync::Arc;
 
 pub use annotation::*;
 pub use artifact::*;
+pub use function::*;
 pub use var::*;
 
-use crate::{Action, Map, Predicate};
+use crate::{Action, Call, Predicate};
 
 #[derive(Clone)]
 pub enum Object {
-    Action(Arc<dyn Action>),
-    Predicate(Arc<dyn Predicate>),
-    Map(Arc<dyn Map>),
+    Func(Function),
     Artifact(Artifact),
     Annotation(Annotation),
     Var(Var),
 }
 
 impl Object {
-    pub fn predicate(predicate: impl Predicate + 'static) -> Self {
-        Self::Predicate(Arc::new(predicate))
+    pub fn action(name: impl Into<String>, action: impl Action + 'static) -> Self {
+        Self::Func(Function::action(name, action))
     }
 
-    pub fn map(map: impl Map + 'static) -> Self {
-        Self::Map(Arc::new(map))
+    pub fn predicate(name: impl Into<String>, predicate: impl Predicate + 'static) -> Self {
+        Self::Func(Function::predicate(name, predicate))
     }
 
-    pub fn is_action(&self) -> bool {
-        matches!(self, Self::Action(_))
+    pub fn func(name: impl Into<String>, func: impl Call + 'static) -> Self {
+        Self::Func(Function::func(name, func))
     }
 
-    pub fn is_predicate(&self) -> bool {
-        matches!(self, Self::Predicate(_))
-    }
-
-    pub fn is_map(&self) -> bool {
-        matches!(self, Self::Map(_))
+    pub fn is_func(&self) -> bool {
+        matches!(self, Self::Func(_))
     }
 
     pub fn is_artifact(&self) -> bool {
@@ -53,23 +47,9 @@ impl Object {
         matches!(self, Self::Var(_))
     }
 
-    pub fn as_action(&self) -> Option<&dyn Action> {
+    pub fn as_func(&self) -> Option<&Function> {
         match self {
-            Self::Action(v) => Some(v.as_ref()),
-            _ => None,
-        }
-    }
-
-    pub fn as_predicate(&self) -> Option<&dyn Predicate> {
-        match self {
-            Self::Predicate(v) => Some(v.as_ref()),
-            _ => None,
-        }
-    }
-
-    pub fn as_map(&self) -> Option<&dyn Map> {
-        match self {
-            Self::Map(v) => Some(v.as_ref()),
+            Self::Func(v) => Some(v),
             _ => None,
         }
     }
@@ -117,9 +97,9 @@ impl Object {
     }
 }
 
-impl<T: Action + 'static> From<T> for Object {
-    fn from(value: T) -> Self {
-        Self::Action(Arc::new(value))
+impl From<Function> for Object {
+    fn from(value: Function) -> Self {
+        Self::Func(value)
     }
 }
 

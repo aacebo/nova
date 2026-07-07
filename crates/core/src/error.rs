@@ -32,6 +32,18 @@ impl From<ActionError> for Error {
     }
 }
 
+impl From<Error> for minijinja::Error {
+    fn from(value: Error) -> Self {
+        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, value.to_string())
+    }
+}
+
+impl From<minijinja::Error> for Error {
+    fn from(value: minijinja::Error) -> Self {
+        Self::other(value)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

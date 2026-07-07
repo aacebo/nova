@@ -1,6 +1,5 @@
-use std::borrow::Cow;
+use std::sync::Arc;
 
-mod arena;
 mod args;
 pub mod builtin;
 mod context;
@@ -9,10 +8,9 @@ mod error;
 mod object;
 mod output;
 mod routine;
-mod scope;
 mod span;
+mod state;
 
-pub use arena::*;
 pub use args::*;
 pub use context::*;
 pub use diagnostic::*;
@@ -21,8 +19,8 @@ pub use minijinja::context;
 pub use object::*;
 pub use output::*;
 pub use routine::*;
-pub use scope::*;
 pub use span::*;
+pub use state::*;
 
 pub type Value = minijinja::Value;
 pub type Environment<'a> = minijinja::Environment<'a>;
@@ -35,17 +33,44 @@ pub trait Predicate: Send + Sync {
     fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>>;
 }
 
-pub trait Map: Send + Sync {
+pub trait Call: Send + Sync {
     fn invoke(&self, ctx: &mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>>;
 }
 
-pub struct Runtime<'a> {
-    env: Environment<'a>,
+impl<F> Action for F
+where
+    F: Fn(&mut Context) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
+{
+    fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
+        self(ctx)
+    }
+}
+
+impl<F> Predicate for F
+where
+    F: Fn(&Context) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
+{
+    fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>> {
+        self(ctx)
+    }
+}
+
+impl<F> Call for F
+where
+    F: Fn(&mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
+{
+    fn invoke(&self, ctx: &mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self(ctx)
+    }
+}
+
+pub struct Runtime {
+    env: Arc<Environment<'static>>,
     scope: Scope,
 }
 
-impl<'a> Runtime<'a> {
-    pub fn env(&self) -> &Environment<'a> {
+impl Runtime {
+    pub fn env(&self) -> &Environment<'static> {
         &self.env
     }
 
@@ -55,24 +80,24 @@ impl<'a> Runtime<'a> {
 
     pub fn call(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let mut ctx = Context::new(ulid::Ulid::new(), args.clone(), &self.env, self.scope.fork());
+        let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
         ctx.call(name, args)?;
         Ok(ctx.into())
     }
 
     pub fn eval(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let ctx = Context::new(ulid::Ulid::new(), args.clone(), &self.env, self.scope.fork());
+        let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
         let value = ctx.eval(name, args)?;
         let mut output = Output::from(ctx);
         output.value = Some(value.into());
         Ok(output)
     }
 
-    pub fn map(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn func(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let mut ctx = Context::new(ulid::Ulid::new(), args.clone(), &self.env, self.scope.fork());
-        let value = ctx.map(name, args)?;
+        let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
+        let value = ctx.func(name, args)?;
         let mut output = Output::from(ctx);
         output.value = value;
         Ok(output)
@@ -80,21 +105,21 @@ impl<'a> Runtime<'a> {
 }
 
 #[doc(hidden)]
-pub struct Builder<'a> {
-    env: Environment<'a>,
+pub struct Builder {
+    templates: Vec<(String, String)>,
     scope: Scope,
 }
 
-impl<'a> Default for Builder<'a> {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> Builder<'a> {
+impl Builder {
     pub fn new() -> Self {
         Self {
-            env: Environment::new(),
+            templates: Vec::new(),
             scope: Scope::from(Arena::new()),
         }
     }
@@ -107,61 +132,44 @@ impl<'a> Builder<'a> {
     }
 
     pub fn action(self, name: impl Into<String>, action: impl Action + 'static) -> Self {
-        self.scope.set(name, action);
+        let name = name.into();
+        self.scope.set(name.clone(), Object::action(name, action));
         self
     }
 
     pub fn predicate(self, name: impl Into<String>, predicate: impl Predicate + 'static) -> Self {
-        self.scope.set(name, Object::predicate(predicate));
+        let name = name.into();
+        self.scope.set(name.clone(), Object::predicate(name, predicate));
         self
     }
 
-    pub fn map(self, name: impl Into<String>, map: impl Map + 'static) -> Self {
-        self.scope.set(name, Object::map(map));
+    pub fn func(self, name: impl Into<String>, func: impl Call + 'static) -> Self {
+        let name = name.into();
+        self.scope.set(name.clone(), Object::func(name, func));
         self
     }
 
     pub fn routine(self, name: impl Into<String>, entrypoint: impl Into<String>) -> Self {
-        self.scope.set(name, Routine::new(entrypoint));
+        let name = name.into();
+        self.scope.set(name.clone(), Object::action(name, Routine::new(entrypoint)));
         self
     }
 
-    pub fn global(mut self, name: impl Into<Cow<'a, str>>, value: impl Into<Value>) -> Self {
-        self.env.add_global(name, value);
+    pub fn template(mut self, name: impl Into<String>, source: impl Into<String>) -> Self {
+        self.templates.push((name.into(), source.into()));
         self
     }
 
-    pub fn template(mut self, name: impl Into<String>, source: impl Into<String>) -> Result<Self, Box<dyn std::error::Error>> {
-        self.env.add_template_owned(name.into(), source.into())?;
-        Ok(self)
-    }
+    pub fn build(self) -> Result<Runtime, Box<dyn std::error::Error>> {
+        let mut env = Environment::new();
 
-    pub fn filter<N, F, Rv, Args>(mut self, name: N, f: F) -> Self
-    where
-        N: Into<Cow<'a, str>>,
-        F: minijinja::functions::Function<Rv, Args>,
-        Rv: minijinja::value::FunctionResult,
-        Args: for<'b> minijinja::value::FunctionArgs<'b>,
-    {
-        self.env.add_filter(name, f);
-        self
-    }
-
-    pub fn function<N, F, Rv, Args>(mut self, name: N, f: F) -> Self
-    where
-        N: Into<Cow<'a, str>>,
-        F: minijinja::functions::Function<Rv, Args>,
-        Rv: minijinja::value::FunctionResult,
-        Args: for<'b> minijinja::value::FunctionArgs<'b>,
-    {
-        self.env.add_function(name, f);
-        self
-    }
-
-    pub fn build(self) -> Runtime<'a> {
-        Runtime {
-            env: self.env,
-            scope: self.scope,
+        for (name, source) in self.templates {
+            env.add_template_owned(name, source)?;
         }
+
+        Ok(Runtime {
+            env: Arc::new(env),
+            scope: self.scope,
+        })
     }
 }

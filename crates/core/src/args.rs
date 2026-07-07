@@ -76,3 +76,23 @@ impl std::ops::Index<&str> for Args {
         self.0.index(index)
     }
 }
+
+impl Args {
+    /// Consume minijinja keyword arguments into `Args`, asserting all were used.
+    pub fn from_kwargs(kwargs: minijinja::value::Kwargs) -> Result<Self, minijinja::Error> {
+        let mut args = Self::new();
+
+        for key in kwargs.args() {
+            args.set(key, kwargs.get::<Value>(key)?);
+        }
+
+        kwargs.assert_all_used()?;
+        Ok(args)
+    }
+}
+
+impl From<Args> for Value {
+    fn from(args: Args) -> Self {
+        Value::from_iter(args.0)
+    }
+}
