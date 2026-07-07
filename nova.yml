@@ -1,4 +1,26 @@
 name: test
 
+on:
+  - push
+
+vars:
+  greeting: hello
+  count: 3
+
+templates:
+  banner: "=== {{ greeting }} ==="
+
 steps:
-  - name: begin
+  - name: say hello
+    run: echo "{{ greeting }}"
+
+  - name: check count
+    call: compare
+    args:
+      left: "{{ count }}"
+      op: gt
+      right: 0
+
+  - if: "{{ count > 0 }}"
+    name: maybe skip
+    run: echo "count was positive"

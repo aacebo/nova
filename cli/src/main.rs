@@ -1,7 +1,10 @@
 mod cmd;
+mod error;
+mod widgets;
 
 use clap::Parser;
 use cmd::*;
+use error::*;
 
 #[derive(Debug, Clone, Parser)]
 #[command(name = "nova", about)]
@@ -10,7 +13,19 @@ struct Input {
     pub cmd: Cmd,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let input = Input::parse();
-    input.cmd.run()
+
+    match input.cmd.run() {
+        Ok(()) => {}
+        Err(Error::Clap(err)) => {
+            let _ = err.print();
+            std::process::exit(err.exit_code());
+        }
+        Err(err) => {
+            let widget = widgets::ErrorWidget::from(&err);
+            widgets::print(&widget, widget.width(), widget.height());
+            std::process::exit(1);
+        }
+    }
 }
