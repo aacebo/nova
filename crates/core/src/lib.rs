@@ -88,7 +88,7 @@ impl Runtime {
     pub fn eval(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
         let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
-        let value = ctx.eval(name, args)?;
+        let value = ctx.call(name, args)?.map(|v| v.is_true()).unwrap_or(false);
         let mut output = Output::from(ctx);
         output.value = Some(value.into());
         Ok(output)
@@ -97,7 +97,7 @@ impl Runtime {
     pub fn func(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
         let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
-        let value = ctx.func(name, args)?;
+        let value = ctx.call(name, args)?;
         let mut output = Output::from(ctx);
         output.value = value;
         Ok(output)

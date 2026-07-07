@@ -10,6 +10,6 @@ impl Not {
 
 impl Predicate for Not {
     fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>> {
-        Ok(!ctx.eval(&self.0, ctx.args().clone())?)
+        Ok(!ctx.call(&self.0, ctx.args().clone())?.map(|v| v.is_true()).unwrap_or(false))
     }
 }

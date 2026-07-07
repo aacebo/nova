@@ -34,8 +34,8 @@ impl Compare {
 
 impl Predicate for Compare {
     fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>> {
-        let a = ctx.eval_expr(&self.a)?;
-        let b = ctx.eval_expr(&self.b)?;
+        let a = ctx.eval(&self.a)?;
+        let b = ctx.eval(&self.b)?;
 
         Ok(match self.style {
             Cmp::Eq => a == b,

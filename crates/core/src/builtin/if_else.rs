@@ -25,7 +25,7 @@ impl Action for If {
     fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
         let args = ctx.args().clone();
 
-        if ctx.eval(&self.condition, args.clone())? {
+        if ctx.call(&self.condition, args.clone())?.map(|v| v.is_true()).unwrap_or(false) {
             ctx.call(&self.then_branch, args)?;
         } else if let Some(branch) = &self.else_branch {
             ctx.call(branch, args)?;

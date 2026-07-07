@@ -48,24 +48,7 @@ impl Context {
         }
     }
 
-    pub fn call(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<(), Box<dyn std::error::Error>> {
-        let name = name.as_ref();
-        let func = self.scope.get_func(name)?;
-        let mut ctx = self.child(args);
-        let result = func.invoke(&mut ctx);
-        self.scope.merge(name, ctx.scope());
-        result.map(|_| ())
-    }
-
-    pub fn eval(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<bool, Box<dyn std::error::Error>> {
-        let name = name.as_ref();
-        let func = self.scope.get_func(name)?;
-        let mut ctx = self.child(args);
-        let value = func.invoke(&mut ctx)?;
-        Ok(value.map(|v| v.is_true()).unwrap_or(false))
-    }
-
-    pub fn func(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn call(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         let name = name.as_ref();
         let func = self.scope.get_func(name)?;
         let mut ctx = self.child(args);
@@ -74,7 +57,7 @@ impl Context {
         result
     }
 
-    pub fn eval_expr(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    pub fn eval(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {
         let expr = self.env().compile_expression(src)?;
         Ok(expr.eval(Value::from_object(self.clone()))?)
     }
@@ -93,8 +76,8 @@ impl minijinja::value::Object for Context {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let name = key.as_str()?;
 
-        if name == Context::KEY {
-            return Some(Value::from_object(Context::clone(self)));
+        if name == Self::KEY {
+            return Some(Value::from_object(Self::clone(self)));
         }
 
         if let Some(value) = self.scope.args().get(name) {
@@ -124,5 +107,11 @@ impl std::ops::Deref for Context {
 
     fn deref(&self) -> &Self::Target {
         &self.scope
+    }
+}
+
+impl std::ops::DerefMut for Context {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.scope
     }
 }

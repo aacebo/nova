@@ -15,6 +15,7 @@ impl Routine {
 impl Action for Routine {
     fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
         let args = ctx.args().clone();
-        ctx.call(&self.entrypoint, args)
+        ctx.call(&self.entrypoint, args)?;
+        Ok(())
     }
 }
