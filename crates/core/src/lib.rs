@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 mod args;
 pub mod builtin;
-mod context;
 mod diagnostic;
 mod error;
 mod global;
@@ -13,7 +10,6 @@ mod span;
 mod state;
 
 pub use args::*;
-pub use context::*;
 pub use diagnostic::*;
 pub use error::*;
 pub use global::*;
@@ -28,52 +24,51 @@ pub type Value = minijinja::Value;
 pub type Environment<'a> = minijinja::Environment<'a>;
 
 pub trait Action: Send + Sync {
-    fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 pub trait Predicate: Send + Sync {
-    fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args) -> Result<bool, Box<dyn std::error::Error>>;
 }
 
 pub trait Call: Send + Sync {
-    fn invoke(&self, ctx: &mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>>;
 }
 
 impl<F> Action for F
 where
-    F: Fn(&mut Context) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
-        self(ctx)
+    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+        self(args)
     }
 }
 
 impl<F> Predicate for F
 where
-    F: Fn(&Context) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, ctx: &Context) -> Result<bool, Box<dyn std::error::Error>> {
-        self(ctx)
+    fn invoke(&self, args: &Args) -> Result<bool, Box<dyn std::error::Error>> {
+        self(args)
     }
 }
 
 impl<F> Call for F
 where
-    F: Fn(&mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, ctx: &mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        self(ctx)
+    fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self(args)
     }
 }
 
 pub struct Runtime {
-    env: Arc<Environment<'static>>,
     scope: Scope,
 }
 
 impl Runtime {
     pub fn env(&self) -> &Environment<'static> {
-        &self.env
+        self.scope.env()
     }
 
     pub fn scope(&self) -> &Scope {
@@ -82,25 +77,25 @@ impl Runtime {
 
     pub fn call(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
-        ctx.call(name, args)?;
-        Ok(ctx.into())
+        let scope = self.scope.fork(args.clone());
+        scope.call(name, args)?;
+        Ok(scope.into())
     }
 
     pub fn eval(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
-        let value = ctx.call(name, args)?.map(|v| v.is_true()).unwrap_or(false);
-        let mut output = Output::from(ctx);
+        let scope = self.scope.fork(args.clone());
+        let value = scope.call(name, args)?.map(|v| v.is_true()).unwrap_or(false);
+        let mut output = Output::from(scope);
         output.value = Some(value.into());
         Ok(output)
     }
 
     pub fn func(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let ctx = Context::new(self.env.clone(), self.scope.fork(args.clone()));
-        let value = ctx.call(name, args)?;
-        let mut output = Output::from(ctx);
+        let scope = self.scope.fork(args.clone());
+        let value = scope.call(name, args)?;
+        let mut output = Output::from(scope);
         output.value = value;
         Ok(output)
     }
@@ -170,8 +165,7 @@ impl Builder {
         }
 
         Ok(Runtime {
-            env: Arc::new(env),
-            scope: self.scope,
+            scope: self.scope.with_env(env),
         })
     }
 }

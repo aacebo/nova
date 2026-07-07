@@ -1,4 +1,4 @@
-use crate::{Context, Diagnostic, Value};
+use crate::{Diagnostic, Scope, Value};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Output {
@@ -29,8 +29,8 @@ impl Output {
     }
 }
 
-impl From<Context> for Output {
-    fn from(ctx: Context) -> Self {
-        Self::new(*ctx.trace_id()).diagnostics(ctx.take_diagnostics())
+impl From<Scope> for Output {
+    fn from(scope: Scope) -> Self {
+        Self::new(*scope.trace_id()).diagnostics(scope.take_diagnostics())
     }
 }

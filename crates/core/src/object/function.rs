@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, Args, Call, Context, Predicate, Value};
+use crate::{Action, Args, Call, Predicate, Scope, Value};
 
 #[derive(Clone)]
 pub enum Callback {
@@ -24,14 +24,14 @@ impl Callback {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, ctx: &mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
-                action.invoke(ctx)?;
+                action.invoke(args)?;
                 Ok(None)
             }
-            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(ctx)?))),
-            Self::Func(func) => func.invoke(ctx),
+            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args)?))),
+            Self::Func(func) => func.invoke(args),
         }
     }
 }
@@ -74,8 +74,8 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, ctx: &mut Context) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        self.callback.invoke(ctx)
+    pub fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self.callback.invoke(args)
     }
 }
 
@@ -96,21 +96,19 @@ impl minijinja::value::Object for Function {
             ));
         }
 
-        let ctx = state
-            .lookup(Context::KEY)
-            .and_then(|v| v.downcast_object::<Context>())
-            .ok_or_else(|| {
-                minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no context bound to template render")
-            })?;
+        let scope = state
+            .lookup(Scope::KEY)
+            .and_then(|v| v.downcast_object::<Scope>())
+            .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
         let args = Args::from_kwargs(kwargs)?;
-        let mut child = ctx.child(args);
+        let child = scope.fork(args);
         let value = {
-            let _guard = crate::enter_trace(*child.trace_id());
-            self.callback.invoke(&mut child)
+            let _guard = crate::enter(&child);
+            self.callback.invoke(child.args())
         }
         .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
-        ctx.scope().merge(&self.name, child.scope());
+        scope.merge(&self.name, &child);
         Ok(value.unwrap_or(Value::UNDEFINED))
     }
 }

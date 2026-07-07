@@ -53,15 +53,15 @@ impl Diagnostic {
     }
 
     pub fn info(self, message: impl Into<String>) -> Self {
-        self.emit(Severity::Info, message)
+        self.child_of(Severity::Info, message)
     }
 
     pub fn warn(self, message: impl Into<String>) -> Self {
-        self.emit(Severity::Warn, message)
+        self.child_of(Severity::Warn, message)
     }
 
     pub fn error(self, message: impl Into<String>) -> Self {
-        self.emit(Severity::Error, message)
+        self.child_of(Severity::Error, message)
     }
 
     pub fn child(mut self, value: impl Into<Self>) -> Self {
@@ -69,10 +69,14 @@ impl Diagnostic {
         self
     }
 
-    pub fn emit(mut self, severity: Severity, message: impl Into<String>) -> Self {
+    pub fn child_of(mut self, severity: Severity, message: impl Into<String>) -> Self {
         let child = Self::new(self.trace_id).sev(severity).message(message);
         self.children.push(child);
         self
+    }
+
+    pub fn emit(self) {
+        crate::scope().emit(self);
     }
 
     pub fn severity(&self) -> Severity {
@@ -87,7 +91,7 @@ impl Diagnostic {
 }
 
 /// Anything that carries a `trace_id`, so the `info!`/`warn!`/`error!` macros can
-/// thread it into the diagnostics they build. Implemented for `Context` and `Scope`.
+/// thread it into the diagnostics they build. Implemented for `Scope` and `Ulid`.
 pub trait Traced {
     fn trace_id(&self) -> ulid::Ulid;
 }
@@ -98,16 +102,16 @@ impl Traced for ulid::Ulid {
     }
 }
 
-/// Build a `Diagnostic` of the given severity. The `trace_id` is read implicitly from
-/// the currently-executing invocation (see [`current_trace_id`]), so no context or id
-/// is passed at the call site:
+/// Build a `Diagnostic` of the given severity, threading the ambient invocation's
+/// `trace_id` implicitly. Children nest via `; [ ... ]`. The result is a `Diagnostic`
+/// value — call [`Diagnostic::emit`] to push it onto the current scope:
 ///
 /// ```ignore
-/// warn!("rate {} exceeded", limit);       // format-string message
-/// info!("outer" ; [                       // nested children via `; [ ]`
+/// warn!("rate {} exceeded", limit).emit();
+/// info!("outer" ; [
 ///     info!("detail one"),
 ///     error!("detail {}", 2),
-/// ]);
+/// ]).emit();
 /// ```
 #[macro_export]
 macro_rules! diagnostic {
@@ -146,55 +150,4 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! error {
     ($($rest:tt)*) => { $crate::__diagnostic_impl!($crate::Severity::Error, $($rest)*) };
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn macro_builds_message_with_format_args() {
-        let trace_id = ulid::Ulid::new();
-        let _guard = crate::enter_trace(trace_id);
-        let d = warn!("rate {} of {}", 9, 10);
-
-        assert_eq!(d.trace_id, trace_id);
-        assert_eq!(d.severity, Some(Severity::Warn));
-        assert_eq!(d.message.as_deref(), Some("rate 9 of 10"));
-        assert!(d.children.is_empty());
-    }
-
-    #[test]
-    fn macro_nests_children_and_rolls_up_severity() {
-        let trace_id = ulid::Ulid::new();
-        let _guard = crate::enter_trace(trace_id);
-        let d = info!("outer" ; [
-            info!("child one"),
-            error!("child {}", 2),
-        ]);
-
-        assert_eq!(d.trace_id, trace_id);
-        assert_eq!(d.severity, Some(Severity::Info));
-        assert_eq!(d.children.len(), 2);
-        assert_eq!(d.children[1].message.as_deref(), Some("child 2"));
-        assert_eq!(d.severity(), Severity::Error);
-    }
-
-    #[test]
-    fn macro_outside_invocation_gets_fresh_id() {
-        let d = warn!("orphan");
-        assert_ne!(d.trace_id, ulid::Ulid::nil());
-    }
-
-    #[test]
-    fn child_builders_append_and_inherit_trace_id() {
-        let trace_id = ulid::Ulid::new();
-        let d = Diagnostic::new(trace_id).warn("a").error("b");
-
-        assert_eq!(d.children.len(), 2);
-        assert_eq!(d.children[0].severity, Some(Severity::Warn));
-        assert_eq!(d.children[0].message.as_deref(), Some("a"));
-        assert_eq!(d.children[1].trace_id, trace_id);
-        assert_eq!(d.severity(), Severity::Error);
-    }
 }

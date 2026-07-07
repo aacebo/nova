@@ -1,4 +1,4 @@
-use crate::{Action, Context};
+use crate::{Action, Args, call};
 
 pub struct Routine {
     entrypoint: String,
@@ -13,9 +13,8 @@ impl Routine {
 }
 
 impl Action for Routine {
-    fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
-        let args = ctx.args().clone();
-        ctx.call(&self.entrypoint, args)?;
+    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+        call!(&self.entrypoint, args.clone());
         Ok(())
     }
 }

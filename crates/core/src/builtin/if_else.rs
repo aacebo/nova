@@ -1,4 +1,4 @@
-use crate::{Action, Context};
+use crate::{Action, Args, call};
 
 pub struct If {
     condition: String,
@@ -22,13 +22,11 @@ impl If {
 }
 
 impl Action for If {
-    fn invoke(&self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
-        let args = ctx.args().clone();
-
-        if ctx.call(&self.condition, args.clone())?.map(|v| v.is_true()).unwrap_or(false) {
-            ctx.call(&self.then_branch, args)?;
+    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+        if call!(&self.condition, args.clone()).map(|v| v.is_true()).unwrap_or(false) {
+            call!(&self.then_branch, args.clone());
         } else if let Some(branch) = &self.else_branch {
-            ctx.call(branch, args)?;
+            call!(branch, args.clone());
         }
 
         Ok(())

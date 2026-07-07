@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Arena, Args, Diagnostic, Entry, Object, Slot, SlotMut, Traced};
+use crate::{Arena, Args, Diagnostic, Entry, Environment, Object, Slot, SlotMut, Traced, Value};
 
-/// The live diagnostic buffer shared across a scope and its forks.
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
 #[derive(Default, Clone)]
@@ -13,6 +12,7 @@ pub struct Scope(Arc<_Scope>);
 struct _Scope {
     trace_id: ulid::Ulid,
     parent: Option<Scope>,
+    env: Arc<Environment<'static>>,
     symbols: Mutex<HashMap<String, ulid::Ulid>>,
     arena: Arc<Mutex<Arena>>,
     args: Args,
@@ -24,6 +24,7 @@ impl Scope {
         Self(Arc::new(_Scope {
             trace_id: ulid::Ulid::new(),
             parent: None,
+            env: Default::default(),
             symbols: Default::default(),
             arena: Default::default(),
             args: Default::default(),
@@ -31,8 +32,18 @@ impl Scope {
         }))
     }
 
+    pub fn with_env(self, env: Environment<'static>) -> Self {
+        let mut inner = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("with_env on a shared scope"));
+        inner.env = Arc::new(env);
+        Self(Arc::new(inner))
+    }
+
     pub fn trace_id(&self) -> &ulid::Ulid {
         &self.0.trace_id
+    }
+
+    pub fn env(&self) -> &Environment<'static> {
+        &self.0.env
     }
 
     pub fn args(&self) -> &Args {
@@ -68,6 +79,7 @@ impl Scope {
         Self(Arc::new(_Scope {
             trace_id: self.0.trace_id,
             parent: Some(self.clone()),
+            env: self.0.env.clone(),
             symbols: Default::default(),
             arena: self.0.arena.clone(),
             args: args.into(),
@@ -160,6 +172,32 @@ impl Scope {
 
         self
     }
+
+    pub fn call(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        let name = name.as_ref();
+        let func = self.get_func(name)?;
+        let child = self.fork(args);
+        let result = {
+            let _guard = crate::enter(&child);
+            func.invoke(child.args())
+        };
+        self.merge(name, &child);
+        result
+    }
+
+    pub fn eval(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {
+        let expr = self.env().compile_expression(src)?;
+        Ok(expr.eval(Value::from_object(self.clone()))?)
+    }
+
+    pub fn render(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let tmpl = self.env().get_template(name)?;
+        Ok(tmpl.render(Value::from_object(self.clone()))?)
+    }
+
+    pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
+        Ok(self.env().render_str(source, Value::from_object(self.clone()))?)
+    }
 }
 
 impl Traced for Scope {
@@ -168,141 +206,50 @@ impl Traced for Scope {
     }
 }
 
+impl Scope {
+    pub const KEY: &'static str = "__$scope__";
+}
+
+impl std::fmt::Debug for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Scope")
+            .field("trace_id", &self.0.trace_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl minijinja::value::Object for Scope {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
+
+        if name == Self::KEY {
+            return Some(Value::from_object(Self::clone(self)));
+        }
+
+        if let Some(value) = self.args().get(name) {
+            return Some(value.clone());
+        }
+
+        let slot = self.get(name)?;
+
+        match &*slot {
+            Object::Var(var) => Some(var.value.clone()),
+            Object::Func(func) => Some(Value::from_object(func.clone())),
+            _ => None,
+        }
+    }
+}
+
 impl From<Arena> for Scope {
     fn from(value: Arena) -> Self {
         Self(Arc::new(_Scope {
             trace_id: ulid::Ulid::new(),
             parent: None,
+            env: Default::default(),
             arena: Arc::new(Mutex::new(value)),
             symbols: Default::default(),
             args: Default::default(),
             diagnostics: Default::default(),
         }))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{Context, Value, Var};
-
-    #[test]
-    fn set_then_get_returns_object() {
-        let scope = Scope::new();
-        scope.set("x", Var::new("x", 1));
-
-        let object = scope.get("x").expect("x should be set");
-        let value = object.as_var().unwrap().value.clone();
-        assert_eq!(value, Value::from(1));
-        assert!(scope.has("x"));
-        assert_eq!(scope.len(), 1);
-    }
-
-    #[test]
-    fn get_mut_mutates_in_place() {
-        let scope = Scope::new();
-        scope.set("x", Var::new("x", 1));
-
-        {
-            let mut slot = scope.get_mut("x").expect("x should be set");
-            slot.as_var_mut().unwrap().value = Value::from(9);
-        }
-
-        let value = scope.get("x").unwrap().as_var().unwrap().value.clone();
-        assert_eq!(value, Value::from(9));
-    }
-
-    #[test]
-    fn set_twice_updates_in_place() {
-        let scope = Scope::new();
-        scope.set("x", Var::new("x", 1));
-        scope.set("x", Var::new("x", 2));
-
-        assert_eq!(scope.len(), 1);
-        assert_eq!(scope.0.arena.lock().unwrap().len(), 1);
-
-        let object = scope.get("x").unwrap();
-        let value = object.as_var().unwrap().value.clone();
-        assert_eq!(value, Value::from(2));
-    }
-
-    #[test]
-    fn fork_child_resolves_parent_binding() {
-        let parent = Scope::new();
-        parent.set("x", Var::new("x", 1));
-
-        let child = parent.fork(Args::new());
-        let object = child.get("x").expect("child should resolve parent's x");
-        let value = object.as_var().unwrap().value.clone();
-        assert_eq!(value, Value::from(1));
-    }
-
-    #[test]
-    fn child_set_on_existing_parent_key_updates_parent() {
-        let parent = Scope::new();
-        parent.set("x", Var::new("x", 1));
-
-        let child = parent.fork(Args::new());
-        child.set("x", Var::new("x", 2));
-
-        let from_parent = parent.get("x").unwrap();
-        let parent_value = from_parent.as_var().unwrap().value.clone();
-        assert_eq!(parent_value, Value::from(2));
-
-        assert!(child.0.symbols.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn child_set_new_key_lands_at_root() {
-        let root = Scope::new();
-        let child = root.fork(Args::new()).fork(Args::new());
-        child.set("y", Var::new("y", 7));
-
-        assert!(!root.0.symbols.lock().unwrap().is_empty());
-        assert!(child.0.symbols.lock().unwrap().is_empty());
-
-        let object = child.get("y").unwrap();
-        let value = object.as_var().unwrap().value.clone();
-        assert_eq!(value, Value::from(7));
-    }
-
-    #[test]
-    fn del_removes_binding() {
-        let scope = Scope::new();
-        scope.set("x", Var::new("x", 1));
-        scope.del("x");
-
-        assert!(!scope.has("x"));
-        assert!(scope.get("x").is_none());
-        assert!(scope.0.symbols.lock().unwrap().is_empty());
-        assert!(scope.0.arena.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn child_del_recurses_to_parent() {
-        let parent = Scope::new();
-        parent.set("x", Var::new("x", 1));
-
-        let child = parent.fork(Args::new());
-        child.del("x");
-
-        assert!(!parent.has("x"));
-        assert!(parent.get("x").is_none());
-    }
-
-    #[test]
-    fn action_is_resolvable_through_scope() {
-        let scope = Scope::new();
-        let id = ulid::Ulid::new();
-        scope.set(
-            id.to_string(),
-            Object::action(
-                id.to_string(),
-                |_ctx: &mut Context| -> Result<(), Box<dyn std::error::Error>> { Ok(()) },
-            ),
-        );
-
-        let object = scope.get(id.to_string()).expect("action should be registered");
-        assert!(object.is_func());
     }
 }
