@@ -12,6 +12,10 @@ documentation = "https://www.docs.rs/nova"
 homepage = "https://www.github.com/aacebo/nova"
 repository = "https://www.github.com/aacebo/nova"
 
+[workspace.lints.clippy]
+result_large_err = "allow"
+type_complexity = "allow"
+
 [package]
 name = "nova"
 version.workspace = true
@@ -31,9 +35,6 @@ workspace = true
 [features]
 default = []
 ai = ["dep:nova-ai"]
-
-[workspace.lints.clippy]
-type_complexity = "allow"
 
 [patch.crates-io]
 ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
