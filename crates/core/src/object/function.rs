@@ -105,10 +105,11 @@ impl minijinja::value::Object for Function {
 
         let args = Args::from_kwargs(kwargs)?;
         let mut child = ctx.child(args);
-        let value = self
-            .callback
-            .invoke(&mut child)
-            .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
+        let value = {
+            let _guard = crate::enter_trace(*child.trace_id());
+            self.callback.invoke(&mut child)
+        }
+        .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
         ctx.scope().merge(&self.name, child.scope());
         Ok(value.unwrap_or(Value::UNDEFINED))
     }

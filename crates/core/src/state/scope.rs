@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Arena, Args, Diagnostic, Entry, Object, Slot, SlotMut};
+use crate::{Arena, Args, Diagnostic, Entry, Object, Slot, SlotMut, Traced};
 
+/// The live diagnostic buffer shared across a scope and its forks.
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
 #[derive(Default, Clone)]
@@ -158,6 +159,12 @@ impl Scope {
         }
 
         self
+    }
+}
+
+impl Traced for Scope {
+    fn trace_id(&self) -> ulid::Ulid {
+        self.0.trace_id
     }
 }
 

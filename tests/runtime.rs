@@ -35,12 +35,12 @@ fn invokes_registered_action_by_name() {
 fn diagnostics_emitted_by_actions_propagate_to_the_frontend() {
     let runtime = Builder::new()
         .action("parent", |ctx: &mut Context| -> ActionResult {
-            ctx.emit(Diagnostic::new(*ctx.trace_id()).sev(Severity::Warn).message("from parent"));
+            ctx.emit(nova::warn!("from parent"));
             ctx.call("child", Args::new())?;
             Ok(())
         })
         .action("child", |ctx: &mut Context| -> ActionResult {
-            ctx.emit(Diagnostic::new(*ctx.trace_id()).sev(Severity::Info).message("from child"));
+            ctx.emit(nova::info!("from child"));
             Ok(())
         })
         .build()
@@ -294,7 +294,7 @@ fn template_can_call_a_predicate_from_scope() {
 fn func_called_from_template_emits_into_the_live_tree() {
     let runtime = Builder::new()
         .func("noisy", |ctx: &mut Context| -> FuncResult {
-            ctx.emit(Diagnostic::new(*ctx.trace_id()).sev(Severity::Warn).message("from func"));
+            ctx.emit(nova::warn!("from func"));
             Ok(Some(Value::from(1)))
         })
         .action("render", render_into(Arc::new(Mutex::new(String::new())), "{{ noisy() }}"))
@@ -305,6 +305,37 @@ fn func_called_from_template_emits_into_the_live_tree() {
 
     let messages: Vec<_> = collect_messages(&output.diagnostics);
     assert!(messages.contains(&"from func".to_string()), "diagnostics: {messages:?}");
+}
+
+#[test]
+fn macros_thread_the_invocation_trace_id_without_a_ctx_arg() {
+    let runtime = Builder::new()
+        .action("parent", |ctx: &mut Context| -> ActionResult {
+            ctx.emit(nova::warn!("from parent"));
+            ctx.call("child", Args::new())?;
+            Ok(())
+        })
+        .action("child", |ctx: &mut Context| -> ActionResult {
+            ctx.emit(nova::error!("from child"));
+            Ok(())
+        })
+        .build()
+        .unwrap();
+
+    let output = runtime.call("parent", Args::new()).unwrap();
+
+    let parent_node = &output.diagnostics[0];
+    assert_eq!(parent_node.message.as_deref(), Some("parent"));
+
+    let parent_diag = &parent_node.children[0];
+    assert_eq!(parent_diag.message.as_deref(), Some("from parent"));
+
+    let child_diag = &parent_node.children[1].children[0];
+    assert_eq!(child_diag.message.as_deref(), Some("from child"));
+
+    assert_eq!(parent_diag.trace_id, output.trace_id);
+    assert_eq!(child_diag.trace_id, output.trace_id);
+    assert_eq!(parent_node.severity(), Severity::Error);
 }
 
 fn collect_messages(diagnostics: &[Diagnostic]) -> Vec<String> {

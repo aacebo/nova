@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::{Args, Diagnostic, Environment, Object, Scope, Value};
+use crate::{Args, Diagnostic, Environment, Object, Scope, Traced, Value};
 
 #[derive(Clone)]
 pub struct Context {
@@ -52,7 +52,10 @@ impl Context {
         let name = name.as_ref();
         let func = self.scope.get_func(name)?;
         let mut ctx = self.child(args);
-        let result = func.invoke(&mut ctx);
+        let result = {
+            let _guard = crate::enter_trace(*ctx.trace_id());
+            func.invoke(&mut ctx)
+        };
         self.scope.merge(name, ctx.scope());
         result
     }
@@ -69,6 +72,12 @@ impl Context {
 
     pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
         Ok(self.env().render_str(source, Value::from_object(self.clone()))?)
+    }
+}
+
+impl Traced for Context {
+    fn trace_id(&self) -> ulid::Ulid {
+        *self.scope.trace_id()
     }
 }
 
