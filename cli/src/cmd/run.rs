@@ -11,11 +11,17 @@ pub struct Args {
 impl Args {
     pub fn run(&self) -> Result<(), Error> {
         let mut figment = Figment::new();
+        let mut matched = 0usize;
 
         for pattern in &self.files {
-            for path in glob::glob(&pattern)? {
+            for path in glob::glob(pattern)? {
                 figment = figment.merge(Yaml::file(path?));
+                matched += 1;
             }
+        }
+
+        if matched == 0 {
+            return Err(Error::NotFound(self.files.clone()));
         }
 
         let manifest: nova::Manifest = figment.extract()?;

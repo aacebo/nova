@@ -4,6 +4,7 @@ pub enum Error {
     Glob(glob::GlobError),
     Pattern(glob::PatternError),
     Figment(figment::Error),
+    NotFound(Vec<String>),
 }
 
 impl From<clap::Error> for Error {
