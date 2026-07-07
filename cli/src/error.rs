@@ -4,6 +4,7 @@ pub enum Error {
     Glob(glob::GlobError),
     Pattern(glob::PatternError),
     Figment(figment::Error),
+    Runtime(Box<dyn std::error::Error>),
     NotFound(Vec<String>),
 }
 
@@ -16,6 +17,12 @@ impl From<clap::Error> for Error {
 impl From<figment::Error> for Error {
     fn from(value: figment::Error) -> Self {
         Self::Figment(value)
+    }
+}
+
+impl From<Box<dyn std::error::Error>> for Error {
+    fn from(value: Box<dyn std::error::Error>) -> Self {
+        Self::Runtime(value)
     }
 }
 

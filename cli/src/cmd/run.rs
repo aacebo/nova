@@ -25,7 +25,14 @@ impl Args {
         }
 
         let manifest: nova::Manifest = figment.extract()?;
-        println!("{:#?}", manifest);
+        let entrypoint = manifest.name.clone().unwrap_or_else(|| "main".into());
+        let runtime = nova::Runtime::try_from(manifest)?;
+        let output = runtime.call(&entrypoint, nova::Args::new())?;
+
+        for diagnostic in &output.diagnostics {
+            println!("{:#?}", diagnostic);
+        }
+
         Ok(())
     }
 }

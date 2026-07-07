@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use nova::{Args, Builder, Diagnostic, Severity, Value, builtin, func, scope, var};
+use nova::{Args, Diagnostic, Severity, Value, builtin, func, scope, var};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
@@ -26,7 +26,7 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
     let receipt = Arc::new(Mutex::new(String::new()));
     let sink = receipt.clone();
 
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .var("store", "nova-mart")
         .template("receipt", "{{ store }}: {{ qty }} x {{ unit }} = {{ total }}")
         .predicate("in_stock", |args: &Args| Ok(args.get("qty") > Some(&Value::from(0))))
@@ -79,7 +79,7 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
     let receipt = Arc::new(Mutex::new(String::from("untouched")));
     let sink = receipt.clone();
 
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .predicate("in_stock", |args: &Args| Ok(args.get("qty") > Some(&Value::from(0))))
         .action("fulfill", move |_args: &Args| -> ActionResult {
             *sink.lock().unwrap() = String::from("fulfilled");
@@ -107,7 +107,7 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
 /// base case. Exercises deep fork/merge, coercion, and predicate composition.
 #[test]
 fn recursive_calls_accumulate_state_and_coerce_results() {
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .predicate("is_zero", |args: &Args| Ok(args.get("n") == Some(&Value::from(0))))
         .predicate("is_positive", builtin::Not::new("is_zero"))
         .func("fact", |args: &Args| -> FuncResult {
@@ -151,7 +151,7 @@ fn template_composes_callables_and_captures_their_diagnostics() {
     let out = Arc::new(Mutex::new(String::new()));
     let sink = out.clone();
 
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .var("label", "score")
         .func("double", |args: &Args| -> FuncResult {
             let n = args.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
@@ -180,7 +180,7 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let calls = seen.clone();
 
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .predicate("even", |args: &Args| {
             let n = args.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(1);
             Ok(n.is_multiple_of(2))
@@ -216,7 +216,7 @@ fn var_and_func_macros_register_into_the_live_scope() {
     let out = Arc::new(Mutex::new(String::new()));
     let sink = out.clone();
 
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .action("setup", move |_args: &Args| -> ActionResult {
             var!("greeting", "hello");
             func!("shout", |args: &Args| -> FuncResult {
@@ -243,7 +243,7 @@ fn var_and_func_macros_register_into_the_live_scope() {
 /// `?` in `call!`, and a malformed template fails at build time.
 #[test]
 fn error_paths_surface_at_call_and_build_time() {
-    let runtime = Builder::new()
+    let runtime = nova::new()
         .func("boom", |_args: &Args| -> FuncResult {
             Err(nova::Error::message("kaboom").into())
         })
@@ -259,5 +259,35 @@ fn error_paths_surface_at_call_and_build_time() {
     // error thrown inside a func propagates up through call!'s `?`
     assert!(runtime.call("caller", Args::new()).is_err());
     // malformed template is rejected when the runtime is built
-    assert!(Builder::new().template("t", "{{ ").build().is_err());
+    assert!(nova::new().template("t", "{{ ").build().is_err());
+}
+
+/// A `Manifest` hydrates into a runnable `Runtime`: vars/templates resolve, the entrypoint runs
+/// steps in order, an `if:` guard skips a step, the auto-registered `compare` builtin resolves a
+/// `call:` step, and a failing step surfaces a diagnostic without aborting the sequence.
+#[test]
+fn manifest_hydrates_into_a_runnable_runtime() {
+    let manifest = nova::manifest()
+        .name("flow")
+        .var("greeting", "hello")
+        .var("count", 3)
+        .template("banner", "== {{ greeting }} ==")
+        .step(nova::step().name("say").run("greeting ~ ' world'"))
+        .step(nova::step().guard("count > 10").run("'skipped'"))
+        .step(nova::step().call("compare", [("left", "count"), ("op", "gt"), ("right", "0")]))
+        .step(nova::step().call("missing_func", [("k", "v")]))
+        .build();
+
+    let runtime = nova::Runtime::try_from(manifest).unwrap();
+    let output = runtime.call("flow", Args::new()).unwrap();
+    let messages = collect_messages(&output.diagnostics);
+
+    // the `run:` step evaluated its expression against the manifest var
+    assert!(messages.iter().any(|m| m == "hello world"), "{messages:?}");
+    // the guarded step whose condition is false did not run
+    assert!(!messages.iter().any(|m| m == "skipped"), "{messages:?}");
+    // the auto-registered `compare` builtin resolved the `call:` step without error
+    assert!(!messages.iter().any(|m| m.contains("compare")), "{messages:?}");
+    // the final step failed (unknown func) yet the earlier steps still ran to completion
+    assert!(messages.iter().any(|m| m.contains("missing_func")), "{messages:?}");
 }

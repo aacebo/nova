@@ -109,6 +109,7 @@ impl From<&Error> for ErrorWidget {
             Error::Pattern(e) => e.into(),
             Error::Figment(e) => e.into(),
             Error::Clap(e) => Self::new("invalid arguments").message(e.to_string()),
+            Error::Runtime(e) => Self::new("failed to run manifest").message(e.to_string()),
             Error::NotFound(patterns) => Self::new("no files matched")
                 .path(patterns.join(", "))
                 .message("check the path, and quote glob patterns so the shell doesn't expand them"),

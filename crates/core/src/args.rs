@@ -35,6 +35,30 @@ impl Args {
         self.0.get(key)
     }
 
+    pub fn get_required<T>(&self, key: &str) -> Result<T, Box<dyn std::error::Error>>
+    where
+        T: TryFrom<Value>,
+        T::Error: std::error::Error + 'static,
+    {
+        let value = self
+            .0
+            .get(key)
+            .cloned()
+            .ok_or_else(|| crate::Error::message(format!("missing required argument `{key}`")))?;
+
+        Ok(T::try_from(value)?)
+    }
+
+    pub fn get_or_default<T>(&self, key: &str) -> T
+    where
+        T: TryFrom<Value> + Default,
+    {
+        match self.0.get(key).cloned() {
+            Some(value) => T::try_from(value).unwrap_or_default(),
+            None => T::default(),
+        }
+    }
+
     pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
         self.0.get_mut(key)
     }

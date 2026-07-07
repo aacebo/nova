@@ -64,6 +64,19 @@ where
     }
 }
 
+pub fn new() -> Builder {
+    Builder::new()
+}
+
+pub fn load(manifest: Manifest) -> Builder {
+    let entrypoint = manifest.name.clone().unwrap_or_else(|| "main".into());
+
+    new()
+        .vars(manifest.vars)
+        .templates(manifest.templates)
+        .steps(entrypoint, manifest.steps)
+}
+
 pub struct Runtime {
     scope: Scope,
 }
@@ -117,16 +130,23 @@ impl Default for Builder {
 
 impl Builder {
     pub fn new() -> Self {
-        Self {
+        builtin::register(Self {
             templates: Vec::new(),
             scope: Scope::from(Arena::new()),
-        }
+        })
     }
 
     pub fn var(self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         let name = name.into();
         let value = value.into();
         self.scope.set(name.clone(), Var::new(name, value));
+        self
+    }
+
+    pub fn vars(mut self, values: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>) -> Self {
+        for (name, value) in values {
+            self = self.var(name, value);
+        }
         self
     }
 
@@ -157,6 +177,31 @@ impl Builder {
     pub fn template(mut self, name: impl Into<String>, source: impl Into<String>) -> Self {
         self.templates.push((name.into(), source.into()));
         self
+    }
+
+    pub fn templates(mut self, values: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>) -> Self {
+        for (name, source) in values {
+            self = self.template(name, source);
+        }
+        self
+    }
+
+    pub fn step(self, name: impl Into<String>, step: impl Into<Step>) -> Self {
+        self.action(name, step.into())
+    }
+
+    pub fn steps(self, entrypoint: impl Into<String>, steps: impl IntoIterator<Item = impl Into<Step>>) -> Self {
+        let entrypoint = entrypoint.into();
+        let mut names = Vec::new();
+        let mut this = self;
+
+        for (index, step) in steps.into_iter().enumerate() {
+            let name = format!("{}[{}]", entrypoint, index);
+            this = this.step(name.clone(), step);
+            names.push(name);
+        }
+
+        this.action(entrypoint, Sequence::new(names))
     }
 
     pub fn build(self) -> Result<Runtime, Box<dyn std::error::Error>> {

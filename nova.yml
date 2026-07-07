@@ -10,15 +10,15 @@ templates:
 
 steps:
   - name: say hello
-    run: echo "{{ greeting }}"
+    run: greeting
 
   - name: check count
     call: compare
     args:
-      left: "{{ count }}"
+      left: count
       op: gt
       right: 0
 
-  - if: "{{ count > 0 }}"
+  - if: count > 0
     name: maybe skip
-    run: echo "count was positive"
+    run: "'count was positive'"

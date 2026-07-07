@@ -18,3 +18,25 @@ impl Action for Routine {
         Ok(())
     }
 }
+
+pub struct Sequence {
+    steps: Vec<String>,
+}
+
+impl Sequence {
+    pub fn new(steps: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Self {
+            steps: steps.into_iter().map(|s| s.into()).collect(),
+        }
+    }
+}
+
+impl Action for Sequence {
+    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+        for step in &self.steps {
+            call!(step, args.clone());
+        }
+
+        Ok(())
+    }
+}
