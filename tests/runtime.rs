@@ -16,11 +16,6 @@ fn collect_messages(diagnostics: &[Diagnostic]) -> Vec<String> {
     out
 }
 
-/// A full "process an order" workflow exercised through one entrypoint: a routine
-/// delegates to an action that branches on a predicate, calls a
-/// func whose return value is coerced, writes running state with `set!`, renders a
-/// receipt template that reads both a scope var and mid-invocation state, and emits
-/// diagnostics at several nesting levels.
 #[test]
 fn order_workflow_threads_state_templates_and_diagnostics_together() {
     let receipt = Arc::new(Mutex::new(String::new()));
@@ -64,12 +59,8 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
 
     let output = runtime.call("process", [("qty", 3), ("unit", 5)]).unwrap();
 
-    // template saw the scope var (`store`), the invocation args (`qty`/`unit`), and the
-    // state written mid-invocation (`total`)
     assert_eq!(*receipt.lock().unwrap(), "nova-mart: 3 x 5 = 15");
 
-    // diagnostics from every level of the fork/merge tree are present, and the roll-up
-    // severity is the max encountered (Warn from `fulfill`, Info from `subtotal`)
     let messages = collect_messages(&output.diagnostics);
     assert!(messages.contains(&"fulfilling order".to_string()), "{messages:?}");
     assert!(messages.contains(&"priced 3 units".to_string()), "{messages:?}");
@@ -80,8 +71,6 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
     assert_eq!(output.diagnostics[0].severity(), Severity::Warn);
 }
 
-/// The same workflow taking the else-branch: a zero quantity fails the predicate, so
-/// `reject` runs, emits an error, and leaves no receipt state behind.
 #[test]
 fn order_workflow_else_branch_rejects_and_escalates_severity() {
     let receipt = Arc::new(Mutex::new(String::from("untouched")));
@@ -119,9 +108,6 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
     assert_eq!(output.diagnostics[0].severity(), Severity::Error);
 }
 
-/// A recursive `factorial` built from scoped state and nested `call!`s: each level reads
-/// its arg, multiplies into an accumulator held in scope, and recurses via a negated
-/// base case. Exercises deep fork/merge, coercion, and predicate composition.
 #[test]
 fn recursive_calls_accumulate_state_and_coerce_results() {
     let runtime = nova::new()
@@ -142,7 +128,6 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
             Ok(Some(Value::from(n * sub)))
         })
         .action("run", |args: &[Value], kargs: &KArgs| -> ActionResult {
-            // gate on the Not-composed predicate before computing
             assert!(nova::call!("is_positive", *args, **kargs).unwrap().is_true());
 
             let result = nova::call!("fact", *args, **kargs as u64).unwrap_or(0);
@@ -158,15 +143,10 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
     let messages = collect_messages(&output.diagnostics);
     assert!(messages.contains(&"factorial = 120".to_string()), "{messages:?}");
 
-    // computing directly through the func entrypoint yields the coerced value too
     let value = runtime.func("fact", [("n", 5)]).unwrap().value;
     assert_eq!(value, Some(Value::from(120u64)));
 }
 
-/// A template that composes a func and a predicate in one render pass, where the func
-/// emits a diagnostic. Confirms template-invoked callables resolve from scope, feed
-/// their results into the rendered string, and still thread diagnostics into the live
-/// tree of the invocation that triggered the render.
 #[test]
 fn template_composes_callables_and_captures_their_diagnostics() {
     let out = Arc::new(Mutex::new(String::new()));
@@ -196,8 +176,6 @@ fn template_composes_callables_and_captures_their_diagnostics() {
     assert!(messages.contains(&"doubling 21".to_string()), "{messages:?}");
 }
 
-/// `Runtime::eval` and the coercion form of `call!` over a predicate, plus arg isolation
-/// across a chained call: the callee sees fresh args and the caller's are unchanged.
 #[test]
 fn eval_predicate_and_call_isolation_across_a_chain() {
     let seen = Arc::new(Mutex::new(Vec::new()));
@@ -215,7 +193,6 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
         .action("caller", |_args: &[Value], kargs: &KArgs| -> ActionResult {
             assert_eq!(kargs.get("n"), Some(&Value::from(1)));
             nova::call!("callee", n = 2);
-            // caller's own args are untouched by the chained call
             assert_eq!(kargs.get("n"), Some(&Value::from(1)));
             Ok(())
         })
@@ -231,9 +208,6 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
     assert_eq!(recorded[0].get("n"), Some(&Value::from(2)));
 }
 
-/// `set!` registers bindings into the live scope mid-invocation, and those bindings are
-/// then reachable — by a template (the var) and by `call!` (the func) — within the same
-/// invocation.
 #[test]
 fn set_registers_bindings_into_the_live_scope() {
     let out = Arc::new(Mutex::new(String::new()));
@@ -250,11 +224,9 @@ fn set_registers_bindings_into_the_live_scope() {
                 })
             );
 
-            // the func registered above is callable by name in the same invocation
             let loud = nova::call!("shout", word = "hey").unwrap();
             assert_eq!(loud, Value::from("HEY"));
 
-            // the var registered above resolves in a render
             *sink.lock().unwrap() = scope().render_str("{{ greeting }}")?;
             Ok(())
         })
@@ -265,8 +237,6 @@ fn set_registers_bindings_into_the_live_scope() {
     assert_eq!(*out.lock().unwrap(), "hello");
 }
 
-/// Error paths: unknown names error, a func returning an error propagates through the
-/// `?` in `call!`, and a malformed template fails at build time.
 #[test]
 fn error_paths_surface_at_call_and_build_time() {
     let runtime = nova::new()
@@ -280,18 +250,11 @@ fn error_paths_surface_at_call_and_build_time() {
         .build()
         .unwrap();
 
-    // unknown name
     assert!(runtime.call("missing", KArgs::new()).is_err());
-    // error thrown inside a func propagates up through call!'s `?`
     assert!(runtime.call("caller", KArgs::new()).is_err());
-    // malformed template is rejected when the runtime is built
     assert!(nova::new().template("t", "{{ ").build().is_err());
 }
 
-/// A `Manifest` hydrates into a runnable `Runtime`: vars/templates resolve, the entrypoint runs
-/// steps in order rendering each `run:` template for its side effects, a false `if:` guard skips
-/// a step, a true `if:` guard runs a step whose body is a `{% if %}` block that emits via the
-/// built-in `info()`, and a failing step surfaces a diagnostic without aborting the sequence.
 #[test]
 fn manifest_hydrates_into_a_runnable_runtime() {
     let manifest = nova::manifest()
@@ -313,20 +276,12 @@ fn manifest_hydrates_into_a_runnable_runtime() {
     let output = runtime.call("flow", KArgs::new()).unwrap();
     let messages = collect_messages(&output.diagnostics);
 
-    // the `run:` step rendered its template against the manifest var and emitted via info()
     assert!(messages.iter().any(|m| m == "hello world"), "{messages:?}");
-    // the guarded step whose condition is false did not run
     assert!(!messages.iter().any(|m| m == "skipped"), "{messages:?}");
-    // the guarded step whose native `count > 0` expression is true did run
     assert!(messages.iter().any(|m| m == "count is positive"), "{messages:?}");
-    // the final step failed (unknown func) yet the earlier steps still ran to completion
     assert!(messages.iter().any(|m| m.contains("missing_func")), "{messages:?}");
 }
 
-/// The built-in `info`/`warn`/`error` template functions are auto-registered on every runtime
-/// and emit diagnostics, taking their message as a positional argument. `print`/`println` write
-/// to stdout instead of diagnostics, so they contribute nothing to the tree. A `{% for %}` block
-/// proves that a `run:` body renders as a full template, not just an expression.
 #[test]
 fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
     let runtime = nova::manifest()
@@ -335,7 +290,6 @@ fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
         .step(nova::step().run("{% for item in items %}{{ info(item) }}{% endfor %}"))
         .step(nova::step().run("{{ warn('careful') }}"))
         .step(nova::step().run("{{ error('boom') }}"))
-        // print/println go to stdout, not diagnostics; included to prove they don't error
         .step(nova::step().run("{{ print('to stdout') }}{{ println('and a line') }}"))
         .build();
 
@@ -343,23 +297,17 @@ fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
     let output = runtime.call("flow", KArgs::new()).unwrap();
     let messages = collect_messages(&output.diagnostics);
 
-    // the block iterated the list and emitted one info per item
     for item in ["a", "b", "c"] {
         assert!(messages.iter().any(|m| m == item), "{messages:?}");
     }
     assert!(messages.iter().any(|m| m == "careful"), "{messages:?}");
     assert!(messages.iter().any(|m| m == "boom"), "{messages:?}");
-    // print/println did NOT land in diagnostics
     assert!(!messages.iter().any(|m| m == "to stdout"), "{messages:?}");
     assert!(!messages.iter().any(|m| m == "and a line"), "{messages:?}");
 
-    // an error() call escalates the roll-up severity
     assert_eq!(output.diagnostics[0].severity(), Severity::Error);
 }
 
-/// A `shell` step renders its command as a template (interpolating a scope var) and runs it with
-/// stdout/stderr inherited (piped straight through), so its output is not captured into
-/// diagnostics. A failing command emits an error diagnostic yet the sequence continues.
 #[test]
 fn shell_step_runs_commands_and_reports_failures() {
     let runtime = nova::manifest()
@@ -374,17 +322,12 @@ fn shell_step_runs_commands_and_reports_failures() {
     let output = runtime.call("flow", KArgs::new()).unwrap();
     let messages = collect_messages(&output.diagnostics);
 
-    // stdout is inherited, not captured — it does not surface as a diagnostic
     assert!(!messages.iter().any(|m| m == "hello"), "{messages:?}");
-    // the failing command emitted an error mentioning its exit status
     assert!(messages.iter().any(|m| m.contains("shell exited")), "{messages:?}");
-    // the step after the failure still ran
     assert!(messages.iter().any(|m| m == "after failure"), "{messages:?}");
     assert_eq!(output.diagnostics[0].severity(), Severity::Error);
 }
 
-/// Optional arguments still pass by keyword alongside a required positional: a func reads its
-/// required arg via `args.at(0)` and an optional one via `args.get("suffix")`.
 #[test]
 fn positional_required_with_optional_keyword_arg() {
     let out = Arc::new(Mutex::new(String::new()));

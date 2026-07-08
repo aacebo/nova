@@ -33,7 +33,7 @@ impl Routine {
     }
 
     pub fn run(&self, caller: &Scope, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
-        let child = self.scope.fork(args.to_vec(), kargs.clone());
+        let child = self.scope.fork(&self.name, args.to_vec(), kargs.clone());
 
         {
             let _guard = crate::enter(&child);
@@ -43,7 +43,7 @@ impl Routine {
             }
         }
 
-        caller.merge(&self.name, &child);
+        caller.merge(&child);
         Ok(())
     }
 

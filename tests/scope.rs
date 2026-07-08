@@ -1,96 +1,104 @@
-use nova::{KArgs, Scope, Value, Var, del, enter, get, get_mut, has, set};
+use nova::{KArgs, Value, Var, del, get, get_mut, has, scope, set};
 
-/// Exercises the full single-scope lifecycle through the macros: create, overwrite,
-/// mutate in place, read back, and delete — asserting `len`/`has` stay consistent.
+type ActionResult = Result<(), Box<dyn std::error::Error>>;
+
 #[test]
 fn scope_bindings_lifecycle_through_macros() {
-    let scope = Scope::new();
-    let _guard = enter(&scope);
+    let runtime = nova::new()
+        .action("run", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+            let baseline = scope().len();
+            assert!(!has!("x"));
 
-    assert!(!has!("x"));
+            set!("x", Var::new("x", 1));
+            set!("x", Var::new("x", 2));
+            assert!(has!("x"));
+            assert_eq!(scope().len(), baseline + 1);
+            assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(2));
 
-    set!("x", Var::new("x", 1));
-    set!("x", Var::new("x", 2)); // overwrite in place, not a second slot
-    assert!(has!("x"));
-    assert_eq!(scope.len(), 1);
-    assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(2));
+            {
+                let mut slot = get_mut!("x").expect("x should be set");
+                slot.as_var_mut().unwrap().value = Value::from(9);
+            }
+            assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(9));
 
-    {
-        let mut slot = get_mut!("x").expect("x should be set");
-        slot.as_var_mut().unwrap().value = Value::from(9);
-    }
-    assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(9));
+            del!("x");
+            assert!(!has!("x"));
+            assert!(get!("x").is_none());
+            assert_eq!(scope().len(), baseline);
+            Ok(())
+        })
+        .build()
+        .unwrap();
 
-    del!("x");
-    assert!(!has!("x"));
-    assert!(get!("x").is_none());
-    assert_eq!(scope.len(), 0);
+    runtime.call("run", KArgs::new()).unwrap();
 }
 
-/// Fork/parent resolution and write-through semantics in one scenario: a child resolves
-/// a parent binding, writes to an existing parent key (updating the parent), and a brand
-/// new key lands at the root so every level can see it.
 #[test]
 fn forked_scopes_resolve_and_write_through_to_ancestors() {
-    let root = Scope::new();
-    root.set("base", Var::new("base", 1));
+    let runtime = nova::new()
+        .action("child", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+            assert_eq!(get!("base").unwrap().as_var().unwrap().value, Value::from(1));
 
-    let child = root.fork(Vec::new(), KArgs::new());
-    let grandchild = child.fork(Vec::new(), KArgs::new());
+            set!("base", Var::new("base", 2));
+            set!("fresh", Var::new("fresh", 7));
+            Ok(())
+        })
+        .action("parent", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+            set!("base", Var::new("base", 1));
 
-    {
-        let _guard = enter(&grandchild);
+            nova::call!("child");
 
-        // resolves the ancestor's binding
-        assert_eq!(get!("base").unwrap().as_var().unwrap().value, Value::from(1));
+            assert_eq!(get!("base").unwrap().as_var().unwrap().value, Value::from(2));
+            assert_eq!(get!("fresh").unwrap().as_var().unwrap().value, Value::from(7));
+            Ok(())
+        })
+        .build()
+        .unwrap();
 
-        // writing an existing key updates the owning ancestor (root), not a local shadow
-        set!("base", Var::new("base", 2));
-
-        // a new key with no existing owner lands at the root
-        set!("fresh", Var::new("fresh", 7));
-    }
-
-    assert_eq!(root.get("base").unwrap().as_var().unwrap().value, Value::from(2));
-    assert_eq!(root.get("fresh").unwrap().as_var().unwrap().value, Value::from(7));
-    // and the whole chain still resolves both
-    assert!(grandchild.has("fresh"));
+    runtime.call("parent", KArgs::new()).unwrap();
 }
 
-/// A child deletion recurses to the ancestor that owns the binding, removing it for the
-/// whole chain.
 #[test]
 fn child_deletion_recurses_to_the_owning_ancestor() {
-    let parent = Scope::new();
-    parent.set("x", Var::new("x", 1));
-    let child = parent.fork(Vec::new(), KArgs::new());
+    let runtime = nova::new()
+        .action("child", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+            assert!(has!("x"));
+            del!("x");
+            Ok(())
+        })
+        .action("parent", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+            set!("x", Var::new("x", 1));
 
-    {
-        let _guard = enter(&child);
-        assert!(has!("x"));
-        del!("x");
-    }
+            nova::call!("child");
 
-    assert!(!parent.has("x"));
-    assert!(parent.get("x").is_none());
+            assert!(!has!("x"));
+            assert!(get!("x").is_none());
+            Ok(())
+        })
+        .build()
+        .unwrap();
+
+    runtime.call("parent", KArgs::new()).unwrap();
 }
 
-/// `get!`/`get_mut!` with `as Variant` filter the slot to a matching `Object` variant:
-/// mutation through `get_mut!("x" as Var)` writes back, a read confirms it, and asking
-/// for the wrong variant yields `None`.
 #[test]
 fn typed_get_filters_by_object_variant() {
-    let scope = Scope::new();
-    let _guard = enter(&scope);
+    let runtime = nova::new()
+        .action("run", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+            set!("x", Var::new("x", 1));
 
-    set!("x", Var::new("x", 1));
+            {
+                let mut slot = get_mut!("x" as Var).expect("x is a Var");
+                slot.as_var_mut().unwrap().value = Value::from(9);
+            }
 
-    {
-        let mut slot = get_mut!("x" as Var).expect("x is a Var");
-        slot.as_var_mut().unwrap().value = Value::from(9);
-    }
+            assert_eq!(get!("x" as Var).unwrap().as_var().unwrap().value, Value::from(9));
+            assert!(get!("x" as Function).is_none());
+            assert!(get_mut!("x" as Function).is_none());
+            Ok(())
+        })
+        .build()
+        .unwrap();
 
-    assert_eq!(get!("x" as Var).unwrap().as_var().unwrap().value, Value::from(9));
-    assert!(get!("x" as Function).is_none());
-    assert!(get_mut!("x" as Function).is_none());
+    runtime.call("run", KArgs::new()).unwrap();
 }

@@ -88,20 +88,19 @@ impl std::fmt::Debug for Function {
 impl minijinja::value::Object for Function {
     fn call(self: &Arc<Self>, state: &minijinja::State<'_, '_>, args: &[Value]) -> Result<Value, minijinja::Error> {
         let (positional, kwargs): (&[Value], Kwargs) = minijinja::value::from_args(args)?;
-
+        let kargs = KArgs::from_kwargs(kwargs)?;
         let scope = state
             .lookup(Scope::KEY)
             .and_then(|v| v.downcast_object::<Scope>())
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
-        let kargs = KArgs::from_kwargs(kwargs)?;
-        let child = scope.fork(positional.to_vec(), kargs);
+        let child = scope.fork(&self.name, positional.to_vec(), kargs);
         let value = {
             let _guard = crate::enter(&child);
             self.callback.invoke(child.args(), child.kargs())
         }
         .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
-        scope.merge(&self.name, &child);
+        scope.merge(&child);
         Ok(value.unwrap_or(Value::UNDEFINED))
     }
 }

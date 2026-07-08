@@ -36,6 +36,17 @@ pub trait Call: Send + Sync {
     fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>>;
 }
 
+pub trait Observer: Send + Sync {
+    #![allow(unused)]
+
+    fn on_create(&self, object: &Object) {}
+    fn on_update(&self, object: &Object) {}
+    fn on_delete(&self, object: &Object) {}
+
+    fn on_before_call(&self, object: &Object) {}
+    fn on_after_call(&self, object: &Object) {}
+}
+
 impl<F> Action for F
 where
     F: Fn(&[Value], &KArgs) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
@@ -82,14 +93,14 @@ impl Runtime {
 
     pub fn call(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let scope = self.scope.fork(Vec::new(), args.clone());
+        let scope = self.scope.fork(name, Vec::new(), args.clone());
         scope.call(name, Vec::new(), args)?;
         Ok(scope.into())
     }
 
     pub fn eval(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let scope = self.scope.fork(Vec::new(), args.clone());
+        let scope = self.scope.fork(name, Vec::new(), args.clone());
         let value = scope.call(name, Vec::new(), args)?.map(|v| v.is_true()).unwrap_or(false);
         let mut output = Output::from(scope);
         output.value = Some(value.into());
@@ -98,7 +109,7 @@ impl Runtime {
 
     pub fn func(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let scope = self.scope.fork(Vec::new(), args.clone());
+        let scope = self.scope.fork(name, Vec::new(), args.clone());
         let value = scope.call(name, Vec::new(), args)?;
         let mut output = Output::from(scope);
         output.value = value;
@@ -122,7 +133,7 @@ impl Default for Builder {
 impl Builder {
     pub fn new() -> Self {
         let builder = Self {
-            scope: Scope::from(Arena::new()),
+            scope: Scope::new("", Default::default()),
             templates: Vec::new(),
             manifests: Vec::new(),
         };
@@ -212,7 +223,7 @@ impl Builder {
                 cenv.add_template_owned(tmpl.clone(), source.clone())?;
             }
 
-            let scope = root.fork(Vec::new(), KArgs::new()).with_env(cenv);
+            let scope = root.fork(&name, Vec::new(), KArgs::new()).with_env(cenv);
 
             for (key, value) in &manifest.vars {
                 scope.set_local(key.clone(), Var::new(key.clone(), value.clone()));

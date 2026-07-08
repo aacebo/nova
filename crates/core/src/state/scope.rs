@@ -5,12 +5,12 @@ use crate::{Arena, Diagnostic, Entry, Environment, KArgs, Object, Slot, SlotMut,
 
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct Scope(Arc<_Scope>);
 
-#[derive(Default)]
 struct _Scope {
     trace_id: ulid::Ulid,
+    name: String,
     parent: Option<Scope>,
     env: Arc<Environment<'static>>,
     symbols: Mutex<HashMap<String, ulid::Ulid>>,
@@ -21,20 +21,23 @@ struct _Scope {
 }
 
 impl Scope {
-    pub fn new() -> Self {
+    pub const KEY: &'static str = "__$scope__";
+
+    pub(crate) fn new(name: impl Into<String>, arena: Arc<Mutex<Arena>>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: ulid::Ulid::new(),
+            name: name.into(),
             parent: None,
             env: Default::default(),
             symbols: Default::default(),
-            arena: Default::default(),
+            arena,
             args: Default::default(),
             kargs: Default::default(),
             diagnostics: Default::default(),
         }))
     }
 
-    pub fn with_env(self, env: Environment<'static>) -> Self {
+    pub(crate) fn with_env(self, env: Environment<'static>) -> Self {
         let mut inner = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("with_env on a shared scope"));
         inner.env = Arc::new(env);
         Self(Arc::new(inner))
@@ -81,9 +84,10 @@ impl Scope {
         self.len() == 0
     }
 
-    pub fn fork(&self, args: Vec<Value>, kargs: impl Into<KArgs>) -> Self {
+    pub fn fork(&self, name: impl Into<String>, args: Vec<Value>, kargs: impl Into<KArgs>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: self.0.trace_id,
+            name: name.into(),
             parent: Some(self.clone()),
             env: self.0.env.clone(),
             symbols: Default::default(),
@@ -94,14 +98,14 @@ impl Scope {
         }))
     }
 
-    pub fn merge(&self, name: &str, child: &Scope) {
+    pub fn merge(&self, child: &Scope) {
         let diagnostics = child.take_diagnostics();
 
         if diagnostics.is_empty() {
             return;
         }
 
-        let mut node = Diagnostic::new(self.0.trace_id).message(name);
+        let mut node = Diagnostic::new(self.0.trace_id).message(&self.0.name);
         node.children = diagnostics;
         self.0.diagnostics.lock().unwrap().push(node);
     }
@@ -211,12 +215,13 @@ impl Scope {
         }
 
         let func = self.get_func(name)?;
-        let child = self.fork(args, kargs);
+        let child = self.fork(name, args, kargs);
         let result = {
             let _guard = crate::enter(&child);
             func.invoke(child.args(), child.kargs())
         };
-        self.merge(name, &child);
+
+        self.merge(&child);
         result
     }
 
@@ -239,10 +244,6 @@ impl Traced for Scope {
     fn trace_id(&self) -> ulid::Ulid {
         self.0.trace_id
     }
-}
-
-impl Scope {
-    pub const KEY: &'static str = "__$scope__";
 }
 
 impl std::fmt::Debug for Scope {
@@ -277,20 +278,5 @@ impl minijinja::value::Object for Scope {
             Object::Routine(rt) => Some(Value::from_object(rt.clone())),
             _ => None,
         }
-    }
-}
-
-impl From<Arena> for Scope {
-    fn from(value: Arena) -> Self {
-        Self(Arc::new(_Scope {
-            trace_id: ulid::Ulid::new(),
-            parent: None,
-            env: Default::default(),
-            arena: Arc::new(Mutex::new(value)),
-            symbols: Default::default(),
-            args: Default::default(),
-            kargs: Default::default(),
-            diagnostics: Default::default(),
-        }))
     }
 }
