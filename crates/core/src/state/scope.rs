@@ -47,6 +47,10 @@ impl Scope {
         &self.0.trace_id
     }
 
+    pub fn name(&self) -> &str {
+        &self.0.name
+    }
+
     pub fn env(&self) -> &Environment<'static> {
         &self.0.env
     }
