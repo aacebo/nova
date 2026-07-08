@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Args, Function, Object, Scope, Value};
+use crate::{Function, KArgs, Object, Scope, Value};
 
 #[derive(Clone)]
 pub struct Namespace {
@@ -18,17 +18,14 @@ impl Namespace {
             let name = name.to_string();
             let scope = scope.clone();
 
-            Function::action(name.clone(), move |args: &Args| {
-                scope.call(&name, args.clone())?;
+            Function::action(name.clone(), move |args: &[Value], kargs: &KArgs| {
+                scope.call(&name, args.to_vec(), kargs.clone())?;
+                crate::scope().merge(&name, &scope);
                 Ok(())
             })
         };
 
-        Self {
-            name,
-            scope,
-            entrypoint,
-        }
+        Self { name, scope, entrypoint }
     }
 
     pub fn name(&self) -> &str {
@@ -73,15 +70,11 @@ impl minijinja::value::Object for Namespace {
             .and_then(|v| v.downcast_object::<Scope>())
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
-        let mut args = Args::from_kwargs(kwargs)?;
-
-        for value in positional {
-            args.push(value.clone());
-        }
+        let kargs = KArgs::from_kwargs(kwargs)?;
 
         let value = self
             .entrypoint
-            .invoke(&args)
+            .invoke(positional, &kargs)
             .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
 
         caller.merge(&self.name, &self.scope);

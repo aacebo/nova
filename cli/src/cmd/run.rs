@@ -27,7 +27,7 @@ impl Args {
         let mut entries: Vec<(String, i64)> = Vec::new();
 
         for manifest in &manifests {
-            let Some(name) = &manifest.name else { continue };
+            let name = &manifest.name;
 
             if let Some(trigger) = manifest.on.iter().find(|t| t.is_run())
                 && !entries.iter().any(|(n, _)| n == name)
@@ -36,12 +36,12 @@ impl Args {
             }
         }
 
-        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.sort_by_key(|(_, priority)| std::cmp::Reverse(*priority));
 
         let runtime = nova::Runtime::try_from(manifests)?;
 
         for (name, _) in &entries {
-            let output = runtime.call(name, nova::Args::new())?;
+            let output = runtime.call(name, nova::KArgs::new())?;
 
             for diagnostic in &output.diagnostics {
                 let widget = widgets::diagnostic::new(diagnostic);

@@ -33,10 +33,7 @@ impl FromStr for Trigger {
             return Ok(Self::Call);
         }
 
-        let rest = s
-            .strip_prefix("run")
-            .ok_or_else(|| format!("unknown trigger `{s}`"))?
-            .trim();
+        let rest = s.strip_prefix("run").ok_or_else(|| format!("unknown trigger `{s}`"))?.trim();
 
         if rest.is_empty() {
             return Ok(Self::Run { priority: None });

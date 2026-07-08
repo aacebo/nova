@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Arena, Args, Diagnostic, Entry, Environment, Object, Slot, SlotMut, Traced, Value};
+use crate::{Arena, Diagnostic, Entry, Environment, KArgs, Object, Slot, SlotMut, Traced, Value};
 
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
@@ -15,7 +15,8 @@ struct _Scope {
     env: Arc<Environment<'static>>,
     symbols: Mutex<HashMap<String, ulid::Ulid>>,
     arena: Arc<Mutex<Arena>>,
-    args: Args,
+    args: Vec<Value>,
+    kargs: KArgs,
     diagnostics: Diagnostics,
 }
 
@@ -28,6 +29,7 @@ impl Scope {
             symbols: Default::default(),
             arena: Default::default(),
             args: Default::default(),
+            kargs: Default::default(),
             diagnostics: Default::default(),
         }))
     }
@@ -46,8 +48,12 @@ impl Scope {
         &self.0.env
     }
 
-    pub fn args(&self) -> &Args {
+    pub fn args(&self) -> &[Value] {
         &self.0.args
+    }
+
+    pub fn kargs(&self) -> &KArgs {
+        &self.0.kargs
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
@@ -75,14 +81,15 @@ impl Scope {
         self.len() == 0
     }
 
-    pub fn fork(&self, args: impl Into<Args>) -> Self {
+    pub fn fork(&self, args: Vec<Value>, kargs: impl Into<KArgs>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: self.0.trace_id,
             parent: Some(self.clone()),
             env: self.0.env.clone(),
             symbols: Default::default(),
             arena: self.0.arena.clone(),
-            args: args.into(),
+            args,
+            kargs: kargs.into(),
             diagnostics: Default::default(),
         }))
     }
@@ -161,6 +168,20 @@ impl Scope {
         self
     }
 
+    pub fn set_local(&self, key: impl Into<String>, object: impl Into<Object>) -> &Self {
+        let key = key.into();
+        let id = self.0.symbols.lock().unwrap().get(&key).copied();
+
+        let id = id.unwrap_or_else(|| {
+            let id = ulid::Ulid::new();
+            self.0.symbols.lock().unwrap().insert(key, id);
+            id
+        });
+
+        self.0.arena.lock().unwrap().set(&id, object.into());
+        self
+    }
+
     pub fn del(&self, key: &str) -> &Self {
         let id = self.0.symbols.lock().unwrap().remove(key);
 
@@ -173,13 +194,18 @@ impl Scope {
         self
     }
 
-    pub fn call(&self, name: impl AsRef<str>, args: impl Into<Args>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn call(
+        &self,
+        name: impl AsRef<str>,
+        args: Vec<Value>,
+        kargs: impl Into<KArgs>,
+    ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         let name = name.as_ref();
         let func = self.get_func(name)?;
-        let child = self.fork(args);
+        let child = self.fork(args, kargs);
         let result = {
             let _guard = crate::enter(&child);
-            func.invoke(child.args())
+            func.invoke(child.args(), child.kargs())
         };
         self.merge(name, &child);
         result
@@ -226,7 +252,11 @@ impl minijinja::value::Object for Scope {
             return Some(Value::from_object(Self::clone(self)));
         }
 
-        if let Some(value) = self.args().get(name) {
+        if name == "args" {
+            return Some(Value::from_iter(self.args().iter().cloned()));
+        }
+
+        if let Some(value) = self.kargs().get(name) {
             return Some(value.clone());
         }
 
@@ -250,6 +280,7 @@ impl From<Arena> for Scope {
             arena: Arc::new(Mutex::new(value)),
             symbols: Default::default(),
             args: Default::default(),
+            kargs: Default::default(),
             diagnostics: Default::default(),
         }))
     }

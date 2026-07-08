@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, Args, Call, Predicate, Scope, Value};
+use crate::{Action, Call, KArgs, Predicate, Scope, Value};
 
 #[derive(Clone)]
 pub enum Callback {
@@ -24,14 +24,14 @@ impl Callback {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
-                action.invoke(args)?;
+                action.invoke(args, kargs)?;
                 Ok(None)
             }
-            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args)?))),
-            Self::Func(func) => func.invoke(args),
+            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args, kargs)?))),
+            Self::Func(func) => func.invoke(args, kargs),
         }
     }
 }
@@ -74,8 +74,8 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        self.callback.invoke(args)
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self.callback.invoke(args, kargs)
     }
 }
 
@@ -94,16 +94,11 @@ impl minijinja::value::Object for Function {
             .and_then(|v| v.downcast_object::<Scope>())
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
-        let mut args = Args::from_kwargs(kwargs)?;
-
-        for value in positional {
-            args.push(value.clone());
-        }
-
-        let child = scope.fork(args);
+        let kargs = KArgs::from_kwargs(kwargs)?;
+        let child = scope.fork(positional.to_vec(), kargs);
         let value = {
             let _guard = crate::enter(&child);
-            self.callback.invoke(child.args())
+            self.callback.invoke(child.args(), child.kargs())
         }
         .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
         scope.merge(&self.name, &child);

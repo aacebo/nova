@@ -1,4 +1,4 @@
-use crate::{Action, Args, call};
+use crate::{Action, KArgs, Value, scope};
 
 pub struct Routine {
     entrypoint: String,
@@ -13,8 +13,8 @@ impl Routine {
 }
 
 impl Action for Routine {
-    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
-        call!(&self.entrypoint, args.clone());
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
+        scope().call(&self.entrypoint, args.to_vec(), kargs.clone())?;
         Ok(())
     }
 }
@@ -32,9 +32,9 @@ impl Sequence {
 }
 
 impl Action for Sequence {
-    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
         for step in &self.steps {
-            call!(step, args.clone());
+            scope().call(step, args.to_vec(), kargs.clone())?;
         }
 
         Ok(())

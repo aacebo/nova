@@ -33,8 +33,9 @@ doctest = false
 workspace = true
 
 [features]
-default = []
+default = ["macros"]
 ai = ["dep:nova-ai"]
+macros = ["dep:nova-macros"]
 
 [patch.crates-io]
 ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
@@ -42,3 +43,4 @@ ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
 [dependencies]
 nova-core = { path = "crates/core" }
 nova-ai = { path = "crates/ai", optional = true }
+nova-macros = { path = "crates/macros", optional = true }

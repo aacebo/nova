@@ -1,0 +1,18 @@
+[package]
+name = "nova-macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zyn = { version = "0.4", features = ["diagnostics", "ext", "pretty"] }

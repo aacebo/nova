@@ -4,9 +4,9 @@ use crate::Value;
 
 #[derive(Default, Debug, Clone, serde::Serialize)]
 #[serde(transparent)]
-pub struct Args(BTreeMap<String, Value>);
+pub struct KArgs(BTreeMap<String, Value>);
 
-impl Args {
+impl KArgs {
     pub fn new() -> Self {
         Self::default()
     }
@@ -33,16 +33,6 @@ impl Args {
 
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.0.get(key)
-    }
-
-    pub fn push(&mut self, value: impl Into<Value>) -> &mut Self {
-        let idx = self.0.keys().filter(|k| k.parse::<usize>().is_ok()).count();
-        self.0.insert(idx.to_string(), value.into());
-        self
-    }
-
-    pub fn at(&self, n: usize) -> Option<&Value> {
-        self.0.get(&n.to_string())
     }
 
     pub fn get_required<T>(&self, key: &str) -> Result<T, Box<dyn std::error::Error>>
@@ -79,7 +69,7 @@ impl Args {
     }
 }
 
-impl<K: Into<String>, V: Into<Value>, T: IntoIterator<Item = (K, V)>> From<T> for Args {
+impl<K: Into<String>, V: Into<Value>, T: IntoIterator<Item = (K, V)>> From<T> for KArgs {
     fn from(value: T) -> Self {
         let mut items = BTreeMap::new();
 
@@ -91,7 +81,7 @@ impl<K: Into<String>, V: Into<Value>, T: IntoIterator<Item = (K, V)>> From<T> fo
     }
 }
 
-impl<K: Into<String>, V: Into<Value>> FromIterator<(K, V)> for Args {
+impl<K: Into<String>, V: Into<Value>> FromIterator<(K, V)> for KArgs {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let mut items = BTreeMap::new();
 
@@ -103,7 +93,7 @@ impl<K: Into<String>, V: Into<Value>> FromIterator<(K, V)> for Args {
     }
 }
 
-impl std::ops::Index<&str> for Args {
+impl std::ops::Index<&str> for KArgs {
     type Output = Value;
 
     fn index(&self, index: &str) -> &Self::Output {
@@ -111,8 +101,8 @@ impl std::ops::Index<&str> for Args {
     }
 }
 
-impl Args {
-    /// Consume minijinja keyword arguments into `Args`, asserting all were used.
+impl KArgs {
+    /// Consume minijinja keyword arguments into `KArgs`, asserting all were used.
     pub fn from_kwargs(kwargs: minijinja::value::Kwargs) -> Result<Self, minijinja::Error> {
         let mut args = Self::new();
 
@@ -125,8 +115,8 @@ impl Args {
     }
 }
 
-impl From<Args> for Value {
-    fn from(args: Args) -> Self {
+impl From<KArgs> for Value {
+    fn from(args: KArgs) -> Self {
         Value::from_iter(args.0)
     }
 }

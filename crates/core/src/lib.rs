@@ -27,41 +27,41 @@ pub type Value = minijinja::Value;
 pub type Environment<'a> = minijinja::Environment<'a>;
 
 pub trait Action: Send + Sync {
-    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 pub trait Predicate: Send + Sync {
-    fn invoke(&self, args: &Args) -> Result<bool, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<bool, Box<dyn std::error::Error>>;
 }
 
 pub trait Call: Send + Sync {
-    fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>>;
 }
 
 impl<F> Action for F
 where
-    F: Fn(&Args) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
-        self(args)
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
+        self(args, kargs)
     }
 }
 
 impl<F> Predicate for F
 where
-    F: Fn(&Args) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &Args) -> Result<bool, Box<dyn std::error::Error>> {
-        self(args)
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<bool, Box<dyn std::error::Error>> {
+        self(args, kargs)
     }
 }
 
 impl<F> Call for F
 where
-    F: Fn(&Args) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &Args) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        self(args)
+    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self(args, kargs)
     }
 }
 
@@ -77,10 +77,7 @@ pub fn load_all(manifests: impl IntoIterator<Item = Manifest>) -> Result<Builder
     let mut merged: std::collections::BTreeMap<String, Manifest> = std::collections::BTreeMap::new();
 
     for manifest in manifests {
-        let name = manifest
-            .name
-            .clone()
-            .ok_or_else(|| Error::message("manifest is missing a required `name`"))?;
+        let name = manifest.name.clone();
 
         match merged.get_mut(&name) {
             Some(existing) => {
@@ -118,26 +115,26 @@ impl Runtime {
         &self.scope
     }
 
-    pub fn call(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn call(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let scope = self.scope.fork(args.clone());
-        scope.call(name, args)?;
+        let scope = self.scope.fork(Vec::new(), args.clone());
+        scope.call(name, Vec::new(), args)?;
         Ok(scope.into())
     }
 
-    pub fn eval(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn eval(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let scope = self.scope.fork(args.clone());
-        let value = scope.call(name, args)?.map(|v| v.is_true()).unwrap_or(false);
+        let scope = self.scope.fork(Vec::new(), args.clone());
+        let value = scope.call(name, Vec::new(), args)?.map(|v| v.is_true()).unwrap_or(false);
         let mut output = Output::from(scope);
         output.value = Some(value.into());
         Ok(output)
     }
 
-    pub fn func(&self, name: &str, args: impl Into<Args>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn func(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
         let args = args.into();
-        let scope = self.scope.fork(args.clone());
-        let value = scope.call(name, args)?;
+        let scope = self.scope.fork(Vec::new(), args.clone());
+        let value = scope.call(name, Vec::new(), args)?;
         let mut output = Output::from(scope);
         output.value = value;
         Ok(output)
@@ -252,21 +249,21 @@ impl Builder {
             env.add_template_owned(tmpl.clone(), source.clone())?;
         }
 
-        let scope = self.scope.fork(Args::new()).with_env(env);
+        let scope = self.scope.fork(Vec::new(), KArgs::new()).with_env(env);
 
         for (key, value) in &manifest.vars {
-            scope.set(key.clone(), Var::new(key.clone(), value.clone()));
+            scope.set_local(key.clone(), Var::new(key.clone(), value.clone()));
         }
 
         let mut names = Vec::new();
 
         for (index, step) in manifest.steps.iter().enumerate() {
             let step_name = format!("{}[{}]", name, index);
-            scope.set(step_name.clone(), Object::action(step_name.clone(), step.clone()));
+            scope.set_local(step_name.clone(), Object::action(step_name.clone(), step.clone()));
             names.push(step_name);
         }
 
-        scope.set(name, Object::action(name, Sequence::new(names)));
+        scope.set_local(name, Object::action(name, Sequence::new(names)));
         Ok(scope)
     }
 

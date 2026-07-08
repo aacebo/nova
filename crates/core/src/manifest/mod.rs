@@ -14,8 +14,7 @@ pub fn manifest() -> build::ManifestBuilder {
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Manifest {
-    #[serde(default)]
-    pub name: Option<String>,
+    pub name: String,
 
     #[serde(default)]
     pub on: Vec<Trigger>,
@@ -108,7 +107,7 @@ pub mod build {
 
         pub fn build(self) -> Manifest {
             Manifest {
-                name: self.name,
+                name: self.name.expect("manifest requires a `name`"),
                 on: self.on,
                 vars: self.vars,
                 templates: self.templates,

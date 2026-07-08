@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{Action, Args, Value, error, scope};
+use crate::{Action, KArgs, Value, emit, scope};
 
 pub fn step() -> build::StepBuilder {
     build::StepBuilder::new()
@@ -33,7 +33,7 @@ impl std::ops::DerefMut for Step {
 }
 
 impl Action for Step {
-    fn invoke(&self, _args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+    fn invoke(&self, _args: &[Value], _kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
         let scope = scope();
 
         if let Some(cond) = &self.cond
@@ -44,7 +44,7 @@ impl Action for Step {
 
         match &self.body {
             StepBody::Call { call, args: fields } => {
-                let mut args = Args::new();
+                let mut kargs = KArgs::new();
 
                 for (key, value) in fields {
                     let value = match value.as_str() {
@@ -52,23 +52,23 @@ impl Action for Step {
                         None => value.clone(),
                     };
 
-                    args.set(key.clone(), value);
+                    kargs.set(key.clone(), value);
                 }
 
-                if let Err(err) = scope.call(call, args) {
-                    error!("{}", err).emit();
+                if let Err(err) = scope.call(call, Vec::new(), kargs) {
+                    emit([err.to_string()]);
                 }
             }
             StepBody::Run { run } => {
                 if let Err(err) = scope.render_str(run) {
-                    error!("{}", err).emit();
+                    emit([err.to_string()]);
                 }
             }
             StepBody::Shell { shell } => {
                 let cmd = match scope.render_str(shell) {
                     Ok(cmd) => cmd,
                     Err(err) => {
-                        error!("{}", err).emit();
+                        emit([err.to_string()]);
                         return Ok(());
                     }
                 };
@@ -82,10 +82,10 @@ impl Action for Step {
 
                 match status {
                     Ok(status) if !status.success() => {
-                        error!("shell exited {}", status).emit();
+                        emit([format!("shell exited {}", status)]);
                     }
                     Ok(_) => {}
-                    Err(err) => error!("{}", err).emit(),
+                    Err(err) => emit([err.to_string()]),
                 }
             }
         }

@@ -1,36 +1,39 @@
-use crate::{Args, Builder, Diagnostic, Severity};
+use crate::{Builder, Diagnostic, KArgs, Severity, Value};
 
 pub fn register(builder: Builder) -> Builder {
     builder
-        .func("info", |args: &Args| {
-            emit(Severity::Info, args);
+        .func("info", |args: &[Value], kargs: &KArgs| {
+            emit(Severity::Info, args, kargs);
             Ok(None)
         })
-        .func("warn", |args: &Args| {
-            emit(Severity::Warn, args);
+        .func("warn", |args: &[Value], kargs: &KArgs| {
+            emit(Severity::Warn, args, kargs);
             Ok(None)
         })
-        .func("error", |args: &Args| {
-            emit(Severity::Error, args);
+        .func("error", |args: &[Value], kargs: &KArgs| {
+            emit(Severity::Error, args, kargs);
             Ok(None)
         })
-        .func("print", |args: &Args| {
-            print!("{}", message(args));
+        .func("print", |args: &[Value], kargs: &KArgs| {
+            print!("{}", message(args, kargs));
             Ok(None)
         })
-        .func("println", |args: &Args| {
-            println!("{}", message(args));
+        .func("println", |args: &[Value], kargs: &KArgs| {
+            println!("{}", message(args, kargs));
             Ok(None)
         })
 }
 
-fn message(args: &Args) -> String {
-    args.at(0)
-        .or_else(|| args.get("message"))
+fn message(args: &[Value], kargs: &KArgs) -> String {
+    args.first()
+        .or_else(|| kargs.get("message"))
         .map(|v| v.to_string())
         .unwrap_or_default()
 }
 
-fn emit(severity: Severity, args: &Args) {
-    Diagnostic::new(crate::trace_id()).sev(severity).message(message(args)).emit();
+fn emit(severity: Severity, args: &[Value], kargs: &KArgs) {
+    Diagnostic::new(crate::trace_id())
+        .sev(severity)
+        .message(message(args, kargs))
+        .emit();
 }

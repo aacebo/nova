@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::Scope;
+use crate::{Diagnostic, Scope, Severity};
 
 thread_local! {
     static SCOPE: RefCell<Option<Scope>> = const { RefCell::new(None) };
@@ -10,6 +10,12 @@ pub fn scope() -> Scope {
     SCOPE
         .with(|scope| scope.borrow().clone())
         .expect("scope macro used outside an invocation")
+}
+
+pub fn emit(messages: impl IntoIterator<Item = impl Into<String>>) {
+    for message in messages {
+        Diagnostic::new(trace_id()).sev(Severity::Error).message(message).emit();
+    }
 }
 
 pub fn trace_id() -> ulid::Ulid {
@@ -32,84 +38,4 @@ impl Drop for Guard {
     fn drop(&mut self) {
         SCOPE.with(|current| *current.borrow_mut() = self.previous.take());
     }
-}
-
-#[macro_export]
-macro_rules! call {
-    ($name:expr $(,)? => $ty:ty) => {
-        $crate::__call_coerce!($crate::scope().call($name, $crate::Args::new())?, $ty)
-    };
-    ($name:expr, $args:expr $(,)? => $ty:ty) => {
-        $crate::__call_coerce!($crate::scope().call($name, $args)?, $ty)
-    };
-    ($name:expr $(,)?) => {
-        $crate::scope().call($name, $crate::Args::new())?
-    };
-    ($name:expr, $args:expr $(,)?) => {
-        $crate::scope().call($name, $args)?
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __call_coerce {
-    ($value:expr, $ty:ty) => {
-        match $value {
-            ::std::option::Option::Some(v) => {
-                ::std::option::Option::Some(<$ty as ::std::convert::TryFrom<$crate::Value>>::try_from(v)?)
-            }
-            ::std::option::Option::None => ::std::option::Option::None,
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! get {
-    ($key:expr $(,)?) => {
-        $crate::scope().get($key)
-    };
-}
-
-#[macro_export]
-macro_rules! get_mut {
-    ($key:expr $(,)?) => {
-        $crate::scope().get_mut($key)
-    };
-}
-
-#[macro_export]
-macro_rules! set {
-    ($key:expr, $obj:expr $(,)?) => {
-        $crate::scope().set($key, $obj)
-    };
-}
-
-#[macro_export]
-macro_rules! var {
-    ($name:expr, $value:expr $(,)?) => {{
-        let __name: ::std::string::String = ::std::convert::Into::into($name);
-        $crate::scope().set(__name.clone(), $crate::Var::new(__name, $value))
-    }};
-}
-
-#[macro_export]
-macro_rules! func {
-    ($name:expr, $func:expr $(,)?) => {{
-        let __name: ::std::string::String = ::std::convert::Into::into($name);
-        $crate::scope().set(__name.clone(), $crate::Object::func(__name, $func))
-    }};
-}
-
-#[macro_export]
-macro_rules! has {
-    ($key:expr $(,)?) => {
-        $crate::scope().has($key)
-    };
-}
-
-#[macro_export]
-macro_rules! del {
-    ($key:expr $(,)?) => {
-        $crate::scope().del($key)
-    };
 }
