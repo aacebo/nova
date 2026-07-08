@@ -1,11 +1,13 @@
 mod annotation;
 mod artifact;
 mod function;
+mod namespace;
 mod var;
 
 pub use annotation::*;
 pub use artifact::*;
 pub use function::*;
+pub use namespace::*;
 pub use var::*;
 
 use crate::{Action, Call, Predicate};
@@ -13,6 +15,7 @@ use crate::{Action, Call, Predicate};
 #[derive(Clone)]
 pub enum Object {
     Func(Function),
+    Namespace(Namespace),
     Artifact(Artifact),
     Annotation(Annotation),
     Var(Var),
@@ -31,8 +34,16 @@ impl Object {
         Self::Func(Function::func(name, func))
     }
 
+    pub fn namespace(namespace: Namespace) -> Self {
+        Self::Namespace(namespace)
+    }
+
     pub fn is_func(&self) -> bool {
         matches!(self, Self::Func(_))
+    }
+
+    pub fn is_namespace(&self) -> bool {
+        matches!(self, Self::Namespace(_))
     }
 
     pub fn is_artifact(&self) -> bool {
@@ -50,6 +61,14 @@ impl Object {
     pub fn as_func(&self) -> Option<&Function> {
         match self {
             Self::Func(v) => Some(v),
+            Self::Namespace(v) => Some(v.entrypoint()),
+            _ => None,
+        }
+    }
+
+    pub fn as_namespace(&self) -> Option<&Namespace> {
+        match self {
+            Self::Namespace(v) => Some(v),
             _ => None,
         }
     }
@@ -100,6 +119,12 @@ impl Object {
 impl From<Function> for Object {
     fn from(value: Function) -> Self {
         Self::Func(value)
+    }
+}
+
+impl From<Namespace> for Object {
+    fn from(value: Namespace) -> Self {
+        Self::Namespace(value)
     }
 }
 

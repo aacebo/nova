@@ -1,8 +1,10 @@
 mod step;
+mod trigger;
 
 use std::collections::BTreeMap;
 
 pub use step::*;
+pub use trigger::*;
 
 use crate::{Runtime, Value};
 
@@ -16,7 +18,7 @@ pub struct Manifest {
     pub name: Option<String>,
 
     #[serde(default)]
-    pub on: Vec<String>,
+    pub on: Vec<Trigger>,
 
     #[serde(default)]
     pub vars: BTreeMap<String, Value>,
@@ -32,7 +34,15 @@ impl TryFrom<Manifest> for Runtime {
     type Error = Box<dyn std::error::Error>;
 
     fn try_from(manifest: Manifest) -> Result<Self, Self::Error> {
-        crate::load(manifest).build()
+        crate::load(manifest)?.build()
+    }
+}
+
+impl TryFrom<Vec<Manifest>> for Runtime {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_from(manifests: Vec<Manifest>) -> Result<Self, Self::Error> {
+        crate::load_all(manifests)?.build()
     }
 }
 
@@ -45,7 +55,7 @@ pub mod build {
     #[derive(Debug, Default, Clone)]
     pub struct ManifestBuilder {
         name: Option<String>,
-        on: Vec<String>,
+        on: Vec<Trigger>,
         vars: BTreeMap<String, Value>,
         templates: BTreeMap<String, String>,
         steps: Vec<Step>,
@@ -61,8 +71,8 @@ pub mod build {
             self
         }
 
-        pub fn on(mut self, value: impl IntoIterator<Item = impl Into<String>>) -> Self {
-            self.on.extend(value.into_iter().map(|v| v.into()));
+        pub fn on(mut self, value: impl IntoIterator<Item = Trigger>) -> Self {
+            self.on.extend(value);
             self
         }
 

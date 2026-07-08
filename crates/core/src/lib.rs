@@ -69,13 +69,40 @@ pub fn new() -> Builder {
     Builder::new()
 }
 
-pub fn load(manifest: Manifest) -> Builder {
-    let entrypoint = manifest.name.clone().unwrap_or_else(|| "main".into());
+pub fn load(manifest: Manifest) -> Result<Builder, Box<dyn std::error::Error>> {
+    load_all([manifest])
+}
 
-    new()
-        .vars(manifest.vars)
-        .templates(manifest.templates)
-        .steps(entrypoint, manifest.steps)
+pub fn load_all(manifests: impl IntoIterator<Item = Manifest>) -> Result<Builder, Box<dyn std::error::Error>> {
+    let mut merged: std::collections::BTreeMap<String, Manifest> = std::collections::BTreeMap::new();
+
+    for manifest in manifests {
+        let name = manifest
+            .name
+            .clone()
+            .ok_or_else(|| Error::message("manifest is missing a required `name`"))?;
+
+        match merged.get_mut(&name) {
+            Some(existing) => {
+                existing.on.extend(manifest.on);
+                existing.vars.extend(manifest.vars);
+                existing.templates.extend(manifest.templates);
+                existing.steps.extend(manifest.steps);
+            }
+            None => {
+                merged.insert(name, manifest);
+            }
+        }
+    }
+
+    let mut builder = new();
+
+    for (name, manifest) in merged {
+        let scope = builder.module(&name, &manifest)?;
+        builder = builder.namespace(name, scope);
+    }
+
+    Ok(builder)
 }
 
 pub struct Runtime {
@@ -209,7 +236,48 @@ impl Builder {
         this.action(entrypoint, Sequence::new(names))
     }
 
+    pub fn namespace(self, name: impl Into<String>, scope: Scope) -> Self {
+        let name = name.into();
+        self.scope.set(name.clone(), Object::namespace(Namespace::new(name, scope)));
+        self
+    }
+
+    /// Build an isolated module scope for a manifest: parented to this builder's root scope
+    /// (so builtins and sibling namespaces resolve through the parent chain), but with its own
+    /// compiled template environment and its own vars/steps.
+    fn module(&self, name: &str, manifest: &Manifest) -> Result<Scope, Box<dyn std::error::Error>> {
+        let mut env = Environment::new();
+
+        for (tmpl, source) in &manifest.templates {
+            env.add_template_owned(tmpl.clone(), source.clone())?;
+        }
+
+        let scope = self.scope.fork(Args::new()).with_env(env);
+
+        for (key, value) in &manifest.vars {
+            scope.set(key.clone(), Var::new(key.clone(), value.clone()));
+        }
+
+        let mut names = Vec::new();
+
+        for (index, step) in manifest.steps.iter().enumerate() {
+            let step_name = format!("{}[{}]", name, index);
+            scope.set(step_name.clone(), Object::action(step_name.clone(), step.clone()));
+            names.push(step_name);
+        }
+
+        scope.set(name, Object::action(name, Sequence::new(names)));
+        Ok(scope)
+    }
+
     pub fn build(self) -> Result<Runtime, Box<dyn std::error::Error>> {
+        // In the namespaced flow the root has no templates of its own (each module compiles its
+        // own env) and its scope is already shared by module scopes that hold it as a parent, so
+        // `with_env` (which needs unique ownership) must not run in that case.
+        if self.templates.is_empty() {
+            return Ok(Runtime { scope: self.scope });
+        }
+
         let mut env = Environment::new();
 
         for (name, source) in self.templates {

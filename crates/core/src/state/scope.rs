@@ -235,6 +235,7 @@ impl minijinja::value::Object for Scope {
         match &*slot {
             Object::Var(var) => Some(var.value.clone()),
             Object::Func(func) => Some(Value::from_object(func.clone())),
+            Object::Namespace(ns) => Some(Value::from_object(ns.clone())),
             _ => None,
         }
     }

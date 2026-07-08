@@ -396,3 +396,17 @@ fn positional_required_with_optional_keyword_arg() {
     runtime.call("render", Args::new()).unwrap();
     assert_eq!(*out.lock().unwrap(), "bob!");
 }
+
+#[test]
+fn ns_debug_repro() {
+    let main = nova::manifest().name("main").on([nova::Trigger::Run { priority: Some(5) }])
+        .var("count", 3)
+        .step(nova::step().name("greet").run("{{ lib.greeting }}"))
+        .build();
+    let lib = nova::manifest().name("lib").on([nova::Trigger::Call])
+        .var("greeting", "hello")
+        .build();
+    let runtime = nova::Runtime::try_from(vec![main, lib]).unwrap();
+    let out = runtime.call("main", Args::new()).unwrap();
+    println!("{:?}", collect_messages(&out.diagnostics));
+}

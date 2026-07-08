@@ -10,28 +10,43 @@ pub struct Args {
 
 impl Args {
     pub fn run(&self) -> Result<(), Error> {
-        let mut figment = Figment::new();
-        let mut matched = 0usize;
+        let mut manifests: Vec<nova::Manifest> = Vec::new();
 
         for pattern in &self.files {
             for path in glob::glob(pattern)? {
-                figment = figment.merge(Yaml::file(path?));
-                matched += 1;
+                let manifest: nova::Manifest = Figment::new().merge(Yaml::file(path?)).extract()?;
+                manifests.push(manifest);
             }
         }
 
-        if matched == 0 {
+        if manifests.is_empty() {
             return Err(Error::NotFound(self.files.clone()));
         }
 
-        let manifest: nova::Manifest = figment.extract()?;
-        let entrypoint = manifest.name.clone().unwrap_or_else(|| "main".into());
-        let runtime = nova::Runtime::try_from(manifest)?;
-        let output = runtime.call(&entrypoint, nova::Args::new())?;
+        // entrypoints are the `run(..)`-triggered manifests, highest priority first
+        let mut entries: Vec<(String, i64)> = Vec::new();
 
-        for diagnostic in &output.diagnostics {
-            let widget = widgets::diagnostic::new(diagnostic);
-            widgets::println(&widget, widget.width(), widget.height());
+        for manifest in &manifests {
+            let Some(name) = &manifest.name else { continue };
+
+            if let Some(trigger) = manifest.on.iter().find(|t| t.is_run())
+                && !entries.iter().any(|(n, _)| n == name)
+            {
+                entries.push((name.clone(), trigger.priority().unwrap_or(0)));
+            }
+        }
+
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let runtime = nova::Runtime::try_from(manifests)?;
+
+        for (name, _) in &entries {
+            let output = runtime.call(name, nova::Args::new())?;
+
+            for diagnostic in &output.diagnostics {
+                let widget = widgets::diagnostic::new(diagnostic);
+                widgets::println(&widget, widget.width(), widget.height());
+            }
         }
 
         Ok(())

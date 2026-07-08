@@ -1,0 +1,10 @@
+name: lib
+on: [call]
+
+vars:
+  greeting: hello
+
+steps:
+  - name: hello
+    run: |
+      {{ info('hello ' ~ name) }}

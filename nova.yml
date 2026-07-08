@@ -1,17 +1,13 @@
-name: test
-on: [push]
+name: main
+on: [run(5)]
 
 vars:
-  greeting: hello
   count: 3
 
-templates:
-  banner: "=== {{ greeting }} ==="
-
 steps:
-  - name: hello
+  - name: greet
     run: |
-      {{ info(greeting) }}
+      {{ info(lib.greeting) }}
 
   - if: count > 0
     name: check_count
@@ -20,5 +16,9 @@ steps:
         {{ println('count is positive') }}
       {% endif %}
 
+  - name: call_lib
+    run: |
+      {{ lib(name='world') }}
+
   - name: greet_shell
-    shell: echo {{ greeting }} from shell
+    shell: echo {{ lib.greeting }} from shell
