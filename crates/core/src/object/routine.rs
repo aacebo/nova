@@ -32,17 +32,6 @@ impl Routine {
         &self.steps
     }
 
-    pub fn run(&self, caller: &Scope, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
-        let child = self.scope.fork(&self.name, args.to_vec(), kargs.clone());
-
-        for step in &self.steps {
-            step.invoke(child.args(), child.kargs(), &child)?;
-        }
-
-        caller.merge(&child);
-        Ok(())
-    }
-
     pub fn get(&self, key: &str) -> Option<Value> {
         let slot = self.scope.get(key)?;
 
@@ -74,9 +63,22 @@ impl minijinja::value::Object for Routine {
             .and_then(|v| v.downcast_object::<Scope>())
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
-        self.run(caller.as_ref(), positional, &kargs)
+        self.invoke(positional, &kargs, &caller)
             .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
 
         Ok(Value::UNDEFINED)
+    }
+}
+
+impl Action for Routine {
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        let child = self.scope.fork(&self.name, args.to_vec(), kargs.clone());
+
+        for step in &self.steps {
+            step.invoke(child.args(), child.kargs(), &child)?;
+        }
+
+        scope.merge(&child);
+        Ok(())
     }
 }

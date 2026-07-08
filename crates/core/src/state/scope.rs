@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Arena, Diagnostic, Entry, Environment, KArgs, Object, Slot, SlotMut, Traced, Value};
+use crate::{Action, Arena, Diagnostic, Entry, Environment, KArgs, Object, Slot, SlotMut, Traced, Value};
 
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
@@ -92,7 +92,7 @@ impl Scope {
         self.len() == 0
     }
 
-    pub fn fork(&self, name: impl Into<String>, args: Vec<Value>, kargs: impl Into<KArgs>) -> Self {
+    pub fn fork(&self, name: impl Into<String>, args: impl IntoIterator<Item = Value>, kargs: impl Into<KArgs>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: self.0.trace_id,
             name: name.into(),
@@ -100,7 +100,7 @@ impl Scope {
             env: self.0.env.clone(),
             symbols: Default::default(),
             arena: self.0.arena.clone(),
-            args,
+            args: args.into_iter().collect(),
             kargs: kargs.into(),
             diagnostics: Default::default(),
         }))
@@ -209,7 +209,7 @@ impl Scope {
     pub fn call(
         &self,
         name: impl AsRef<str>,
-        args: Vec<Value>,
+        args: impl IntoIterator<Item = Value>,
         kargs: impl Into<KArgs>,
     ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         let name = name.as_ref();
@@ -217,8 +217,9 @@ impl Scope {
         if let Some(slot) = self.get(name)
             && let Some(routine) = slot.as_routine()
         {
+            let args: Vec<_> = args.into_iter().collect();
             let kargs = kargs.into();
-            routine.run(self, &args, &kargs)?;
+            routine.invoke(&args, &kargs, self)?;
             return Ok(None);
         }
 
