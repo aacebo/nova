@@ -65,28 +65,6 @@ pub fn error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     diagnostic.tokens(zyn! { ::nova::Severity::Error }).into()
 }
 
-fn lookup(input: proc_macro::TokenStream, method: TokenStream) -> proc_macro::TokenStream {
-    let (key, ty) = match coerce::split_as(input.into()) {
-        Ok(parts) => parts,
-        Err(err) => return err.to_compile_error().into(),
-    };
-
-    let key = match zyn::syn::parse2::<Expr>(key) {
-        Ok(key) => key,
-        Err(err) => return err.to_compile_error().into(),
-    };
-
-    match ty {
-        None => zyn! { ::nova::scope().{{ method }}({{ key }}) }.into(),
-        Some(ty) => match coerce::variant_accessor(&ty) {
-            Ok(accessor) => {
-                zyn! { ::nova::scope().{{ method }}({{ key }}).filter(|__slot| __slot.{{ accessor }}().is_some()) }.into()
-            }
-            Err(err) => err.to_compile_error().into(),
-        },
-    }
-}
-
 #[proc_macro]
 pub fn get(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     lookup(input, zyn! { get })
@@ -113,4 +91,26 @@ pub fn has(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 pub fn del(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let key = parse_macro_input!(input as Expr);
     zyn! { ::nova::scope().del({{ key }}) }.into()
+}
+
+fn lookup(input: proc_macro::TokenStream, method: TokenStream) -> proc_macro::TokenStream {
+    let (key, ty) = match coerce::split_as(input.into()) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error().into(),
+    };
+
+    let key = match zyn::syn::parse2::<Expr>(key) {
+        Ok(key) => key,
+        Err(err) => return err.to_compile_error().into(),
+    };
+
+    match ty {
+        None => zyn! { ::nova::scope().{{ method }}({{ key }}) }.into(),
+        Some(ty) => match coerce::variant_accessor(&ty) {
+            Ok(accessor) => {
+                zyn! { ::nova::scope().{{ method }}({{ key }}).filter(|__slot| __slot.{{ accessor }}().is_some()) }.into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
+    }
 }
