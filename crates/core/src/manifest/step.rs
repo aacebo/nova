@@ -59,12 +59,35 @@ impl Action for Step {
                     error!("{}", err).emit();
                 }
             }
-            StepBody::Run { run } => match scope.eval(run) {
-                Ok(_) => {}
-                Err(err) => {
+            StepBody::Run { run } => {
+                if let Err(err) = scope.render_str(run) {
                     error!("{}", err).emit();
                 }
-            },
+            }
+            StepBody::Shell { shell } => {
+                let cmd = match scope.render_str(shell) {
+                    Ok(cmd) => cmd,
+                    Err(err) => {
+                        error!("{}", err).emit();
+                        return Ok(());
+                    }
+                };
+
+                let status = std::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+                    .arg(if cfg!(windows) { "/C" } else { "-c" })
+                    .arg(&cmd)
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .status();
+
+                match status {
+                    Ok(status) if !status.success() => {
+                        error!("shell exited {}", status).emit();
+                    }
+                    Ok(_) => {}
+                    Err(err) => error!("{}", err).emit(),
+                }
+            }
         }
 
         Ok(())
@@ -76,6 +99,7 @@ impl Action for Step {
 pub enum StepBody {
     Call { call: String, args: BTreeMap<String, Value> },
     Run { run: String },
+    Shell { shell: String },
 }
 
 #[doc(hidden)]
@@ -106,6 +130,11 @@ pub mod build {
 
         pub fn run(mut self, name: impl Into<String>) -> Self {
             self.body = Some(StepBody::Run { run: name.into() });
+            self
+        }
+
+        pub fn shell(mut self, cmd: impl Into<String>) -> Self {
+            self.body = Some(StepBody::Shell { shell: cmd.into() });
             self
         }
 

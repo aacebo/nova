@@ -103,8 +103,9 @@ impl Traced for ulid::Ulid {
 }
 
 /// Build a `Diagnostic` of the given severity, threading the ambient invocation's
-/// `trace_id` implicitly. Children nest via `; [ ... ]`. The result is a `Diagnostic`
-/// value — call [`Diagnostic::emit`] to push it onto the current scope:
+/// `trace_id` implicitly (or a fresh one outside any invocation). Children nest via
+/// `; [ ... ]`. The result is a `Diagnostic` value — call [`Diagnostic::emit`] to push it
+/// onto the current scope:
 ///
 /// ```ignore
 /// warn!("rate {} exceeded", limit).emit();
@@ -124,14 +125,14 @@ macro_rules! diagnostic {
 #[macro_export]
 macro_rules! __diagnostic_impl {
     ($sev:expr, $fmt:literal $(, $arg:expr)* $(,)? ; [ $($child:expr),* $(,)? ]) => {{
-        let mut __d = $crate::Diagnostic::new(*$crate::scope().trace_id())
+        let mut __d = $crate::Diagnostic::new($crate::trace_id())
             .sev($sev)
             .message(::std::format!($fmt $(, $arg)*));
         $( __d = __d.child($child); )*
         __d
     }};
     ($sev:expr, $fmt:literal $(, $arg:expr)* $(,)?) => {
-        $crate::Diagnostic::new(*$crate::scope().trace_id())
+        $crate::Diagnostic::new($crate::trace_id())
             .sev($sev)
             .message(::std::format!($fmt $(, $arg)*))
     };

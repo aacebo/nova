@@ -35,6 +35,16 @@ impl Args {
         self.0.get(key)
     }
 
+    pub fn push(&mut self, value: impl Into<Value>) -> &mut Self {
+        let idx = self.0.keys().filter(|k| k.parse::<usize>().is_ok()).count();
+        self.0.insert(idx.to_string(), value.into());
+        self
+    }
+
+    pub fn at(&self, n: usize) -> Option<&Value> {
+        self.0.get(&n.to_string())
+    }
+
     pub fn get_required<T>(&self, key: &str) -> Result<T, Box<dyn std::error::Error>>
     where
         T: TryFrom<Value>,

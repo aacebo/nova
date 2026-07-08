@@ -89,19 +89,17 @@ impl minijinja::value::Object for Function {
     fn call(self: &Arc<Self>, state: &minijinja::State<'_, '_>, args: &[Value]) -> Result<Value, minijinja::Error> {
         let (positional, kwargs): (&[Value], Kwargs) = minijinja::value::from_args(args)?;
 
-        if !positional.is_empty() {
-            return Err(minijinja::Error::new(
-                minijinja::ErrorKind::InvalidOperation,
-                format!("\"{}\" takes keyword arguments only", self.name),
-            ));
-        }
-
         let scope = state
             .lookup(Scope::KEY)
             .and_then(|v| v.downcast_object::<Scope>())
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
-        let args = Args::from_kwargs(kwargs)?;
+        let mut args = Args::from_kwargs(kwargs)?;
+
+        for value in positional {
+            args.push(value.clone());
+        }
+
         let child = scope.fork(args);
         let value = {
             let _guard = crate::enter(&child);

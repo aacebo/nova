@@ -10,8 +10,15 @@ templates:
 
 steps:
   - name: hello
-    run: greeting
+    run: |
+      {{ info(greeting) }}
 
   - if: count > 0
     name: check_count
-    run: "'count was positive'"
+    run: |
+      {% if count > 0 %}
+        {{ println('count is positive') }}
+      {% endif %}
+
+  - name: greet_shell
+    shell: echo {{ greeting }} from shell

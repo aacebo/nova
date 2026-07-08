@@ -170,13 +170,13 @@ fn template_composes_callables_and_captures_their_diagnostics() {
     let runtime = nova::new()
         .var("label", "score")
         .func("double", |args: &Args| -> FuncResult {
-            let n = args.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
+            let n = args.at(0).and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
             nova::warn!("doubling {}", n).emit();
             Ok(Some(Value::from(n * 2)))
         })
-        .predicate("is_positive", |args: &Args| Ok(args.get("n") > Some(&Value::from(0))))
+        .predicate("is_positive", |args: &Args| Ok(args.at(0) > Some(&Value::from(0))))
         .action("render", move |_args: &Args| -> ActionResult {
-            *sink.lock().unwrap() = scope().render_str("{{ label }}: {{ double(n=21) }} ({{ is_positive(n=1) }})")?;
+            *sink.lock().unwrap() = scope().render_str("{{ label }}: {{ double(21) }} ({{ is_positive(1) }})")?;
             Ok(())
         })
         .build()
@@ -279,9 +279,9 @@ fn error_paths_surface_at_call_and_build_time() {
 }
 
 /// A `Manifest` hydrates into a runnable `Runtime`: vars/templates resolve, the entrypoint runs
-/// steps in order, a false `if:` guard skips a step, a true `if:` guard runs a step whose
-/// expression compares a var natively, and a failing step surfaces a diagnostic without
-/// aborting the sequence.
+/// steps in order rendering each `run:` template for its side effects, a false `if:` guard skips
+/// a step, a true `if:` guard runs a step whose body is a `{% if %}` block that emits via the
+/// built-in `info()`, and a failing step surfaces a diagnostic without aborting the sequence.
 #[test]
 fn manifest_hydrates_into_a_runnable_runtime() {
     let manifest = nova::manifest()
@@ -289,9 +289,13 @@ fn manifest_hydrates_into_a_runnable_runtime() {
         .var("greeting", "hello")
         .var("count", 3)
         .template("banner", "== {{ greeting }} ==")
-        .step(nova::step().name("say").run("greeting ~ ' world'"))
-        .step(nova::step().guard("count > 10").run("'skipped'"))
-        .step(nova::step().guard("count > 0").run("'count is positive'"))
+        .step(nova::step().name("say").run("{{ info(greeting ~ ' world') }}"))
+        .step(nova::step().guard("count > 10").run("{{ info('skipped') }}"))
+        .step(
+            nova::step()
+                .guard("count > 0")
+                .run("{% if count > 0 %}{{ info('count is positive') }}{% endif %}"),
+        )
         .step(nova::step().call("missing_func", [("k", "v")]))
         .build();
 
@@ -299,7 +303,7 @@ fn manifest_hydrates_into_a_runnable_runtime() {
     let output = runtime.call("flow", Args::new()).unwrap();
     let messages = collect_messages(&output.diagnostics);
 
-    // the `run:` step evaluated its expression against the manifest var
+    // the `run:` step rendered its template against the manifest var and emitted via info()
     assert!(messages.iter().any(|m| m == "hello world"), "{messages:?}");
     // the guarded step whose condition is false did not run
     assert!(!messages.iter().any(|m| m == "skipped"), "{messages:?}");
@@ -307,4 +311,88 @@ fn manifest_hydrates_into_a_runnable_runtime() {
     assert!(messages.iter().any(|m| m == "count is positive"), "{messages:?}");
     // the final step failed (unknown func) yet the earlier steps still ran to completion
     assert!(messages.iter().any(|m| m.contains("missing_func")), "{messages:?}");
+}
+
+/// The built-in `info`/`warn`/`error` template functions are auto-registered on every runtime
+/// and emit diagnostics, taking their message as a positional argument. `print`/`println` write
+/// to stdout instead of diagnostics, so they contribute nothing to the tree. A `{% for %}` block
+/// proves that a `run:` body renders as a full template, not just an expression.
+#[test]
+fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
+    let runtime = nova::manifest()
+        .name("flow")
+        .var("items", vec!["a", "b", "c"])
+        .step(nova::step().run("{% for item in items %}{{ info(item) }}{% endfor %}"))
+        .step(nova::step().run("{{ warn('careful') }}"))
+        .step(nova::step().run("{{ error('boom') }}"))
+        // print/println go to stdout, not diagnostics; included to prove they don't error
+        .step(nova::step().run("{{ print('to stdout') }}{{ println('and a line') }}"))
+        .build();
+
+    let runtime = nova::Runtime::try_from(runtime).unwrap();
+    let output = runtime.call("flow", Args::new()).unwrap();
+    let messages = collect_messages(&output.diagnostics);
+
+    // the block iterated the list and emitted one info per item
+    for item in ["a", "b", "c"] {
+        assert!(messages.iter().any(|m| m == item), "{messages:?}");
+    }
+    assert!(messages.iter().any(|m| m == "careful"), "{messages:?}");
+    assert!(messages.iter().any(|m| m == "boom"), "{messages:?}");
+    // print/println did NOT land in diagnostics
+    assert!(!messages.iter().any(|m| m == "to stdout"), "{messages:?}");
+    assert!(!messages.iter().any(|m| m == "and a line"), "{messages:?}");
+
+    // an error() call escalates the roll-up severity
+    assert_eq!(output.diagnostics[0].severity(), Severity::Error);
+}
+
+/// A `shell` step renders its command as a template (interpolating a scope var) and runs it with
+/// stdout/stderr inherited (piped straight through), so its output is not captured into
+/// diagnostics. A failing command emits an error diagnostic yet the sequence continues.
+#[test]
+fn shell_step_runs_commands_and_reports_failures() {
+    let runtime = nova::manifest()
+        .name("flow")
+        .var("greeting", "hello")
+        .step(nova::step().shell("echo {{ greeting }}"))
+        .step(nova::step().shell("exit 3"))
+        .step(nova::step().run("{{ info('after failure') }}"))
+        .build();
+
+    let runtime = nova::Runtime::try_from(runtime).unwrap();
+    let output = runtime.call("flow", Args::new()).unwrap();
+    let messages = collect_messages(&output.diagnostics);
+
+    // stdout is inherited, not captured — it does not surface as a diagnostic
+    assert!(!messages.iter().any(|m| m == "hello"), "{messages:?}");
+    // the failing command emitted an error mentioning its exit status
+    assert!(messages.iter().any(|m| m.contains("shell exited")), "{messages:?}");
+    // the step after the failure still ran
+    assert!(messages.iter().any(|m| m == "after failure"), "{messages:?}");
+    assert_eq!(output.diagnostics[0].severity(), Severity::Error);
+}
+
+/// Optional arguments still pass by keyword alongside a required positional: a func reads its
+/// required arg via `args.at(0)` and an optional one via `args.get("suffix")`.
+#[test]
+fn positional_required_with_optional_keyword_arg() {
+    let out = Arc::new(Mutex::new(String::new()));
+    let sink = out.clone();
+
+    let runtime = nova::new()
+        .func("greet", |args: &Args| -> FuncResult {
+            let name = args.at(0).map(|v| v.to_string()).unwrap_or_default();
+            let suffix = args.get("suffix").map(|v| v.to_string()).unwrap_or_default();
+            Ok(Some(Value::from(format!("{name}{suffix}"))))
+        })
+        .action("render", move |_args: &Args| -> ActionResult {
+            *sink.lock().unwrap() = scope().render_str("{{ greet('bob', suffix='!') }}")?;
+            Ok(())
+        })
+        .build()
+        .unwrap();
+
+    runtime.call("render", Args::new()).unwrap();
+    assert_eq!(*out.lock().unwrap(), "bob!");
 }

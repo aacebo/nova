@@ -1,4 +1,5 @@
 mod args;
+mod builtin;
 mod diagnostic;
 mod error;
 mod global;
@@ -10,6 +11,7 @@ mod span;
 mod state;
 
 pub use args::*;
+pub use builtin::*;
 pub use diagnostic::*;
 pub use error::*;
 pub use global::*;
@@ -129,10 +131,12 @@ impl Default for Builder {
 
 impl Builder {
     pub fn new() -> Self {
-        Self {
+        let builder = Self {
             templates: Vec::new(),
             scope: Scope::from(Arena::new()),
-        }
+        };
+
+        builtin::register(builder)
     }
 
     pub fn var(self, name: impl Into<String>, value: impl Into<Value>) -> Self {
