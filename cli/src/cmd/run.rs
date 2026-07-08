@@ -1,7 +1,7 @@
 use figment::Figment;
 use figment::providers::{Format, Yaml};
 
-use crate::Error;
+use crate::{Error, widgets};
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Args {
@@ -30,7 +30,8 @@ impl Args {
         let output = runtime.call(&entrypoint, nova::Args::new())?;
 
         for diagnostic in &output.diagnostics {
-            println!("{:#?}", diagnostic);
+            let widget = widgets::diagnostic::new(diagnostic);
+            widgets::println(&widget, widget.width(), widget.height());
         }
 
         Ok(())

@@ -2,9 +2,15 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Widget;
 
 use crate::Error;
+
+pub fn new(title: impl Into<String>) -> Widget {
+    Widget {
+        title: title.into(),
+        ..Widget::default()
+    }
+}
 
 /// A readable, colored error report for the terminal.
 ///
@@ -20,21 +26,14 @@ use crate::Error;
 ///
 /// `source` and `path` are optional and omitted when absent.
 #[derive(Debug, Clone, Default)]
-pub struct ErrorWidget {
+pub struct Widget {
     title: String,
     source: Option<String>,
     path: Option<String>,
     message: String,
 }
 
-impl ErrorWidget {
-    pub fn new(title: impl Into<String>) -> Self {
-        Self {
-            title: title.into(),
-            ..Self::default()
-        }
-    }
-
+impl Widget {
     pub fn source(mut self, source: impl Into<String>) -> Self {
         self.source = Some(source.into());
         self
@@ -88,7 +87,7 @@ impl ErrorWidget {
     }
 }
 
-impl Widget for &ErrorWidget {
+impl ratatui::widgets::Widget for &Widget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         for (i, line) in self.lines().into_iter().enumerate() {
             let y = area.y.saturating_add(i as u16);
@@ -102,26 +101,26 @@ impl Widget for &ErrorWidget {
     }
 }
 
-impl From<&Error> for ErrorWidget {
+impl From<&Error> for Widget {
     fn from(err: &Error) -> Self {
         match err {
             Error::Glob(e) => e.into(),
             Error::Pattern(e) => e.into(),
             Error::Figment(e) => e.into(),
-            Error::Clap(e) => Self::new("invalid arguments").message(e.to_string()),
-            Error::Runtime(e) => Self::new("failed to run manifest").message(e.to_string()),
-            Error::NotFound(patterns) => Self::new("no files matched")
+            Error::Clap(e) => new("invalid arguments").message(e.to_string()),
+            Error::Runtime(e) => new("failed to run manifest").message(e.to_string()),
+            Error::NotFound(patterns) => new("no files matched")
                 .path(patterns.join(", "))
                 .message("check the path, and quote glob patterns so the shell doesn't expand them"),
         }
     }
 }
 
-impl From<&figment::Error> for ErrorWidget {
+impl From<&figment::Error> for Widget {
     fn from(err: &figment::Error) -> Self {
         let source = err.metadata.as_ref().and_then(|m| m.source.as_ref()).map(|s| s.to_string());
         let path = (!err.path.is_empty()).then(|| err.path.join("."));
-        let mut widget = Self::new("failed to load manifest").message(err.kind.to_string());
+        let mut widget = new("failed to load manifest").message(err.kind.to_string());
 
         if let Some(source) = source {
             widget = widget.source(source);
@@ -135,17 +134,17 @@ impl From<&figment::Error> for ErrorWidget {
     }
 }
 
-impl From<&glob::GlobError> for ErrorWidget {
+impl From<&glob::GlobError> for Widget {
     fn from(err: &glob::GlobError) -> Self {
-        Self::new("failed to read file")
+        new("failed to read file")
             .source(err.path().display().to_string())
             .message(err.error().to_string())
     }
 }
 
-impl From<&glob::PatternError> for ErrorWidget {
+impl From<&glob::PatternError> for Widget {
     fn from(err: &glob::PatternError) -> Self {
-        Self::new("invalid glob pattern")
+        new("invalid glob pattern")
             .path(format!("position {}", err.pos))
             .message(err.msg)
     }

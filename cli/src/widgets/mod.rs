@@ -1,15 +1,14 @@
-mod error;
+pub mod diagnostic;
+pub mod error;
 
 use std::io::{IsTerminal, Write};
 
-pub use error::*;
 use ratatui::backend::IntoCrossterm;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::QueueableCommand;
 use ratatui::crossterm::style::{ContentStyle, PrintStyledContent};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use ratatui::widgets::Widget;
 
 /// Render a widget and print it to stderr as inline output — no alternate
 /// screen, no event loop — so it composes with normal shell scrollback.
@@ -18,16 +17,28 @@ use ratatui::widgets::Widget;
 /// then the buffer is written out. On a TTY, each cell keeps its color and
 /// modifiers via crossterm; when stderr is redirected or piped, styling is
 /// dropped so logs and captures stay free of ANSI escapes.
-pub fn print<W: Widget>(widget: W, width: u16, height: u16) {
+pub fn print<W: ratatui::widgets::Widget>(widget: W, width: u16, height: u16) {
+    let stderr = std::io::stderr();
+    let is_terminal = stderr.is_terminal();
+    render(widget, width, height, &mut stderr.lock(), is_terminal);
+}
+
+/// Like [`print`], but writes to stdout — for normal program output such as
+/// diagnostics, keeping stderr reserved for errors.
+pub fn println<W: ratatui::widgets::Widget>(widget: W, width: u16, height: u16) {
+    let stdout = std::io::stdout();
+    let is_terminal = stdout.is_terminal();
+    render(widget, width, height, &mut stdout.lock(), is_terminal);
+}
+
+fn render<W: ratatui::widgets::Widget>(widget: W, width: u16, height: u16, out: &mut impl Write, color: bool) {
     let area = Rect::new(0, 0, width.max(1), height.max(1));
     let mut buf = Buffer::empty(area);
     widget.render(area, &mut buf);
-    blit(&buf);
+    blit(&buf, out, color);
 }
 
-fn blit(buf: &Buffer) {
-    let mut stderr = std::io::stderr();
-    let color = stderr.is_terminal();
+fn blit(buf: &Buffer, out: &mut impl Write, color: bool) {
     let area = buf.area;
 
     for y in area.top()..area.bottom() {
@@ -48,30 +59,30 @@ fn blit(buf: &Buffer) {
             let style = Style::default().fg(cell.fg).bg(cell.bg).add_modifier(cell.modifier);
 
             if run_style != Some(style) {
-                flush_run(&mut stderr, &mut run, run_style, color);
+                flush_run(out, &mut run, run_style, color);
                 run_style = Some(style);
             }
 
             run.push_str(cell.symbol());
         }
 
-        flush_run(&mut stderr, &mut run, run_style, color);
-        let _ = writeln!(stderr);
+        flush_run(out, &mut run, run_style, color);
+        let _ = writeln!(out);
     }
 
-    let _ = stderr.flush();
+    let _ = out.flush();
 }
 
-fn flush_run(stderr: &mut impl Write, run: &mut String, style: Option<Style>, color: bool) {
+fn flush_run(out: &mut impl Write, run: &mut String, style: Option<Style>, color: bool) {
     if run.is_empty() {
         return;
     }
 
     if color {
         let style: ContentStyle = style.unwrap_or_default().into_crossterm();
-        let _ = stderr.queue(PrintStyledContent(style.apply(run.as_str())));
+        let _ = out.queue(PrintStyledContent(style.apply(run.as_str())));
     } else {
-        let _ = write!(stderr, "{run}");
+        let _ = write!(out, "{run}");
     }
 
     run.clear();

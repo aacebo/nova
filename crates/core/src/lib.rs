@@ -1,5 +1,4 @@
 mod args;
-pub mod builtin;
 mod diagnostic;
 mod error;
 mod global;
@@ -130,10 +129,10 @@ impl Default for Builder {
 
 impl Builder {
     pub fn new() -> Self {
-        builtin::register(Self {
+        Self {
             templates: Vec::new(),
             scope: Scope::from(Arena::new()),
-        })
+        }
     }
 
     pub fn var(self, name: impl Into<String>, value: impl Into<Value>) -> Self {
@@ -147,6 +146,7 @@ impl Builder {
         for (name, value) in values {
             self = self.var(name, value);
         }
+
         self
     }
 
@@ -183,6 +183,7 @@ impl Builder {
         for (name, source) in values {
             self = self.template(name, source);
         }
+
         self
     }
 

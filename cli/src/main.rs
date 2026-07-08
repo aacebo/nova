@@ -23,7 +23,7 @@ fn main() {
             std::process::exit(err.exit_code());
         }
         Err(err) => {
-            let widget = widgets::ErrorWidget::from(&err);
+            let widget = widgets::error::Widget::from(&err);
             widgets::print(&widget, widget.width(), widget.height());
             std::process::exit(1);
         }

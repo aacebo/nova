@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use nova::{Args, Diagnostic, Severity, Value, builtin, func, scope, var};
+use nova::{Args, Diagnostic, Severity, Value, func, scope, var};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
@@ -17,7 +17,7 @@ fn collect_messages(diagnostics: &[Diagnostic]) -> Vec<String> {
 }
 
 /// A full "process an order" workflow exercised through one entrypoint: a routine
-/// delegates to an action that branches on a predicate (via the `If` builtin), calls a
+/// delegates to an action that branches on a predicate, calls a
 /// func whose return value is coerced, writes running state with `set!`, renders a
 /// receipt template that reads both a scope var and mid-invocation state, and emits
 /// diagnostics at several nesting levels.
@@ -49,7 +49,14 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
             nova::error!("out of stock").emit();
             Ok(())
         })
-        .action("process", builtin::If::new("in_stock", "fulfill").or_else("reject"))
+        .action("process", |args: &Args| -> ActionResult {
+            if nova::call!("in_stock", args.clone()).map(|v| v.is_true()).unwrap_or(false) {
+                nova::call!("fulfill", args.clone());
+            } else {
+                nova::call!("reject", args.clone());
+            }
+            Ok(())
+        })
         .routine("order", "process")
         .build()
         .unwrap();
@@ -90,7 +97,14 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
             assert!(!nova::has!("total"));
             Ok(())
         })
-        .action("process", builtin::If::new("in_stock", "fulfill").or_else("reject"))
+        .action("process", |args: &Args| -> ActionResult {
+            if nova::call!("in_stock", args.clone()).map(|v| v.is_true()).unwrap_or(false) {
+                nova::call!("fulfill", args.clone());
+            } else {
+                nova::call!("reject", args.clone());
+            }
+            Ok(())
+        })
         .build()
         .unwrap();
 
@@ -103,13 +117,15 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
 }
 
 /// A recursive `factorial` built from scoped state and nested `call!`s: each level reads
-/// its arg, multiplies into an accumulator held in scope, and recurses via a `Not`-gated
+/// its arg, multiplies into an accumulator held in scope, and recurses via a negated
 /// base case. Exercises deep fork/merge, coercion, and predicate composition.
 #[test]
 fn recursive_calls_accumulate_state_and_coerce_results() {
     let runtime = nova::new()
         .predicate("is_zero", |args: &Args| Ok(args.get("n") == Some(&Value::from(0))))
-        .predicate("is_positive", builtin::Not::new("is_zero"))
+        .predicate("is_positive", |args: &Args| {
+            Ok(!nova::call!("is_zero", args.clone()).map(|v| v.is_true()).unwrap_or(false))
+        })
         .func("fact", |args: &Args| -> FuncResult {
             let n = args.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
 
@@ -263,8 +279,9 @@ fn error_paths_surface_at_call_and_build_time() {
 }
 
 /// A `Manifest` hydrates into a runnable `Runtime`: vars/templates resolve, the entrypoint runs
-/// steps in order, an `if:` guard skips a step, the auto-registered `compare` builtin resolves a
-/// `call:` step, and a failing step surfaces a diagnostic without aborting the sequence.
+/// steps in order, a false `if:` guard skips a step, a true `if:` guard runs a step whose
+/// expression compares a var natively, and a failing step surfaces a diagnostic without
+/// aborting the sequence.
 #[test]
 fn manifest_hydrates_into_a_runnable_runtime() {
     let manifest = nova::manifest()
@@ -274,7 +291,7 @@ fn manifest_hydrates_into_a_runnable_runtime() {
         .template("banner", "== {{ greeting }} ==")
         .step(nova::step().name("say").run("greeting ~ ' world'"))
         .step(nova::step().guard("count > 10").run("'skipped'"))
-        .step(nova::step().call("compare", [("left", "count"), ("op", "gt"), ("right", "0")]))
+        .step(nova::step().guard("count > 0").run("'count is positive'"))
         .step(nova::step().call("missing_func", [("k", "v")]))
         .build();
 
@@ -286,8 +303,8 @@ fn manifest_hydrates_into_a_runnable_runtime() {
     assert!(messages.iter().any(|m| m == "hello world"), "{messages:?}");
     // the guarded step whose condition is false did not run
     assert!(!messages.iter().any(|m| m == "skipped"), "{messages:?}");
-    // the auto-registered `compare` builtin resolved the `call:` step without error
-    assert!(!messages.iter().any(|m| m.contains("compare")), "{messages:?}");
+    // the guarded step whose native `count > 0` expression is true did run
+    assert!(messages.iter().any(|m| m == "count is positive"), "{messages:?}");
     // the final step failed (unknown func) yet the earlier steps still ran to completion
     assert!(messages.iter().any(|m| m.contains("missing_func")), "{messages:?}");
 }

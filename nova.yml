@@ -9,16 +9,9 @@ templates:
   banner: "=== {{ greeting }} ==="
 
 steps:
-  - name: say hello
+  - name: hello
     run: greeting
 
-  - name: check count
-    call: compare
-    args:
-      left: count
-      op: gt
-      right: 0
-
   - if: count > 0
-    name: maybe skip
+    name: check_count
     run: "'count was positive'"

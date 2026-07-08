@@ -124,14 +124,14 @@ macro_rules! diagnostic {
 #[macro_export]
 macro_rules! __diagnostic_impl {
     ($sev:expr, $fmt:literal $(, $arg:expr)* $(,)? ; [ $($child:expr),* $(,)? ]) => {{
-        let mut __d = $crate::Diagnostic::new($crate::current_trace_id())
+        let mut __d = $crate::Diagnostic::new(*$crate::scope().trace_id())
             .sev($sev)
             .message(::std::format!($fmt $(, $arg)*));
         $( __d = __d.child($child); )*
         __d
     }};
     ($sev:expr, $fmt:literal $(, $arg:expr)* $(,)?) => {
-        $crate::Diagnostic::new($crate::current_trace_id())
+        $crate::Diagnostic::new(*$crate::scope().trace_id())
             .sev($sev)
             .message(::std::format!($fmt $(, $arg)*))
     };
