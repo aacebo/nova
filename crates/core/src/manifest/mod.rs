@@ -33,7 +33,7 @@ impl TryFrom<Manifest> for Runtime {
     type Error = Box<dyn std::error::Error>;
 
     fn try_from(manifest: Manifest) -> Result<Self, Self::Error> {
-        crate::load(manifest)?.build()
+        crate::new().routine(manifest).build()
     }
 }
 
@@ -41,7 +41,13 @@ impl TryFrom<Vec<Manifest>> for Runtime {
     type Error = Box<dyn std::error::Error>;
 
     fn try_from(manifests: Vec<Manifest>) -> Result<Self, Self::Error> {
-        crate::load_all(manifests)?.build()
+        let mut builder = crate::new();
+
+        for manifest in manifests {
+            builder = builder.routine(manifest);
+        }
+
+        builder.build()
     }
 }
 

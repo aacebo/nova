@@ -201,6 +201,15 @@ impl Scope {
         kargs: impl Into<KArgs>,
     ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         let name = name.as_ref();
+
+        if let Some(slot) = self.get(name)
+            && let Some(routine) = slot.as_routine()
+        {
+            let kargs = kargs.into();
+            routine.run(self, &args, &kargs)?;
+            return Ok(None);
+        }
+
         let func = self.get_func(name)?;
         let child = self.fork(args, kargs);
         let result = {
@@ -265,7 +274,7 @@ impl minijinja::value::Object for Scope {
         match &*slot {
             Object::Var(var) => Some(var.value.clone()),
             Object::Func(func) => Some(Value::from_object(func.clone())),
-            Object::Namespace(ns) => Some(Value::from_object(ns.clone())),
+            Object::Routine(rt) => Some(Value::from_object(rt.clone())),
             _ => None,
         }
     }

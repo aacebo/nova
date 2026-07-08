@@ -6,7 +6,6 @@ mod global;
 mod manifest;
 mod object;
 mod output;
-mod routine;
 mod span;
 mod state;
 
@@ -19,7 +18,6 @@ pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
 pub use output::*;
-pub use routine::*;
 pub use span::*;
 pub use state::*;
 
@@ -69,39 +67,6 @@ pub fn new() -> Builder {
     Builder::new()
 }
 
-pub fn load(manifest: Manifest) -> Result<Builder, Box<dyn std::error::Error>> {
-    load_all([manifest])
-}
-
-pub fn load_all(manifests: impl IntoIterator<Item = Manifest>) -> Result<Builder, Box<dyn std::error::Error>> {
-    let mut merged: std::collections::BTreeMap<String, Manifest> = std::collections::BTreeMap::new();
-
-    for manifest in manifests {
-        let name = manifest.name.clone();
-
-        match merged.get_mut(&name) {
-            Some(existing) => {
-                existing.on.extend(manifest.on);
-                existing.vars.extend(manifest.vars);
-                existing.templates.extend(manifest.templates);
-                existing.steps.extend(manifest.steps);
-            }
-            None => {
-                merged.insert(name, manifest);
-            }
-        }
-    }
-
-    let mut builder = new();
-
-    for (name, manifest) in merged {
-        let scope = builder.module(&name, &manifest)?;
-        builder = builder.namespace(name, scope);
-    }
-
-    Ok(builder)
-}
-
 pub struct Runtime {
     scope: Scope,
 }
@@ -143,8 +108,9 @@ impl Runtime {
 
 #[doc(hidden)]
 pub struct Builder {
-    templates: Vec<(String, String)>,
     scope: Scope,
+    templates: Vec<(String, String)>,
+    manifests: Vec<Manifest>,
 }
 
 impl Default for Builder {
@@ -156,8 +122,9 @@ impl Default for Builder {
 impl Builder {
     pub fn new() -> Self {
         let builder = Self {
-            templates: Vec::new(),
             scope: Scope::from(Arena::new()),
+            templates: Vec::new(),
+            manifests: Vec::new(),
         };
 
         builtin::register(builder)
@@ -196,12 +163,6 @@ impl Builder {
         self
     }
 
-    pub fn routine(self, name: impl Into<String>, entrypoint: impl Into<String>) -> Self {
-        let name = name.into();
-        self.scope.set(name.clone(), Object::action(name, Routine::new(entrypoint)));
-        self
-    }
-
     pub fn template(mut self, name: impl Into<String>, source: impl Into<String>) -> Self {
         self.templates.push((name.into(), source.into()));
         self
@@ -215,74 +176,51 @@ impl Builder {
         self
     }
 
-    pub fn step(self, name: impl Into<String>, step: impl Into<Step>) -> Self {
-        self.action(name, step.into())
-    }
-
-    pub fn steps(self, entrypoint: impl Into<String>, steps: impl IntoIterator<Item = impl Into<Step>>) -> Self {
-        let entrypoint = entrypoint.into();
-        let mut names = Vec::new();
-        let mut this = self;
-
-        for (index, step) in steps.into_iter().enumerate() {
-            let name = format!("{}[{}]", entrypoint, index);
-            this = this.step(name.clone(), step);
-            names.push(name);
-        }
-
-        this.action(entrypoint, Sequence::new(names))
-    }
-
-    pub fn namespace(self, name: impl Into<String>, scope: Scope) -> Self {
-        let name = name.into();
-        self.scope.set(name.clone(), Object::namespace(Namespace::new(name, scope)));
+    pub fn routine(mut self, manifest: impl Into<Manifest>) -> Self {
+        self.manifests.push(manifest.into());
         self
     }
 
-    /// Build an isolated module scope for a manifest: parented to this builder's root scope
-    /// (so builtins and sibling namespaces resolve through the parent chain), but with its own
-    /// compiled template environment and its own vars/steps.
-    fn module(&self, name: &str, manifest: &Manifest) -> Result<Scope, Box<dyn std::error::Error>> {
-        let mut env = Environment::new();
-
-        for (tmpl, source) in &manifest.templates {
-            env.add_template_owned(tmpl.clone(), source.clone())?;
-        }
-
-        let scope = self.scope.fork(Vec::new(), KArgs::new()).with_env(env);
-
-        for (key, value) in &manifest.vars {
-            scope.set_local(key.clone(), Var::new(key.clone(), value.clone()));
-        }
-
-        let mut names = Vec::new();
-
-        for (index, step) in manifest.steps.iter().enumerate() {
-            let step_name = format!("{}[{}]", name, index);
-            scope.set_local(step_name.clone(), Object::action(step_name.clone(), step.clone()));
-            names.push(step_name);
-        }
-
-        scope.set_local(name, Object::action(name, Sequence::new(names)));
-        Ok(scope)
-    }
-
     pub fn build(self) -> Result<Runtime, Box<dyn std::error::Error>> {
-        // In the namespaced flow the root has no templates of its own (each module compiles its
-        // own env) and its scope is already shared by module scopes that hold it as a parent, so
-        // `with_env` (which needs unique ownership) must not run in that case.
-        if self.templates.is_empty() {
-            return Ok(Runtime { scope: self.scope });
-        }
-
         let mut env = Environment::new();
 
         for (name, source) in self.templates {
             env.add_template_owned(name, source)?;
         }
 
-        Ok(Runtime {
-            scope: self.scope.with_env(env),
-        })
+        let root = self.scope.with_env(env);
+        let mut merged: std::collections::BTreeMap<String, Manifest> = std::collections::BTreeMap::new();
+
+        for manifest in self.manifests {
+            match merged.get_mut(&manifest.name) {
+                Some(existing) => {
+                    existing.on.extend(manifest.on);
+                    existing.vars.extend(manifest.vars);
+                    existing.templates.extend(manifest.templates);
+                    existing.steps.extend(manifest.steps);
+                }
+                None => {
+                    merged.insert(manifest.name.clone(), manifest);
+                }
+            }
+        }
+
+        for (name, manifest) in merged {
+            let mut cenv = Environment::new();
+
+            for (tmpl, source) in &manifest.templates {
+                cenv.add_template_owned(tmpl.clone(), source.clone())?;
+            }
+
+            let scope = root.fork(Vec::new(), KArgs::new()).with_env(cenv);
+
+            for (key, value) in &manifest.vars {
+                scope.set_local(key.clone(), Var::new(key.clone(), value.clone()));
+            }
+
+            root.set(name.clone(), Routine::new(name, scope, manifest.steps));
+        }
+
+        Ok(Runtime { scope: root })
     }
 }

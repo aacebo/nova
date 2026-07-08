@@ -26,13 +26,13 @@ pub fn variant_accessor(ty: &Type) -> zyn::syn::Result<Ident> {
     let accessor = match segment.as_deref() {
         Some("Var") => "as_var",
         Some("Function") => "as_func",
-        Some("Namespace") => "as_namespace",
+        Some("Routine") => "as_routine",
         Some("Artifact") => "as_artifact",
         Some("Annotation") => "as_annotation",
         _ => {
             return Err(zyn::syn::Error::new_spanned(
                 ty,
-                "expected an Object variant: Var, Function, Namespace, Artifact, or Annotation",
+                "expected an Object variant: Var, Function, Routine, Artifact, or Annotation",
             ));
         }
     };

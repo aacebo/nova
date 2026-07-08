@@ -59,11 +59,10 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
             }
             Ok(())
         })
-        .routine("order", "process")
         .build()
         .unwrap();
 
-    let output = runtime.call("order", [("qty", 3), ("unit", 5)]).unwrap();
+    let output = runtime.call("process", [("qty", 3), ("unit", 5)]).unwrap();
 
     // template saw the scope var (`store`), the invocation args (`qty`/`unit`), and the
     // state written mid-invocation (`total`)
