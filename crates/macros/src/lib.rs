@@ -14,9 +14,7 @@ use crate::key_value::KeyValue;
 #[proc_macro]
 pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let Call { name, args, coerce } = parse_macro_input!(input as Call);
-
     let stmts: Vec<_> = args.iter().map(args::Arg::stmt).collect();
-
     let invoke = zyn! {
         {
             let mut __args: ::std::vec::Vec<::nova::Value> = ::std::vec::Vec::new();
