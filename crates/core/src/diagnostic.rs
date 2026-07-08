@@ -75,8 +75,8 @@ impl Diagnostic {
         self
     }
 
-    pub fn emit(self) {
-        crate::scope().emit(self);
+    pub fn emit(self, scope: &crate::Scope) {
+        scope.emit(self);
     }
 
     pub fn severity(&self) -> Severity {
@@ -99,5 +99,11 @@ pub trait Traced {
 impl Traced for ulid::Ulid {
     fn trace_id(&self) -> ulid::Ulid {
         *self
+    }
+}
+
+impl<T: Traced + ?Sized> Traced for &T {
+    fn trace_id(&self) -> ulid::Ulid {
+        (**self).trace_id()
     }
 }

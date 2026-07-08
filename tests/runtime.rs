@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use nova::{Diagnostic, KArgs, Severity, Value, scope};
+use nova::{Diagnostic, KArgs, Scope, Severity, Value};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
@@ -24,29 +24,32 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
     let runtime = nova::new()
         .var("store", "nova-mart")
         .template("receipt", "{{ store }}: {{ qty }} x {{ unit }} = {{ total }}")
-        .predicate("in_stock", |_args: &[Value], kargs: &KArgs| {
+        .predicate("in_stock", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             Ok(kargs.get("qty") > Some(&Value::from(0)))
         })
-        .func("subtotal", |_args: &[Value], kargs: &KArgs| -> FuncResult {
+        .func("subtotal", |_args: &[Value], kargs: &KArgs, scope: &Scope| -> FuncResult {
             let qty = kargs.get("qty").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
             let unit = kargs.get("unit").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
-            nova::info!("priced {} units", qty).emit();
+            nova::info!("priced {} units", qty).emit(scope);
             Ok(Some(Value::from(qty * unit)))
         })
-        .action("fulfill", move |args: &[Value], kargs: &KArgs| -> ActionResult {
-            nova::warn!("fulfilling order").emit();
+        .action(
+            "fulfill",
+            move |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
+                nova::warn!("fulfilling order").emit(scope);
 
-            let total = nova::call!("subtotal", *args, **kargs as u64).unwrap_or(0);
-            nova::set!("total", nova::Var::new("total", total));
+                let total = nova::call!("subtotal", *args, **kargs as u64).unwrap_or(0);
+                nova::set!("total", nova::Var::new("total", total));
 
-            *sink.lock().unwrap() = scope().render("receipt")?;
+                *sink.lock().unwrap() = scope.render("receipt")?;
+                Ok(())
+            },
+        )
+        .action("reject", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+            nova::error!("out of stock").emit(scope);
             Ok(())
         })
-        .action("reject", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            nova::error!("out of stock").emit();
-            Ok(())
-        })
-        .action("process", |args: &[Value], kargs: &KArgs| -> ActionResult {
+        .action("process", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
             if nova::call!("in_stock", *args, **kargs).map(|v| v.is_true()).unwrap_or(false) {
                 nova::call!("fulfill", *args, **kargs);
             } else {
@@ -77,19 +80,22 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
     let sink = receipt.clone();
 
     let runtime = nova::new()
-        .predicate("in_stock", |_args: &[Value], kargs: &KArgs| {
+        .predicate("in_stock", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             Ok(kargs.get("qty") > Some(&Value::from(0)))
         })
-        .action("fulfill", move |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            *sink.lock().unwrap() = String::from("fulfilled");
-            Ok(())
-        })
-        .action("reject", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            nova::error!("out of stock").emit();
+        .action(
+            "fulfill",
+            move |_args: &[Value], _kargs: &KArgs, _scope: &Scope| -> ActionResult {
+                *sink.lock().unwrap() = String::from("fulfilled");
+                Ok(())
+            },
+        )
+        .action("reject", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+            nova::error!("out of stock").emit(scope);
             assert!(!nova::has!("total"));
             Ok(())
         })
-        .action("process", |args: &[Value], kargs: &KArgs| -> ActionResult {
+        .action("process", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
             if nova::call!("in_stock", *args, **kargs).map(|v| v.is_true()).unwrap_or(false) {
                 nova::call!("fulfill", *args, **kargs);
             } else {
@@ -111,13 +117,13 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
 #[test]
 fn recursive_calls_accumulate_state_and_coerce_results() {
     let runtime = nova::new()
-        .predicate("is_zero", |_args: &[Value], kargs: &KArgs| {
+        .predicate("is_zero", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             Ok(kargs.get("n") == Some(&Value::from(0)))
         })
-        .predicate("is_positive", |args: &[Value], kargs: &KArgs| {
+        .predicate("is_positive", |args: &[Value], kargs: &KArgs, scope: &Scope| {
             Ok(!nova::call!("is_zero", *args, **kargs).map(|v| v.is_true()).unwrap_or(false))
         })
-        .func("fact", |_args: &[Value], kargs: &KArgs| -> FuncResult {
+        .func("fact", |_args: &[Value], kargs: &KArgs, scope: &Scope| -> FuncResult {
             let n = kargs.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
 
             if n == 0 {
@@ -127,12 +133,12 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
             let sub = nova::call!("fact", n = n - 1 as u64).unwrap_or(1);
             Ok(Some(Value::from(n * sub)))
         })
-        .action("run", |args: &[Value], kargs: &KArgs| -> ActionResult {
+        .action("run", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
             assert!(nova::call!("is_positive", *args, **kargs).unwrap().is_true());
 
             let result = nova::call!("fact", *args, **kargs as u64).unwrap_or(0);
             nova::set!("result", nova::Var::new("result", result));
-            nova::info!("factorial = {}", result).emit();
+            nova::info!("factorial = {}", result).emit(scope);
             Ok(())
         })
         .build()
@@ -154,18 +160,21 @@ fn template_composes_callables_and_captures_their_diagnostics() {
 
     let runtime = nova::new()
         .var("label", "score")
-        .func("double", |args: &[Value], _kargs: &KArgs| -> FuncResult {
+        .func("double", |args: &[Value], _kargs: &KArgs, scope: &Scope| -> FuncResult {
             let n = args.first().and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
-            nova::warn!("doubling {}", n).emit();
+            nova::warn!("doubling {}", n).emit(scope);
             Ok(Some(Value::from(n * 2)))
         })
-        .predicate("is_positive", |args: &[Value], _kargs: &KArgs| {
+        .predicate("is_positive", |args: &[Value], _kargs: &KArgs, _scope: &Scope| {
             Ok(args.first() > Some(&Value::from(0)))
         })
-        .action("render", move |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            *sink.lock().unwrap() = scope().render_str("{{ label }}: {{ double(21) }} ({{ is_positive(1) }})")?;
-            Ok(())
-        })
+        .action(
+            "render",
+            move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+                *sink.lock().unwrap() = scope.render_str("{{ label }}: {{ double(21) }} ({{ is_positive(1) }})")?;
+                Ok(())
+            },
+        )
         .build()
         .unwrap();
 
@@ -182,15 +191,18 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
     let calls = seen.clone();
 
     let runtime = nova::new()
-        .predicate("even", |_args: &[Value], kargs: &KArgs| {
+        .predicate("even", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             let n = kargs.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(1);
             Ok(n.is_multiple_of(2))
         })
-        .action("callee", move |_args: &[Value], kargs: &KArgs| -> ActionResult {
-            calls.lock().unwrap().push(kargs.clone());
-            Ok(())
-        })
-        .action("caller", |_args: &[Value], kargs: &KArgs| -> ActionResult {
+        .action(
+            "callee",
+            move |_args: &[Value], kargs: &KArgs, _scope: &Scope| -> ActionResult {
+                calls.lock().unwrap().push(kargs.clone());
+                Ok(())
+            },
+        )
+        .action("caller", |_args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
             assert_eq!(kargs.get("n"), Some(&Value::from(1)));
             nova::call!("callee", n = 2);
             assert_eq!(kargs.get("n"), Some(&Value::from(1)));
@@ -214,22 +226,25 @@ fn set_registers_bindings_into_the_live_scope() {
     let sink = out.clone();
 
     let runtime = nova::new()
-        .action("setup", move |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            nova::set!("greeting", nova::Var::new("greeting", "hello"));
-            nova::set!(
-                "shout",
-                nova::Object::func("shout", |_args: &[Value], kargs: &KArgs| -> FuncResult {
-                    let word = kargs.get("word").map(|v| v.to_string()).unwrap_or_default();
-                    Ok(Some(Value::from(word.to_uppercase())))
-                })
-            );
+        .action(
+            "setup",
+            move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+                nova::set!("greeting", nova::Var::new("greeting", "hello"));
+                nova::set!(
+                    "shout",
+                    nova::Object::func("shout", |_args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
+                        let word = kargs.get("word").map(|v| v.to_string()).unwrap_or_default();
+                        Ok(Some(Value::from(word.to_uppercase())))
+                    })
+                );
 
-            let loud = nova::call!("shout", word = "hey").unwrap();
-            assert_eq!(loud, Value::from("HEY"));
+                let loud = nova::call!("shout", word = "hey").unwrap();
+                assert_eq!(loud, Value::from("HEY"));
 
-            *sink.lock().unwrap() = scope().render_str("{{ greeting }}")?;
-            Ok(())
-        })
+                *sink.lock().unwrap() = scope.render_str("{{ greeting }}")?;
+                Ok(())
+            },
+        )
         .build()
         .unwrap();
 
@@ -240,10 +255,10 @@ fn set_registers_bindings_into_the_live_scope() {
 #[test]
 fn error_paths_surface_at_call_and_build_time() {
     let runtime = nova::new()
-        .func("boom", |_args: &[Value], _kargs: &KArgs| -> FuncResult {
+        .func("boom", |_args: &[Value], _kargs: &KArgs, _scope: &Scope| -> FuncResult {
             Err(nova::Error::message("kaboom").into())
         })
-        .action("caller", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+        .action("caller", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             nova::call!("boom");
             Ok(())
         })
@@ -334,15 +349,18 @@ fn positional_required_with_optional_keyword_arg() {
     let sink = out.clone();
 
     let runtime = nova::new()
-        .func("greet", |args: &[Value], kargs: &KArgs| -> FuncResult {
+        .func("greet", |args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
             let name = args.first().map(|v| v.to_string()).unwrap_or_default();
             let suffix = kargs.get("suffix").map(|v| v.to_string()).unwrap_or_default();
             Ok(Some(Value::from(format!("{name}{suffix}"))))
         })
-        .action("render", move |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            *sink.lock().unwrap() = scope().render_str("{{ greet('bob', suffix='!') }}")?;
-            Ok(())
-        })
+        .action(
+            "render",
+            move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+                *sink.lock().unwrap() = scope.render_str("{{ greet('bob', suffix='!') }}")?;
+                Ok(())
+            },
+        )
         .build()
         .unwrap();
 

@@ -2,7 +2,6 @@ mod args;
 mod builtin;
 mod diagnostic;
 mod error;
-mod global;
 mod manifest;
 mod object;
 mod output;
@@ -13,27 +12,27 @@ pub use args::*;
 pub use builtin::*;
 pub use diagnostic::*;
 pub use error::*;
-pub use global::*;
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
 pub use output::*;
 pub use span::*;
 pub use state::*;
+pub use ulid;
 
 pub type Value = minijinja::Value;
 pub type Environment<'a> = minijinja::Environment<'a>;
 
 pub trait Action: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 pub trait Predicate: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<bool, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<bool, Box<dyn std::error::Error>>;
 }
 
 pub trait Call: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>>;
 }
 
 pub trait Observer: Send + Sync {
@@ -49,28 +48,28 @@ pub trait Observer: Send + Sync {
 
 impl<F> Action for F
 where
-    F: Fn(&[Value], &KArgs) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs, &Scope) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
-        self(args, kargs)
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        self(args, kargs, scope)
     }
 }
 
 impl<F> Predicate for F
 where
-    F: Fn(&[Value], &KArgs) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs, &Scope) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<bool, Box<dyn std::error::Error>> {
-        self(args, kargs)
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<bool, Box<dyn std::error::Error>> {
+        self(args, kargs, scope)
     }
 }
 
 impl<F> Call for F
 where
-    F: Fn(&[Value], &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs, &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        self(args, kargs)
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self(args, kargs, scope)
     }
 }
 

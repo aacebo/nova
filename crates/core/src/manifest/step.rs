@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{Action, KArgs, Value, emit, scope};
+use crate::{Action, KArgs, Scope, Value};
 
 pub fn step() -> build::StepBuilder {
     build::StepBuilder::new()
@@ -33,9 +33,7 @@ impl std::ops::DerefMut for Step {
 }
 
 impl Action for Step {
-    fn invoke(&self, _args: &[Value], _kargs: &KArgs) -> Result<(), Box<dyn std::error::Error>> {
-        let scope = scope();
-
+    fn invoke(&self, _args: &[Value], _kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(cond) = &self.cond
             && !scope.eval(cond).map(|v| v.is_true()).unwrap_or(false)
         {
@@ -56,19 +54,19 @@ impl Action for Step {
                 }
 
                 if let Err(err) = scope.call(call, Vec::new(), kargs) {
-                    emit([err.to_string()]);
+                    scope.error(err.to_string());
                 }
             }
             StepBody::Run { run } => {
                 if let Err(err) = scope.render_str(run) {
-                    emit([err.to_string()]);
+                    scope.error(err.to_string());
                 }
             }
             StepBody::Shell { shell } => {
                 let cmd = match scope.render_str(shell) {
                     Ok(cmd) => cmd,
                     Err(err) => {
-                        emit([err.to_string()]);
+                        scope.error(err.to_string());
                         return Ok(());
                     }
                 };
@@ -82,10 +80,12 @@ impl Action for Step {
 
                 match status {
                     Ok(status) if !status.success() => {
-                        emit([format!("shell exited {}", status)]);
+                        scope.error(format!("shell exited {}", status));
                     }
                     Ok(_) => {}
-                    Err(err) => emit([err.to_string()]),
+                    Err(err) => {
+                        scope.error(err.to_string());
+                    }
                 }
             }
         }

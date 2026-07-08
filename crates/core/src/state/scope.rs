@@ -72,6 +72,10 @@ impl Scope {
         self
     }
 
+    pub fn error(&self, message: impl Into<String>) -> &Self {
+        self.emit(Diagnostic::new(self.0.trace_id).sev(crate::Severity::Error).message(message))
+    }
+
     pub fn take_diagnostics(&self) -> Vec<Diagnostic> {
         self.0.diagnostics.lock().unwrap().drain(..).collect()
     }
@@ -220,11 +224,7 @@ impl Scope {
 
         let func = self.get_func(name)?;
         let child = self.fork(name, args, kargs);
-        let result = {
-            let _guard = crate::enter(&child);
-            func.invoke(child.args(), child.kargs())
-        };
-
+        let result = func.invoke(child.args(), child.kargs(), &child);
         self.merge(&child);
         result
     }

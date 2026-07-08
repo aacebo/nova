@@ -1,18 +1,18 @@
-use nova::{KArgs, Value, Var, del, get, get_mut, has, scope, set};
+use nova::{KArgs, Scope, Value, Var, del, get, get_mut, has, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn scope_bindings_lifecycle_through_macros() {
     let runtime = nova::new()
-        .action("run", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            let baseline = scope().len();
+        .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+            let baseline = scope.len();
             assert!(!has!("x"));
 
             set!("x", Var::new("x", 1));
             set!("x", Var::new("x", 2));
             assert!(has!("x"));
-            assert_eq!(scope().len(), baseline + 1);
+            assert_eq!(scope.len(), baseline + 1);
             assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(2));
 
             {
@@ -24,7 +24,7 @@ fn scope_bindings_lifecycle_through_macros() {
             del!("x");
             assert!(!has!("x"));
             assert!(get!("x").is_none());
-            assert_eq!(scope().len(), baseline);
+            assert_eq!(scope.len(), baseline);
             Ok(())
         })
         .build()
@@ -36,14 +36,14 @@ fn scope_bindings_lifecycle_through_macros() {
 #[test]
 fn forked_scopes_resolve_and_write_through_to_ancestors() {
     let runtime = nova::new()
-        .action("child", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+        .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             assert_eq!(get!("base").unwrap().as_var().unwrap().value, Value::from(1));
 
             set!("base", Var::new("base", 2));
             set!("fresh", Var::new("fresh", 7));
             Ok(())
         })
-        .action("parent", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+        .action("parent", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             set!("base", Var::new("base", 1));
 
             nova::call!("child");
@@ -61,12 +61,12 @@ fn forked_scopes_resolve_and_write_through_to_ancestors() {
 #[test]
 fn child_deletion_recurses_to_the_owning_ancestor() {
     let runtime = nova::new()
-        .action("child", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+        .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             assert!(has!("x"));
             del!("x");
             Ok(())
         })
-        .action("parent", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+        .action("parent", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             set!("x", Var::new("x", 1));
 
             nova::call!("child");
@@ -84,7 +84,7 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
 #[test]
 fn typed_get_filters_by_object_variant() {
     let runtime = nova::new()
-        .action("run", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
+        .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             set!("x", Var::new("x", 1));
 
             {

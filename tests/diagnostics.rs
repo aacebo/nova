@@ -1,12 +1,12 @@
-use nova::{KArgs, Severity, Value, error, info, scope, warn};
+use nova::{KArgs, Scope, Severity, Value, error, info, warn};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
     let runtime = nova::new()
-        .action("run", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            let trace_id = *scope().trace_id();
+        .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+            let trace_id = *scope.trace_id();
 
             let d = info!("request {}", 7 ; [
                 info!("validated"),
@@ -31,9 +31,9 @@ fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
 #[test]
 fn fluent_builders_and_emit_populate_the_scope_buffer() {
     let runtime = nova::new()
-        .action("run", |_args: &[Value], _kargs: &KArgs| -> ActionResult {
-            warn!("job").warn("step a").error("step b").emit();
-            info!("done").emit();
+        .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+            warn!("job").warn("step a").error("step b").emit(scope);
+            info!("done").emit(scope);
             Ok(())
         })
         .build()
@@ -56,7 +56,13 @@ fn fluent_builders_and_emit_populate_the_scope_buffer() {
 
 #[test]
 fn diagnostics_built_outside_an_invocation_get_fresh_ids() {
-    let a = warn!("orphan");
-    let b = warn!("orphan");
+    let a = {
+        let scope = nova::ulid::Ulid::new();
+        warn!("orphan")
+    };
+    let b = {
+        let scope = nova::ulid::Ulid::new();
+        warn!("orphan")
+    };
     assert_ne!(a.trace_id, b.trace_id);
 }

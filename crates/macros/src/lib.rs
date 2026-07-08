@@ -48,19 +48,19 @@ pub fn get_mut(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[proc_macro]
 pub fn set(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let KeyValue { key, value } = parse_macro_input!(input as KeyValue);
-    zyn! { ::nova::scope().set({{ key }}, {{ value }}) }.into()
+    zyn! { scope.set({{ key }}, {{ value }}) }.into()
 }
 
 #[proc_macro]
 pub fn has(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let key = parse_macro_input!(input as Expr);
-    zyn! { ::nova::scope().has({{ key }}) }.into()
+    zyn! { scope.has({{ key }}) }.into()
 }
 
 #[proc_macro]
 pub fn del(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let key = parse_macro_input!(input as Expr);
-    zyn! { ::nova::scope().del({{ key }}) }.into()
+    zyn! { scope.del({{ key }}) }.into()
 }
 
 #[proc_macro]
@@ -74,7 +74,7 @@ pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             @for (stmt in stmts.iter()) {
                 {{ stmt }}
             }
-            ::nova::scope().call({{ name }}, __args, __kargs)?
+            scope.call({{ name }}, __args, __kargs)?
         }
     };
 
@@ -105,11 +105,9 @@ fn lookup(input: proc_macro::TokenStream, method: TokenStream) -> proc_macro::To
     };
 
     match ty {
-        None => zyn! { ::nova::scope().{{ method }}({{ key }}) }.into(),
+        None => zyn! { scope.{{ method }}({{ key }}) }.into(),
         Some(ty) => match coerce::variant_accessor(&ty) {
-            Ok(accessor) => {
-                zyn! { ::nova::scope().{{ method }}({{ key }}).filter(|__slot| __slot.{{ accessor }}().is_some()) }.into()
-            }
+            Ok(accessor) => zyn! { scope.{{ method }}({{ key }}).filter(|__slot| __slot.{{ accessor }}().is_some()) }.into(),
             Err(err) => err.to_compile_error().into(),
         },
     }

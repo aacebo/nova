@@ -24,14 +24,14 @@ impl Callback {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
-                action.invoke(args, kargs)?;
+                action.invoke(args, kargs, scope)?;
                 Ok(None)
             }
-            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args, kargs)?))),
-            Self::Func(func) => func.invoke(args, kargs),
+            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args, kargs, scope)?))),
+            Self::Func(func) => func.invoke(args, kargs, scope),
         }
     }
 }
@@ -74,8 +74,8 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, args: &[Value], kargs: &KArgs) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        self.callback.invoke(args, kargs)
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        self.callback.invoke(args, kargs, scope)
     }
 }
 
@@ -95,11 +95,10 @@ impl minijinja::value::Object for Function {
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
         let child = scope.fork(&self.name, positional.to_vec(), kargs);
-        let value = {
-            let _guard = crate::enter(&child);
-            self.callback.invoke(child.args(), child.kargs())
-        }
-        .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
+        let value = self
+            .callback
+            .invoke(child.args(), child.kargs(), &child)
+            .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
         scope.merge(&child);
         Ok(value.unwrap_or(Value::UNDEFINED))
     }
