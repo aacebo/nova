@@ -2,39 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, Call, KArgs, Predicate, Scope, Value};
-
-#[derive(Clone)]
-pub enum Callback {
-    Action(Arc<dyn Action>),
-    Predicate(Arc<dyn Predicate>),
-    Func(Arc<dyn Call>),
-}
-
-impl Callback {
-    pub fn action(action: impl Action + 'static) -> Self {
-        Self::Action(Arc::new(action))
-    }
-
-    pub fn predicate(predicate: impl Predicate + 'static) -> Self {
-        Self::Predicate(Arc::new(predicate))
-    }
-
-    pub fn func(func: impl Call + 'static) -> Self {
-        Self::Func(Arc::new(func))
-    }
-
-    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        match self {
-            Self::Action(action) => {
-                action.invoke(args, kargs, scope)?;
-                Ok(None)
-            }
-            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args, kargs, scope)?))),
-            Self::Func(func) => func.invoke(args, kargs, scope),
-        }
-    }
-}
+use crate::{Action, Call, KArgs, Predicate, Reflect, Scope, Value};
 
 #[derive(Clone)]
 pub struct Function {
@@ -85,7 +53,7 @@ impl std::fmt::Debug for Function {
     }
 }
 
-impl minijinja::value::Object for Function {
+impl Reflect for Function {
     fn call(self: &Arc<Self>, state: &minijinja::State<'_, '_>, args: &[Value]) -> Result<Value, minijinja::Error> {
         let (positional, kwargs): (&[Value], Kwargs) = minijinja::value::from_args(args)?;
         let kargs = KArgs::from_kwargs(kwargs)?;
@@ -101,5 +69,37 @@ impl minijinja::value::Object for Function {
             .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
         scope.merge(&child);
         Ok(value.unwrap_or(Value::UNDEFINED))
+    }
+}
+
+#[derive(Clone)]
+pub enum Callback {
+    Action(Arc<dyn Action>),
+    Predicate(Arc<dyn Predicate>),
+    Func(Arc<dyn Call>),
+}
+
+impl Callback {
+    pub fn action(action: impl Action + 'static) -> Self {
+        Self::Action(Arc::new(action))
+    }
+
+    pub fn predicate(predicate: impl Predicate + 'static) -> Self {
+        Self::Predicate(Arc::new(predicate))
+    }
+
+    pub fn func(func: impl Call + 'static) -> Self {
+        Self::Func(Arc::new(func))
+    }
+
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        match self {
+            Self::Action(action) => {
+                action.invoke(args, kargs, scope)?;
+                Ok(None)
+            }
+            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args, kargs, scope)?))),
+            Self::Func(func) => func.invoke(args, kargs, scope),
+        }
     }
 }

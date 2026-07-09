@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, KArgs, Object, Scope, Step, Value};
+use crate::{Action, KArgs, Object, Reflect, Scope, Step, Value};
 
 #[derive(Clone)]
 pub struct Routine {
@@ -36,10 +36,9 @@ impl Routine {
         let slot = self.scope.get(key)?;
 
         match &*slot {
-            Object::Var(var) => Some(var.value.clone()),
+            Object::Value(value) => Some(value.clone()),
             Object::Func(func) => Some(Value::from_object(func.clone())),
             Object::Routine(rt) => Some(Value::from_object(rt.clone())),
-            _ => None,
         }
     }
 }
@@ -50,7 +49,7 @@ impl std::fmt::Debug for Routine {
     }
 }
 
-impl minijinja::value::Object for Routine {
+impl Reflect for Routine {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         self.get(key.as_str()?)
     }

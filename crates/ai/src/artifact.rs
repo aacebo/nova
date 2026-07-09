@@ -1,8 +1,27 @@
+use nova_core::{Reflect, Value};
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Artifact {
     pub name: String,
     pub value: ArtifactContent,
     pub vector: Option<Vec<f32>>,
+}
+
+impl Reflect for Artifact {
+    fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
+        let key = key.as_str()?;
+
+        if key == "name" {
+            Some((&self.name).into())
+        } else if key == "value" {
+            Some(match &self.value {
+                ArtifactContent::Text(v) => v.into(),
+                ArtifactContent::File(v) => v.display().to_string().into(),
+            })
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

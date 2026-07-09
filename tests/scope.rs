@@ -1,4 +1,4 @@
-use nova::{KArgs, Scope, Value, Var, del, get, get_mut, has, set};
+use nova::{KArgs, Scope, Value, del, get, get_mut, has, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -9,17 +9,17 @@ fn scope_bindings_lifecycle_through_macros() {
             let baseline = scope.len();
             assert!(!has!("x"));
 
-            set!("x", Var::new("x", 1));
-            set!("x", Var::new("x", 2));
+            set!("x", 1);
+            set!("x", 2);
             assert!(has!("x"));
             assert_eq!(scope.len(), baseline + 1);
-            assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(2));
+            assert_eq!(get!("x").unwrap().clone(), Value::from(2));
 
             {
                 let mut slot = get_mut!("x").expect("x should be set");
-                slot.as_var_mut().unwrap().value = Value::from(9);
+                *slot.as_value_mut().unwrap() = Value::from(9);
             }
-            assert_eq!(get!("x").unwrap().as_var().unwrap().value, Value::from(9));
+            assert_eq!(get!("x").unwrap().clone(), Value::from(9));
 
             del!("x");
             assert!(!has!("x"));
@@ -37,19 +37,19 @@ fn scope_bindings_lifecycle_through_macros() {
 fn forked_scopes_resolve_and_write_through_to_ancestors() {
     let runtime = nova::new()
         .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-            assert_eq!(get!("base").unwrap().as_var().unwrap().value, Value::from(1));
+            assert_eq!(get!("base").unwrap().clone(), Value::from(1));
 
-            set!("base", Var::new("base", 2));
-            set!("fresh", Var::new("fresh", 7));
+            set!("base", 2);
+            set!("fresh", 7);
             Ok(())
         })
         .action("parent", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-            set!("base", Var::new("base", 1));
+            set!("base", 1);
 
             nova::call!("child");
 
-            assert_eq!(get!("base").unwrap().as_var().unwrap().value, Value::from(2));
-            assert_eq!(get!("fresh").unwrap().as_var().unwrap().value, Value::from(7));
+            assert_eq!(get!("base").unwrap().clone(), Value::from(2));
+            assert_eq!(get!("fresh").unwrap().clone(), Value::from(7));
             Ok(())
         })
         .build()
@@ -67,7 +67,7 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
             Ok(())
         })
         .action("parent", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-            set!("x", Var::new("x", 1));
+            set!("x", 1);
 
             nova::call!("child");
 
@@ -85,14 +85,14 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
 fn typed_get_filters_by_object_variant() {
     let runtime = nova::new()
         .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-            set!("x", Var::new("x", 1));
+            set!("x", 1);
 
             {
-                let mut slot = get_mut!("x" as Var).expect("x is a Var");
-                slot.as_var_mut().unwrap().value = Value::from(9);
+                let mut slot = get_mut!("x" as Value).expect("x is a Var");
+                *slot.as_value_mut().unwrap() = Value::from(9);
             }
 
-            assert_eq!(get!("x" as Var).unwrap().as_var().unwrap().value, Value::from(9));
+            assert_eq!(get!("x" as Value).unwrap().clone(), Value::from(9));
             assert!(get!("x" as Function).is_none());
             assert!(get_mut!("x" as Function).is_none());
             Ok(())

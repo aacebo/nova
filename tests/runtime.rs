@@ -39,7 +39,7 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
                 nova::warn!("fulfilling order").emit(scope);
 
                 let total = nova::call!("subtotal", *args, **kargs as u64).unwrap_or(0);
-                nova::set!("total", nova::Var::new("total", total));
+                nova::set!("total", total);
 
                 *sink.lock().unwrap() = scope.render("receipt")?;
                 Ok(())
@@ -137,7 +137,7 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
             assert!(nova::call!("is_positive", *args, **kargs).unwrap().is_true());
 
             let result = nova::call!("fact", *args, **kargs as u64).unwrap_or(0);
-            nova::set!("result", nova::Var::new("result", result));
+            nova::set!("result", result);
             nova::info!("factorial = {}", result).emit(scope);
             Ok(())
         })
@@ -229,7 +229,7 @@ fn set_registers_bindings_into_the_live_scope() {
         .action(
             "setup",
             move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-                nova::set!("greeting", nova::Var::new("greeting", "hello"));
+                nova::set!("greeting", "hello");
                 nova::set!(
                     "shout",
                     nova::Object::func("shout", |_args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {

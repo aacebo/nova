@@ -2,26 +2,26 @@ mod args;
 mod builtin;
 mod diagnostic;
 mod error;
+pub mod events;
 mod manifest;
 mod object;
 mod output;
-mod span;
 mod state;
 
 pub use args::*;
 pub use builtin::*;
 pub use diagnostic::*;
 pub use error::*;
+pub use events::Event;
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
 pub use output::*;
-pub use span::*;
 pub use state::*;
-pub use ulid;
 
 pub type Value = minijinja::Value;
 pub type Environment<'a> = minijinja::Environment<'a>;
+pub use minijinja::value::Object as Reflect;
 
 pub trait Action: Send + Sync {
     fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>>;
@@ -33,17 +33,6 @@ pub trait Predicate: Send + Sync {
 
 pub trait Call: Send + Sync {
     fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>>;
-}
-
-pub trait Observer: Send + Sync {
-    #![allow(unused)]
-
-    fn on_create(&self, object: &Object) {}
-    fn on_update(&self, object: &Object) {}
-    fn on_delete(&self, object: &Object) {}
-
-    fn on_before_call(&self, object: &Object) {}
-    fn on_after_call(&self, object: &Object) {}
 }
 
 impl<F> Action for F
@@ -143,7 +132,7 @@ impl Builder {
     pub fn var(self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         let name = name.into();
         let value = value.into();
-        self.scope.set(name.clone(), Var::new(name, value));
+        self.scope.set(name.clone(), Object::value(value));
         self
     }
 
@@ -225,7 +214,7 @@ impl Builder {
             let scope = root.fork(&name, Vec::new(), KArgs::new()).with_env(cenv);
 
             for (key, value) in &manifest.vars {
-                scope.set_local(key.clone(), Var::new(key.clone(), value.clone()));
+                scope.set_local(key.clone(), Object::value(value.clone()));
             }
 
             root.set(name.clone(), Routine::new(name, scope, manifest.steps));

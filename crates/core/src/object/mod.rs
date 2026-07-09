@@ -1,24 +1,16 @@
-mod annotation;
-mod artifact;
 mod function;
 mod routine;
-mod var;
 
-pub use annotation::*;
-pub use artifact::*;
 pub use function::*;
 pub use routine::*;
-pub use var::*;
 
-use crate::{Action, Call, Predicate};
+use crate::{Action, Call, Predicate, Value};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Object {
     Func(Function),
     Routine(Routine),
-    Artifact(Artifact),
-    Annotation(Annotation),
-    Var(Var),
+    Value(Value),
 }
 
 impl Object {
@@ -38,6 +30,10 @@ impl Object {
         Self::Routine(routine)
     }
 
+    pub fn value(value: Value) -> Self {
+        Self::Value(value)
+    }
+
     pub fn is_func(&self) -> bool {
         matches!(self, Self::Func(_))
     }
@@ -46,16 +42,8 @@ impl Object {
         matches!(self, Self::Routine(_))
     }
 
-    pub fn is_artifact(&self) -> bool {
-        matches!(self, Self::Artifact(_))
-    }
-
-    pub fn is_annotation(&self) -> bool {
-        matches!(self, Self::Annotation(_))
-    }
-
-    pub fn is_var(&self) -> bool {
-        matches!(self, Self::Var(_))
+    pub fn is_value(&self) -> bool {
+        matches!(self, Self::Value(_))
     }
 
     pub fn as_func(&self) -> Option<&Function> {
@@ -72,44 +60,16 @@ impl Object {
         }
     }
 
-    pub fn as_artifact(&self) -> Option<&Artifact> {
+    pub fn as_value(&self) -> Option<&Value> {
         match self {
-            Self::Artifact(v) => Some(v),
+            Self::Value(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_artifact_mut(&mut self) -> Option<&mut Artifact> {
+    pub fn as_value_mut(&mut self) -> Option<&mut Value> {
         match self {
-            Self::Artifact(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn as_annotation(&self) -> Option<&Annotation> {
-        match self {
-            Self::Annotation(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn as_annotation_mut(&mut self) -> Option<&mut Annotation> {
-        match self {
-            Self::Annotation(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn as_var(&self) -> Option<&Var> {
-        match self {
-            Self::Var(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn as_var_mut(&mut self) -> Option<&mut Var> {
-        match self {
-            Self::Var(v) => Some(v),
+            Self::Value(v) => Some(v),
             _ => None,
         }
     }
@@ -127,20 +87,54 @@ impl From<Routine> for Object {
     }
 }
 
-impl From<Artifact> for Object {
-    fn from(value: Artifact) -> Self {
-        Self::Artifact(value)
+impl<T: Into<Value>> From<T> for Object {
+    fn from(value: T) -> Self {
+        Self::Value(value.into())
     }
 }
 
-impl From<Annotation> for Object {
-    fn from(value: Annotation) -> Self {
-        Self::Annotation(value)
+impl Eq for Object {}
+
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Func(a), Self::Func(b)) => a.name() == b.name(),
+            (Self::Routine(a), Self::Routine(b)) => a.name() == b.name(),
+            (Self::Value(a), Self::Value(b)) => *a == *b,
+            _ => false,
+        }
     }
 }
 
-impl From<Var> for Object {
-    fn from(value: Var) -> Self {
-        Self::Var(value)
+impl PartialEq<Value> for Object {
+    fn eq(&self, other: &Value) -> bool {
+        if let Some(value) = self.as_value() {
+            *value == *other
+        } else {
+            false
+        }
+    }
+}
+
+impl PartialEq<&Value> for Object {
+    fn eq(&self, other: &&Value) -> bool {
+        if let Some(value) = self.as_value() {
+            *value == **other
+        } else {
+            false
+        }
+    }
+}
+
+impl serde::Serialize for Object {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Value(v) => v.serialize(serializer),
+            Self::Routine(v) => v.name().serialize(serializer),
+            Self::Func(v) => v.name().serialize(serializer),
+        }
     }
 }

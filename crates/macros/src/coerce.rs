@@ -3,7 +3,6 @@ use zyn::syn::Type;
 
 pub fn split_as(input: TokenStream) -> zyn::syn::Result<(TokenStream, Option<Type>)> {
     let tokens: Vec<TokenTree> = input.into_iter().collect();
-
     let as_pos = tokens.iter().position(|tt| matches!(tt, TokenTree::Ident(id) if *id == "as"));
 
     match as_pos {
@@ -24,15 +23,13 @@ pub fn variant_accessor(ty: &Type) -> zyn::syn::Result<Ident> {
     };
 
     let accessor = match segment.as_deref() {
-        Some("Var") => "as_var",
+        Some("Value") => "as_value",
         Some("Function") => "as_func",
         Some("Routine") => "as_routine",
-        Some("Artifact") => "as_artifact",
-        Some("Annotation") => "as_annotation",
         _ => {
             return Err(zyn::syn::Error::new_spanned(
                 ty,
-                "expected an Object variant: Var, Function, Routine, Artifact, or Annotation",
+                "expected an Object variant: Value, Function, or Routine",
             ));
         }
     };

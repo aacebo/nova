@@ -1,4 +1,4 @@
-use nova::{KArgs, Scope, Value, Var, get, set};
+use nova::{KArgs, Scope, Value, get, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -6,13 +6,13 @@ type ActionResult = Result<(), Box<dyn std::error::Error>>;
 fn scope_moves_across_threads_without_panicking() {
     let runtime = nova::new()
         .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-            set!("base", Var::new("base", 1));
+            set!("base", 1);
 
             let child = scope.fork("worker", Vec::new(), KArgs::new());
             let handle = std::thread::spawn(move || {
                 let scope = &child;
-                set!("threaded", Var::new("threaded", 42));
-                get!("base").unwrap().as_var().unwrap().value.clone()
+                set!("threaded", 42);
+                get!("base").unwrap().as_value().unwrap().clone()
             });
 
             let seen = handle.join().unwrap();

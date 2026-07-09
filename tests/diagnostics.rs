@@ -53,16 +53,3 @@ fn fluent_builders_and_emit_populate_the_scope_buffer() {
 
     assert_eq!(emitted[1].message.as_deref(), Some("done"));
 }
-
-#[test]
-fn diagnostics_built_outside_an_invocation_get_fresh_ids() {
-    let a = {
-        let scope = nova::ulid::Ulid::new();
-        warn!("orphan")
-    };
-    let b = {
-        let scope = nova::ulid::Ulid::new();
-        warn!("orphan")
-    };
-    assert_ne!(a.trace_id, b.trace_id);
-}

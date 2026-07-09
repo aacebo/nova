@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Action, Arena, Diagnostic, Entry, Environment, KArgs, Object, Slot, SlotMut, Traced, Value};
+use crate::{Action, Arena, Diagnostic, Entry, Environment, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value};
 
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
@@ -259,7 +259,7 @@ impl std::fmt::Debug for Scope {
     }
 }
 
-impl minijinja::value::Object for Scope {
+impl Reflect for Scope {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let name = key.as_str()?;
 
@@ -278,10 +278,9 @@ impl minijinja::value::Object for Scope {
         let slot = self.get(name)?;
 
         match &*slot {
-            Object::Var(var) => Some(var.value.clone()),
+            Object::Value(value) => Some(value.clone()),
             Object::Func(func) => Some(Value::from_object(func.clone())),
             Object::Routine(rt) => Some(Value::from_object(rt.clone())),
-            _ => None,
         }
     }
 }
