@@ -41,7 +41,7 @@ fn scope_bindings_lifecycle_through_macros() {
         .build()
         .unwrap();
 
-    runtime.call("run", KArgs::new()).unwrap();
+    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "run action never executed");
 }
 
@@ -77,7 +77,7 @@ fn forked_scopes_resolve_and_write_through_to_ancestors() {
         .build()
         .unwrap();
 
-    runtime.call("parent", KArgs::new()).unwrap();
+    runtime.call("parent", [] as [Value; 0], KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "parent action never executed");
     drop(runtime);
     assert!(!recorder.has_error(), "no child call should have errored");
@@ -113,7 +113,7 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
         .build()
         .unwrap();
 
-    runtime.call("parent", KArgs::new()).unwrap();
+    runtime.call("parent", [] as [Value; 0], KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "parent action never executed");
     drop(runtime);
     assert!(!recorder.has_error(), "no child call should have errored");
@@ -143,6 +143,6 @@ fn typed_get_filters_by_object_variant() {
         .build()
         .unwrap();
 
-    runtime.call("run", KArgs::new()).unwrap();
+    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "run action never executed");
 }

@@ -29,6 +29,6 @@ fn scope_moves_across_threads_without_panicking() {
         .build()
         .unwrap();
 
-    runtime.call("run", KArgs::new()).unwrap();
+    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "run action never executed");
 }

@@ -1,7 +1,7 @@
 #![cfg(feature = "fs")]
 
+use nova::KArgs;
 use nova::fs::FileSystem;
-use nova::{KArgs, Value};
 
 fn runtime() -> nova::Runtime {
     nova::new().import(FileSystem).unwrap().build().unwrap()
@@ -13,14 +13,11 @@ fn write_then_read_string_round_trip() {
     let path = dir.path().join("hello.txt");
     let path = path.to_str().unwrap();
     let rt = runtime();
-    let scope = rt.scope();
 
-    scope
-        .call("fs.write", [Value::from(path), Value::from("hello world")], KArgs::new())
-        .unwrap();
+    rt.call("fs.write", [path, "hello world"], KArgs::new()).unwrap();
 
-    let out = scope
-        .call("fs.read", [Value::from(path)], KArgs::new())
+    let out = rt
+        .func("fs.read", [path], KArgs::new())
         .unwrap()
         .expect("fs.read should return a value");
 
@@ -33,15 +30,10 @@ fn write_overwrites_then_read_returns_latest() {
     let path = dir.path().join("data.txt");
     let path = path.to_str().unwrap();
     let rt = runtime();
-    let scope = rt.scope();
 
-    scope
-        .call("fs.write", [Value::from(path), Value::from("first")], KArgs::new())
-        .unwrap();
-    scope
-        .call("fs.write", [Value::from(path), Value::from("second")], KArgs::new())
-        .unwrap();
+    rt.call("fs.write", [path, "first"], KArgs::new()).unwrap();
+    rt.call("fs.write", [path, "second"], KArgs::new()).unwrap();
 
-    let out = scope.call("fs.read", [Value::from(path)], KArgs::new()).unwrap().unwrap();
+    let out = rt.func("fs.read", [path], KArgs::new()).unwrap().unwrap();
     assert_eq!(out.as_str(), Some("second"));
 }

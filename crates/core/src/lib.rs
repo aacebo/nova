@@ -82,23 +82,35 @@ impl Runtime {
         &self.scope
     }
 
-    pub fn call(&self, name: &str, args: impl Into<KArgs>) -> Result<(), Box<dyn std::error::Error>> {
-        let args = args.into();
-        let scope = self.scope.fork(name, Vec::new(), args.clone());
-        scope.call(name, Vec::new(), args)?;
+    pub fn call(
+        &self,
+        name: &str,
+        args: impl IntoIterator<Item = impl Into<Value>>,
+        kargs: impl Into<KArgs>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let args: Vec<Value> = args.into_iter().map(Into::into).collect();
+        self.scope.call(name, args, kargs)?;
         Ok(())
     }
 
-    pub fn eval(&self, name: &str, args: impl Into<KArgs>) -> Result<bool, Box<dyn std::error::Error>> {
-        let args = args.into();
-        let scope = self.scope.fork(name, Vec::new(), args.clone());
-        Ok(scope.call(name, Vec::new(), args)?.map(|v| v.is_true()).unwrap_or(false))
+    pub fn eval(
+        &self,
+        name: &str,
+        args: impl IntoIterator<Item = impl Into<Value>>,
+        kargs: impl Into<KArgs>,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let args: Vec<Value> = args.into_iter().map(Into::into).collect();
+        Ok(self.scope.call(name, args, kargs)?.map(|v| v.is_true()).unwrap_or(false))
     }
 
-    pub fn func(&self, name: &str, args: impl Into<KArgs>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        let args = args.into();
-        let scope = self.scope.fork(name, Vec::new(), args.clone());
-        scope.call(name, Vec::new(), args)
+    pub fn func(
+        &self,
+        name: &str,
+        args: impl IntoIterator<Item = impl Into<Value>>,
+        kargs: impl Into<KArgs>,
+    ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+        let args: Vec<Value> = args.into_iter().map(Into::into).collect();
+        self.scope.call(name, args, kargs)
     }
 }
 

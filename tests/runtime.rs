@@ -63,7 +63,7 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
         .build()
         .unwrap();
 
-    runtime.call("process", [("qty", 3), ("unit", 5)]).unwrap();
+    runtime.call("process", [] as [Value; 0], [("qty", 3), ("unit", 5)]).unwrap();
     drop(runtime);
 
     assert_eq!(*receipt.lock().unwrap(), "nova-mart: 3 x 5 = 15");
@@ -111,7 +111,7 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
         .build()
         .unwrap();
 
-    runtime.call("process", [("qty", 0)]).unwrap();
+    runtime.call("process", [] as [Value; 0], [("qty", 0)]).unwrap();
     drop(runtime);
 
     assert_eq!(*receipt.lock().unwrap(), "untouched");
@@ -155,8 +155,8 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
         .build()
         .unwrap();
 
-    runtime.call("run", [("n", 5)]).unwrap();
-    let value = runtime.func("fact", [("n", 5)]).unwrap();
+    runtime.call("run", [] as [Value; 0], [("n", 5)]).unwrap();
+    let value = runtime.func("fact", [] as [Value; 0], [("n", 5)]).unwrap();
     assert_eq!(value, Some(Value::from(120u64)));
 
     drop(runtime);
@@ -193,7 +193,7 @@ fn template_composes_callables_and_captures_their_diagnostics() {
         .build()
         .unwrap();
 
-    runtime.call("render", KArgs::new()).unwrap();
+    runtime.call("render", [] as [Value; 0], KArgs::new()).unwrap();
     drop(runtime);
 
     assert_eq!(*out.lock().unwrap(), "score: 42 (true)");
@@ -229,10 +229,10 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
         .build()
         .unwrap();
 
-    assert!(runtime.eval("even", [("n", 4)]).unwrap());
-    assert!(!runtime.eval("even", [("n", 3)]).unwrap());
+    assert!(runtime.eval("even", [] as [Value; 0], [("n", 4)]).unwrap());
+    assert!(!runtime.eval("even", [] as [Value; 0], [("n", 3)]).unwrap());
 
-    runtime.call("caller", [("n", 1)]).unwrap();
+    runtime.call("caller", [] as [Value; 0], [("n", 1)]).unwrap();
     let recorded = seen.lock().unwrap();
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].get("n"), Some(&Value::from(2)));
@@ -265,7 +265,7 @@ fn set_registers_bindings_into_the_live_scope() {
         .build()
         .unwrap();
 
-    runtime.call("setup", KArgs::new()).unwrap();
+    runtime.call("setup", [] as [Value; 0], KArgs::new()).unwrap();
     assert_eq!(*out.lock().unwrap(), "hello");
 }
 
@@ -282,8 +282,8 @@ fn error_paths_surface_at_call_and_build_time() {
         .build()
         .unwrap();
 
-    assert!(runtime.call("missing", KArgs::new()).is_err());
-    assert!(runtime.call("caller", KArgs::new()).is_err());
+    assert!(runtime.call("missing", [] as [Value; 0], KArgs::new()).is_err());
+    assert!(runtime.call("caller", [] as [Value; 0], KArgs::new()).is_err());
     assert!(nova::new().template("t", "{{ ").build().is_err());
 }
 
@@ -302,11 +302,11 @@ fn manifest_hydrates_into_a_runnable_runtime() {
                 .guard("count > 0")
                 .run("{% if count > 0 %}{{ info('count is positive') }}{% endif %}"),
         )
-        .step(nova::step().call("missing_func", [("k", "v")]))
+        .step(nova::step().call("missing_func", [] as [Value; 0], [("k", "v")]))
         .build();
 
     let runtime = routines(&recorder, [manifest]);
-    runtime.call("flow", KArgs::new()).unwrap();
+    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();
@@ -314,6 +314,40 @@ fn manifest_hydrates_into_a_runnable_runtime() {
     assert!(!messages.iter().any(|m| m == "skipped"), "{messages:?}");
     assert!(messages.iter().any(|m| m == "count is positive"), "{messages:?}");
     assert!(messages.iter().any(|m| m.contains("missing_func")), "{messages:?}");
+}
+
+#[test]
+fn call_step_passes_positional_and_named_args() {
+    let seen = Arc::new(Mutex::new(Vec::<(Value, Value)>::new()));
+    let sink = seen.clone();
+    let recorder = Recorder::new();
+
+    let manifest = nova::manifest()
+        .name("flow")
+        .var("greeting", "hello")
+        .step(nova::step().call("record", ["greeting"], [("tag", "'literal'")]))
+        .build();
+
+    let mut builder = nova::new().observe(recorder.clone());
+    builder = builder.action(
+        "record",
+        move |args: &[Value], kargs: &KArgs, _scope: &Scope| -> ActionResult {
+            let first = args.first().cloned().unwrap_or(Value::UNDEFINED);
+            let tag = kargs.get("tag").cloned().unwrap_or(Value::UNDEFINED);
+            sink.lock().unwrap().push((first, tag));
+            Ok(())
+        },
+    );
+    let runtime = builder.routine(manifest).build().unwrap();
+
+    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    drop(runtime);
+
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 1, "record should have run once");
+    assert_eq!(seen[0].0.as_str(), Some("hello"), "positional arg resolves via var");
+    assert_eq!(seen[0].1.as_str(), Some("literal"), "named arg resolves as expression");
+    assert!(!recorder.has_error(), "call step should not error");
 }
 
 #[test]
@@ -329,7 +363,7 @@ fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
         .build();
 
     let runtime = routines(&recorder, [manifest]);
-    runtime.call("flow", KArgs::new()).unwrap();
+    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();
@@ -355,7 +389,7 @@ fn shell_step_runs_commands_and_reports_failures() {
         .build();
 
     let runtime = routines(&recorder, [manifest]);
-    runtime.call("flow", KArgs::new()).unwrap();
+    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();
@@ -385,7 +419,7 @@ fn positional_required_with_optional_keyword_arg() {
         .build()
         .unwrap();
 
-    runtime.call("render", KArgs::new()).unwrap();
+    runtime.call("render", [] as [Value; 0], KArgs::new()).unwrap();
     assert_eq!(*out.lock().unwrap(), "bob!");
 }
 
@@ -405,7 +439,7 @@ fn namespaced_manifests_resolve_across_scopes() {
         .build();
 
     let runtime = routines(&recorder, [main, lib]);
-    runtime.call("main", KArgs::new()).unwrap();
+    runtime.call("main", [] as [Value; 0], KArgs::new()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();

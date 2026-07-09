@@ -41,19 +41,20 @@ impl Action for Step {
         }
 
         match &self.body {
-            StepBody::Call { call, args: fields } => {
+            StepBody::Call { call, args, with } => {
+                let resolve = |value: &Value| match value.as_str() {
+                    Some(source) => scope.eval(source).unwrap_or_else(|_| value.clone()),
+                    None => value.clone(),
+                };
+
+                let positional: Vec<Value> = args.iter().map(&resolve).collect();
                 let mut kargs = KArgs::new();
 
-                for (key, value) in fields {
-                    let value = match value.as_str() {
-                        Some(source) => scope.eval(source).unwrap_or_else(|_| value.clone()),
-                        None => value.clone(),
-                    };
-
-                    kargs.set(key.clone(), value);
+                for (key, value) in with {
+                    kargs.set(key.clone(), resolve(value));
                 }
 
-                if let Err(err) = scope.call(call, Vec::new(), kargs) {
+                if let Err(err) = scope.call(call, positional, kargs) {
                     scope.error(err.to_string());
                 }
             }
@@ -97,9 +98,21 @@ impl Action for Step {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum StepBody {
-    Call { call: String, args: BTreeMap<String, Value> },
-    Run { run: String },
-    Shell { shell: String },
+    Call {
+        call: String,
+
+        #[serde(default)]
+        args: Vec<Value>,
+
+        #[serde(default)]
+        with: BTreeMap<String, Value>,
+    },
+    Run {
+        run: String,
+    },
+    Shell {
+        shell: String,
+    },
 }
 
 #[doc(hidden)]
@@ -141,11 +154,13 @@ pub mod build {
         pub fn call(
             mut self,
             name: impl Into<String>,
-            args: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>,
+            args: impl IntoIterator<Item = impl Into<Value>>,
+            with: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>,
         ) -> Self {
             self.body = Some(StepBody::Call {
                 call: name.into(),
-                args: args.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
+                args: args.into_iter().map(Into::into).collect(),
+                with: with.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
             });
 
             self
