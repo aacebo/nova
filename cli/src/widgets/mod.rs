@@ -1,3 +1,4 @@
+pub mod board;
 pub mod diagnostic;
 pub mod error;
 
@@ -6,7 +7,9 @@ use std::io::{IsTerminal, Write};
 use ratatui::backend::IntoCrossterm;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::QueueableCommand;
+use ratatui::crossterm::cursor::{MoveToColumn, MoveUp};
 use ratatui::crossterm::style::{ContentStyle, PrintStyledContent};
+use ratatui::crossterm::terminal::{Clear, ClearType};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
@@ -29,6 +32,59 @@ pub fn println<W: ratatui::widgets::Widget>(widget: W, width: u16, height: u16) 
     let stdout = std::io::stdout();
     let is_terminal = stdout.is_terminal();
     render(widget, width, height, &mut stdout.lock(), is_terminal);
+}
+
+pub struct Painter {
+    is_terminal: bool,
+    prev_lines: u16,
+}
+
+impl Default for Painter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Painter {
+    pub fn new() -> Self {
+        Self {
+            is_terminal: std::io::stdout().is_terminal(),
+            prev_lines: 0,
+        }
+    }
+
+    pub fn draw<W: ratatui::widgets::Widget>(&mut self, widget: W, width: u16, height: u16) {
+        if !self.is_terminal {
+            return;
+        }
+
+        let stdout = std::io::stdout();
+        let mut out = stdout.lock();
+
+        if self.prev_lines > 0 {
+            let _ = out.queue(MoveUp(self.prev_lines));
+            let _ = out.queue(MoveToColumn(0));
+            let _ = out.queue(Clear(ClearType::FromCursorDown));
+        }
+
+        render(widget, width, height, &mut out, true);
+        self.prev_lines = height;
+    }
+
+    pub fn finish<W: ratatui::widgets::Widget>(&mut self, widget: W, width: u16, height: u16) {
+        let stdout = std::io::stdout();
+        let is_terminal = stdout.is_terminal();
+        let mut out = stdout.lock();
+
+        if is_terminal && self.prev_lines > 0 {
+            let _ = out.queue(MoveUp(self.prev_lines));
+            let _ = out.queue(MoveToColumn(0));
+            let _ = out.queue(Clear(ClearType::FromCursorDown));
+        }
+
+        render(widget, width, height, &mut out, is_terminal);
+        self.prev_lines = 0;
+    }
 }
 
 fn render<W: ratatui::widgets::Widget>(widget: W, width: u16, height: u16, out: &mut impl Write, color: bool) {

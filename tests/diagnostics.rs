@@ -1,6 +1,9 @@
+mod common;
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use common::Recorder;
 use nova::{KArgs, Scope, Severity, Value, error, info, warn};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
@@ -37,8 +40,10 @@ fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
 }
 
 #[test]
-fn fluent_builders_and_emit_populate_the_scope_buffer() {
+fn fluent_builders_and_emit_stream_each_diagnostic() {
+    let recorder = Recorder::new();
     let runtime = nova::new()
+        .observe(recorder.clone())
         .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             warn!("job").warn("step a").error("step b").emit(scope);
             info!("done").emit(scope);
@@ -47,10 +52,10 @@ fn fluent_builders_and_emit_populate_the_scope_buffer() {
         .build()
         .unwrap();
 
-    let diagnostics = runtime.call("run", KArgs::new()).unwrap().diagnostics;
-    assert_eq!(diagnostics.len(), 1);
+    runtime.call("run", KArgs::new()).unwrap();
+    drop(runtime);
 
-    let emitted = &diagnostics[0].children;
+    let emitted = recorder.diagnostics();
     assert_eq!(emitted.len(), 2);
 
     let job = &emitted[0];

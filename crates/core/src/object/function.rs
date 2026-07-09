@@ -67,7 +67,6 @@ impl Reflect for Function {
             .callback
             .invoke(child.args(), child.kargs(), &child)
             .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
-        scope.merge(&child);
         Ok(value.unwrap_or(Value::UNDEFINED))
     }
 }

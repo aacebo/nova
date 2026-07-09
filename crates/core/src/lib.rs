@@ -5,7 +5,6 @@ mod error;
 pub mod event;
 mod manifest;
 mod object;
-mod output;
 mod state;
 
 pub use args::*;
@@ -16,7 +15,6 @@ pub use event::{Event, Observer};
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
-pub use output::*;
 pub use state::*;
 
 pub type Value = minijinja::Value;
@@ -81,29 +79,23 @@ impl Runtime {
         &self.scope
     }
 
-    pub fn call(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn call(&self, name: &str, args: impl Into<KArgs>) -> Result<(), Box<dyn std::error::Error>> {
         let args = args.into();
         let scope = self.scope.fork(name, Vec::new(), args.clone());
         scope.call(name, Vec::new(), args)?;
-        Ok(scope.into())
+        Ok(())
     }
 
-    pub fn eval(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn eval(&self, name: &str, args: impl Into<KArgs>) -> Result<bool, Box<dyn std::error::Error>> {
         let args = args.into();
         let scope = self.scope.fork(name, Vec::new(), args.clone());
-        let value = scope.call(name, Vec::new(), args)?.map(|v| v.is_true()).unwrap_or(false);
-        let mut output = Output::from(scope);
-        output.value = Some(value.into());
-        Ok(output)
+        Ok(scope.call(name, Vec::new(), args)?.map(|v| v.is_true()).unwrap_or(false))
     }
 
-    pub fn func(&self, name: &str, args: impl Into<KArgs>) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn func(&self, name: &str, args: impl Into<KArgs>) -> Result<Option<Value>, Box<dyn std::error::Error>> {
         let args = args.into();
         let scope = self.scope.fork(name, Vec::new(), args.clone());
-        let value = scope.call(name, Vec::new(), args)?;
-        let mut output = Output::from(scope);
-        output.value = value;
-        Ok(output)
+        scope.call(name, Vec::new(), args)
     }
 }
 

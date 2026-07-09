@@ -3,8 +3,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::{Action, Arena, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value, event};
 
-pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
-
 #[derive(Clone)]
 pub struct Scope(Arc<_Scope>);
 
@@ -18,7 +16,6 @@ struct _Scope {
     args: Vec<Value>,
     kargs: KArgs,
     events: crossbeam::Sender<Event>,
-    diagnostics: Diagnostics,
 }
 
 impl Scope {
@@ -35,7 +32,6 @@ impl Scope {
             args: Default::default(),
             kargs: Default::default(),
             events,
-            diagnostics: Default::default(),
         }))
     }
 
@@ -65,23 +61,13 @@ impl Scope {
         &self.0.kargs
     }
 
-    pub fn diagnostics(&self) -> &Diagnostics {
-        &self.0.diagnostics
-    }
-
     pub fn emit(&self, diagnostic: Diagnostic) -> &Self {
-        self.0.diagnostics.lock().unwrap().push(diagnostic);
+        self.dispatch(diagnostic);
         self
     }
 
     pub fn error(&self, message: impl Into<String>) -> &Self {
-        let message = message.into();
-        self.dispatch(crate::Error::message(message.clone()));
         self.emit(Diagnostic::new(self.0.trace_id).sev(crate::Severity::Error).message(message))
-    }
-
-    pub fn take_diagnostics(&self) -> Vec<Diagnostic> {
-        self.0.diagnostics.lock().unwrap().drain(..).collect()
     }
 
     pub fn len(&self) -> usize {
@@ -107,20 +93,7 @@ impl Scope {
             args: args.into_iter().collect(),
             kargs: kargs.into(),
             events: self.0.events.clone(),
-            diagnostics: Default::default(),
         }))
-    }
-
-    pub fn merge(&self, child: &Scope) {
-        let diagnostics = child.take_diagnostics();
-
-        if diagnostics.is_empty() {
-            return;
-        }
-
-        let mut node = Diagnostic::new(self.0.trace_id).message(&self.0.name);
-        node.children = diagnostics;
-        self.0.diagnostics.lock().unwrap().push(node);
     }
 
     pub fn has(&self, key: impl AsRef<str>) -> bool {
@@ -270,9 +243,7 @@ impl Scope {
             child.kargs().clone().into_inner(),
         ));
 
-        let result = func.invoke(child.args(), child.kargs(), &child);
-        self.merge(&child);
-        result
+        func.invoke(child.args(), child.kargs(), &child)
     }
 
     pub fn eval(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {

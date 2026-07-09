@@ -1,26 +1,30 @@
+mod common;
+
 use std::sync::{Arc, Mutex};
 
-use nova::{Diagnostic, KArgs, Scope, Severity, Value};
+use common::Recorder;
+use nova::{KArgs, Manifest, Scope, Value};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
 
-fn collect_messages(diagnostics: &[Diagnostic]) -> Vec<String> {
-    let mut out = Vec::new();
-    for d in diagnostics {
-        if let Some(m) = &d.message {
-            out.push(m.clone());
-        }
-        out.extend(collect_messages(&d.children));
+fn routines(recorder: &Recorder, manifests: impl IntoIterator<Item = Manifest>) -> nova::Runtime {
+    let mut builder = nova::new().observe(recorder.clone());
+
+    for manifest in manifests {
+        builder = builder.routine(manifest);
     }
-    out
+
+    builder.build().unwrap()
 }
 
 #[test]
 fn order_workflow_threads_state_templates_and_diagnostics_together() {
     let receipt = Arc::new(Mutex::new(String::new()));
     let sink = receipt.clone();
+    let recorder = Recorder::new();
     let runtime = nova::new()
+        .observe(recorder.clone())
         .var("store", "nova-mart")
         .template("receipt", "{{ store }}: {{ qty }} x {{ unit }} = {{ total }}")
         .predicate("in_stock", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
@@ -59,25 +63,28 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
         .build()
         .unwrap();
 
-    let output = runtime.call("process", [("qty", 3), ("unit", 5)]).unwrap();
+    runtime.call("process", [("qty", 3), ("unit", 5)]).unwrap();
+    drop(runtime);
 
     assert_eq!(*receipt.lock().unwrap(), "nova-mart: 3 x 5 = 15");
 
-    let messages = collect_messages(&output.diagnostics);
+    let messages = recorder.messages();
     assert!(messages.contains(&"fulfilling order".to_string()), "{messages:?}");
     assert!(messages.contains(&"priced 3 units".to_string()), "{messages:?}");
     assert!(
         !messages.contains(&"out of stock".to_string()),
         "reject branch should not run"
     );
-    assert_eq!(output.diagnostics[0].severity(), Severity::Warn);
+    assert!(!recorder.has_error());
 }
 
 #[test]
 fn order_workflow_else_branch_rejects_and_escalates_severity() {
     let receipt = Arc::new(Mutex::new(String::from("untouched")));
     let sink = receipt.clone();
+    let recorder = Recorder::new();
     let runtime = nova::new()
+        .observe(recorder.clone())
         .predicate("in_stock", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             Ok(kargs.get("qty") > Some(&Value::from(0)))
         })
@@ -104,17 +111,23 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
         .build()
         .unwrap();
 
-    let output = runtime.call("process", [("qty", 0)]).unwrap();
+    runtime.call("process", [("qty", 0)]).unwrap();
+    drop(runtime);
 
     assert_eq!(*receipt.lock().unwrap(), "untouched");
-    let messages = collect_messages(&output.diagnostics);
-    assert!(messages.contains(&"out of stock".to_string()), "{messages:?}");
-    assert_eq!(output.diagnostics[0].severity(), Severity::Error);
+    assert!(
+        recorder.messages().contains(&"out of stock".to_string()),
+        "{:?}",
+        recorder.messages()
+    );
+    assert!(recorder.has_error());
 }
 
 #[test]
 fn recursive_calls_accumulate_state_and_coerce_results() {
+    let recorder = Recorder::new();
     let runtime = nova::new()
+        .observe(recorder.clone())
         .predicate("is_zero", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             Ok(kargs.get("n") == Some(&Value::from(0)))
         })
@@ -142,19 +155,25 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
         .build()
         .unwrap();
 
-    let output = runtime.call("run", [("n", 5)]).unwrap();
-    let messages = collect_messages(&output.diagnostics);
-    assert!(messages.contains(&"factorial = 120".to_string()), "{messages:?}");
-
-    let value = runtime.func("fact", [("n", 5)]).unwrap().value;
+    runtime.call("run", [("n", 5)]).unwrap();
+    let value = runtime.func("fact", [("n", 5)]).unwrap();
     assert_eq!(value, Some(Value::from(120u64)));
+
+    drop(runtime);
+    assert!(
+        recorder.messages().contains(&"factorial = 120".to_string()),
+        "{:?}",
+        recorder.messages()
+    );
 }
 
 #[test]
 fn template_composes_callables_and_captures_their_diagnostics() {
     let out = Arc::new(Mutex::new(String::new()));
     let sink = out.clone();
+    let recorder = Recorder::new();
     let runtime = nova::new()
+        .observe(recorder.clone())
         .var("label", "score")
         .func("double", |args: &[Value], _kargs: &KArgs, scope: &Scope| -> FuncResult {
             let n = args.first().and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
@@ -174,11 +193,15 @@ fn template_composes_callables_and_captures_their_diagnostics() {
         .build()
         .unwrap();
 
-    let output = runtime.call("render", KArgs::new()).unwrap();
+    runtime.call("render", KArgs::new()).unwrap();
+    drop(runtime);
 
     assert_eq!(*out.lock().unwrap(), "score: 42 (true)");
-    let messages = collect_messages(&output.diagnostics);
-    assert!(messages.contains(&"doubling 21".to_string()), "{messages:?}");
+    assert!(
+        recorder.messages().contains(&"doubling 21".to_string()),
+        "{:?}",
+        recorder.messages()
+    );
 }
 
 #[test]
@@ -206,8 +229,8 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
         .build()
         .unwrap();
 
-    assert_eq!(runtime.eval("even", [("n", 4)]).unwrap().value, Some(Value::from(true)));
-    assert_eq!(runtime.eval("even", [("n", 3)]).unwrap().value, Some(Value::from(false)));
+    assert!(runtime.eval("even", [("n", 4)]).unwrap());
+    assert!(!runtime.eval("even", [("n", 3)]).unwrap());
 
     runtime.call("caller", [("n", 1)]).unwrap();
     let recorded = seen.lock().unwrap();
@@ -266,6 +289,7 @@ fn error_paths_surface_at_call_and_build_time() {
 
 #[test]
 fn manifest_hydrates_into_a_runnable_runtime() {
+    let recorder = Recorder::new();
     let manifest = nova::manifest()
         .name("flow")
         .var("greeting", "hello")
@@ -281,10 +305,11 @@ fn manifest_hydrates_into_a_runnable_runtime() {
         .step(nova::step().call("missing_func", [("k", "v")]))
         .build();
 
-    let runtime = nova::Runtime::try_from(manifest).unwrap();
-    let output = runtime.call("flow", KArgs::new()).unwrap();
-    let messages = collect_messages(&output.diagnostics);
+    let runtime = routines(&recorder, [manifest]);
+    runtime.call("flow", KArgs::new()).unwrap();
+    drop(runtime);
 
+    let messages = recorder.messages();
     assert!(messages.iter().any(|m| m == "hello world"), "{messages:?}");
     assert!(!messages.iter().any(|m| m == "skipped"), "{messages:?}");
     assert!(messages.iter().any(|m| m == "count is positive"), "{messages:?}");
@@ -293,7 +318,8 @@ fn manifest_hydrates_into_a_runnable_runtime() {
 
 #[test]
 fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
-    let runtime = nova::manifest()
+    let recorder = Recorder::new();
+    let manifest = nova::manifest()
         .name("flow")
         .var("items", vec!["a", "b", "c"])
         .step(nova::step().run("{% for item in items %}{{ info(item) }}{% endfor %}"))
@@ -302,10 +328,11 @@ fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
         .step(nova::step().run("{{ print('to stdout') }}{{ println('and a line') }}"))
         .build();
 
-    let runtime = nova::Runtime::try_from(runtime).unwrap();
-    let output = runtime.call("flow", KArgs::new()).unwrap();
-    let messages = collect_messages(&output.diagnostics);
+    let runtime = routines(&recorder, [manifest]);
+    runtime.call("flow", KArgs::new()).unwrap();
+    drop(runtime);
 
+    let messages = recorder.messages();
     for item in ["a", "b", "c"] {
         assert!(messages.iter().any(|m| m == item), "{messages:?}");
     }
@@ -313,13 +340,13 @@ fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
     assert!(messages.iter().any(|m| m == "boom"), "{messages:?}");
     assert!(!messages.iter().any(|m| m == "to stdout"), "{messages:?}");
     assert!(!messages.iter().any(|m| m == "and a line"), "{messages:?}");
-
-    assert_eq!(output.diagnostics[0].severity(), Severity::Error);
+    assert!(recorder.has_error());
 }
 
 #[test]
 fn shell_step_runs_commands_and_reports_failures() {
-    let runtime = nova::manifest()
+    let recorder = Recorder::new();
+    let manifest = nova::manifest()
         .name("flow")
         .var("greeting", "hello")
         .step(nova::step().shell("echo {{ greeting }}"))
@@ -327,14 +354,15 @@ fn shell_step_runs_commands_and_reports_failures() {
         .step(nova::step().run("{{ info('after failure') }}"))
         .build();
 
-    let runtime = nova::Runtime::try_from(runtime).unwrap();
-    let output = runtime.call("flow", KArgs::new()).unwrap();
-    let messages = collect_messages(&output.diagnostics);
+    let runtime = routines(&recorder, [manifest]);
+    runtime.call("flow", KArgs::new()).unwrap();
+    drop(runtime);
 
+    let messages = recorder.messages();
     assert!(!messages.iter().any(|m| m == "hello"), "{messages:?}");
     assert!(messages.iter().any(|m| m.contains("shell exited")), "{messages:?}");
     assert!(messages.iter().any(|m| m == "after failure"), "{messages:?}");
-    assert_eq!(output.diagnostics[0].severity(), Severity::Error);
+    assert!(recorder.has_error());
 }
 
 #[test]
@@ -363,6 +391,7 @@ fn positional_required_with_optional_keyword_arg() {
 
 #[test]
 fn namespaced_manifests_resolve_across_scopes() {
+    let recorder = Recorder::new();
     let main = nova::manifest()
         .name("main")
         .on([nova::Trigger::Run { priority: Some(5) }])
@@ -374,13 +403,15 @@ fn namespaced_manifests_resolve_across_scopes() {
         .on([nova::Trigger::Call])
         .var("greeting", "hello")
         .build();
-    let runtime = nova::Runtime::try_from(vec![main, lib]).unwrap();
-    let out = runtime.call("main", KArgs::new()).unwrap();
-    let messages = collect_messages(&out.diagnostics);
 
+    let runtime = routines(&recorder, [main, lib]);
+    runtime.call("main", KArgs::new()).unwrap();
+    drop(runtime);
+
+    let messages = recorder.messages();
     assert!(messages.iter().any(|m| m == "hello"), "{messages:?}");
     assert!(
-        out.diagnostics.iter().all(|d| d.severity() != Severity::Error),
+        !recorder.has_error(),
         "cross-namespace resolution should not error: {messages:?}"
     );
 }

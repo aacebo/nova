@@ -7,7 +7,7 @@ vars:
 steps:
   - name: greet
     run: |
-      {{ info(lib.greeting) }}
+      {{ error(lib.greeting) }}
 
   - if: count > 0
     name: check_count

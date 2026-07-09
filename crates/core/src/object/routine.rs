@@ -70,7 +70,7 @@ impl Reflect for Routine {
 }
 
 impl Action for Routine {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+    fn invoke(&self, args: &[Value], kargs: &KArgs, _scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
         let child = self.scope.fork(&self.name, args.to_vec(), kargs.clone());
         let total = self.steps.len();
 
@@ -78,19 +78,36 @@ impl Action for Routine {
             let name = step.name.clone().unwrap_or_default();
             child.dispatch(event::step::start(&self.name, &name, index, total));
 
+            let skipped = step
+                .cond
+                .as_ref()
+                .map(|cond| !child.eval(cond).map(|v| v.is_true()).unwrap_or(false))
+                .unwrap_or(false);
+
+            if skipped {
+                child.dispatch(event::step::end(
+                    &self.name,
+                    &name,
+                    index,
+                    event::step::Status::Skipped,
+                    std::time::Duration::ZERO,
+                ));
+                continue;
+            }
+
             let started = std::time::Instant::now();
             let result = step.invoke(child.args(), child.kargs(), &child);
-            let status = if result.is_ok() {
-                event::step::Status::Ok
-            } else {
+            let elapsed = started.elapsed();
+            let status = if result.is_err() {
                 event::step::Status::Error
+            } else {
+                event::step::Status::Ok
             };
-            child.dispatch(event::step::end(&self.name, &name, index, status, started.elapsed()));
 
+            child.dispatch(event::step::end(&self.name, &name, index, status, elapsed));
             result?;
         }
 
-        scope.merge(&child);
         Ok(())
     }
 }

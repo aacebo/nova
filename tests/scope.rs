@@ -1,7 +1,10 @@
+mod common;
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use nova::{KArgs, Scope, Severity, Value, del, get, get_mut, has, set};
+use common::Recorder;
+use nova::{KArgs, Scope, Value, del, get, get_mut, has, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -46,8 +49,10 @@ fn scope_bindings_lifecycle_through_macros() {
 fn forked_scopes_resolve_and_write_through_to_ancestors() {
     let ran = Arc::new(AtomicBool::new(false));
     let flag = ran.clone();
+    let recorder = Recorder::new();
 
     let runtime = nova::new()
+        .observe(recorder.clone())
         .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             assert_eq!(get!("base").unwrap().clone(), Value::from(1));
 
@@ -72,21 +77,20 @@ fn forked_scopes_resolve_and_write_through_to_ancestors() {
         .build()
         .unwrap();
 
-    let output = runtime.call("parent", KArgs::new()).unwrap();
+    runtime.call("parent", KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "parent action never executed");
-    assert!(
-        output.diagnostics.iter().all(|d| d.severity() != Severity::Error),
-        "no child call should have errored: {:?}",
-        output.diagnostics
-    );
+    drop(runtime);
+    assert!(!recorder.has_error(), "no child call should have errored");
 }
 
 #[test]
 fn child_deletion_recurses_to_the_owning_ancestor() {
     let ran = Arc::new(AtomicBool::new(false));
     let flag = ran.clone();
+    let recorder = Recorder::new();
 
     let runtime = nova::new()
+        .observe(recorder.clone())
         .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             assert!(has!("x"));
             del!("x");
@@ -109,13 +113,10 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
         .build()
         .unwrap();
 
-    let output = runtime.call("parent", KArgs::new()).unwrap();
+    runtime.call("parent", KArgs::new()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "parent action never executed");
-    assert!(
-        output.diagnostics.iter().all(|d| d.severity() != Severity::Error),
-        "no child call should have errored: {:?}",
-        output.diagnostics
-    );
+    drop(runtime);
+    assert!(!recorder.has_error(), "no child call should have errored");
 }
 
 #[test]

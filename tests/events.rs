@@ -1,58 +1,19 @@
+mod common;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use common::Recorder;
 use nova::event::object::{CallEvent, UpdateEvent};
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Event, KArgs, Object, Observer, Scope, Value, event};
+use nova::{Event, KArgs, Object, Scope, Value, event};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
 
-#[derive(Clone, Default)]
-struct Recorder(Arc<RecorderInner>);
-
-#[derive(Default)]
-struct RecorderInner {
-    calls: Mutex<Vec<String>>,
-    updates: Mutex<Vec<(String, Value, Value)>>,
-    errors: Mutex<Vec<String>>,
-}
-
-impl Recorder {
-    fn calls(&self) -> Vec<String> {
-        self.0.calls.lock().unwrap().clone()
-    }
-
-    fn updates(&self) -> Vec<(String, Value, Value)> {
-        self.0.updates.lock().unwrap().clone()
-    }
-
-    fn errors(&self) -> Vec<String> {
-        self.0.errors.lock().unwrap().clone()
-    }
-}
-
-impl Observer for Recorder {
-    fn on_call(&self, event: &CallEvent) {
-        self.0.calls.lock().unwrap().push(event.name.clone());
-    }
-
-    fn on_update(&self, event: &UpdateEvent) {
-        self.0
-            .updates
-            .lock()
-            .unwrap()
-            .push((event.name.clone(), event.from.clone(), event.to.clone()));
-    }
-
-    fn on_error(&self, event: &nova::Error) {
-        self.0.errors.lock().unwrap().push(event.to_string());
-    }
-}
-
 #[test]
 fn listener_delivers_calls_updates_and_errors() {
-    let recorder = Recorder::default();
+    let recorder = Recorder::new();
     let runtime = nova::new()
         .observe(recorder.clone())
         .var("total", 0)
@@ -103,8 +64,8 @@ fn listener_delivers_calls_updates_and_errors() {
     assert_eq!(total_update.1, Value::from(0), "old value");
     assert_eq!(total_update.2, Value::from(15u64), "new value");
 
-    let errors = recorder.errors();
-    assert!(errors.iter().any(|e| e.contains("out of stock")), "{errors:?}");
+    let messages = recorder.messages();
+    assert!(messages.iter().any(|e| e.contains("out of stock")), "{messages:?}");
 }
 
 #[test]
@@ -129,7 +90,7 @@ fn closure_observer_receives_events() {
 
 #[test]
 fn multiple_observers_each_receive_every_event() {
-    let recorder = Recorder::default();
+    let recorder = Recorder::new();
     let count = Arc::new(AtomicUsize::new(0));
     let counter = count.clone();
     let runtime = nova::new()
@@ -155,7 +116,7 @@ fn multiple_observers_each_receive_every_event() {
 
 #[test]
 fn listener_accumulates_across_multiple_calls() {
-    let recorder = Recorder::default();
+    let recorder = Recorder::new();
     let runtime = nova::new()
         .observe(recorder.clone())
         .var("n", 0)
@@ -183,7 +144,7 @@ fn listener_accumulates_across_multiple_calls() {
 
 #[test]
 fn fresh_bindings_do_not_emit_updates() {
-    let recorder = Recorder::default();
+    let recorder = Recorder::new();
     let runtime = nova::new()
         .observe(recorder.clone())
         .var("known", 1)
@@ -228,7 +189,7 @@ fn runtime_without_observers_runs_and_drops_cleanly() {
 
 #[test]
 fn runtime_with_routines_and_observer_joins_on_drop() {
-    let recorder = Recorder::default();
+    let recorder = Recorder::new();
     let manifest = nova::manifest()
         .name("flow")
         .var("greeting", "hello")
@@ -279,6 +240,34 @@ fn step_events_fire_for_routine_steps() {
     assert_eq!(starts[0].total, 2);
     assert_eq!(starts[1].index, 1);
     assert!(ends.iter().all(|e| e.status == event::step::Status::Ok), "{ends:?}");
+}
+
+#[test]
+fn step_end_status_reflects_skip_and_shell_failure_is_a_diagnostic() {
+    let recorder = Recorder::new();
+    let manifest = nova::manifest()
+        .name("flow")
+        .var("enabled", false)
+        .step(nova::step().name("ok").run("{{ info('ran') }}"))
+        .step(nova::step().name("skipped").guard("enabled").run("{{ info('nope') }}"))
+        .step(nova::step().name("boom").shell("exit 3"))
+        .build();
+
+    let runtime = nova::new().observe(recorder.clone()).routine(manifest).build().unwrap();
+
+    runtime.call("flow", KArgs::new()).unwrap();
+    drop(runtime);
+
+    let ends = recorder.step_ends();
+    let by_name: std::collections::HashMap<&str, event::step::Status> =
+        ends.iter().map(|e| (e.name.as_str(), e.status)).collect();
+
+    assert_eq!(by_name.get("ok"), Some(&event::step::Status::Ok), "{ends:?}");
+    assert_eq!(by_name.get("skipped"), Some(&event::step::Status::Skipped), "{ends:?}");
+
+    let messages = recorder.messages();
+    assert!(messages.iter().any(|m| m.contains("shell exited")), "{messages:?}");
+    assert!(recorder.has_error());
 }
 
 #[test]
