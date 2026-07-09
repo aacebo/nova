@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Action, Arena, Diagnostic, Entry, Environment, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value};
+use crate::{Action, Arena, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Source, Traced, Value};
 
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
@@ -17,13 +17,14 @@ struct _Scope {
     arena: Arc<Mutex<Arena>>,
     args: Vec<Value>,
     kargs: KArgs,
+    events: crossbeam::Sender<Event>,
     diagnostics: Diagnostics,
 }
 
 impl Scope {
     pub const KEY: &'static str = "__$scope__";
 
-    pub(crate) fn new(name: impl Into<String>, arena: Arc<Mutex<Arena>>) -> Self {
+    pub(crate) fn new(name: impl Into<String>, arena: Arc<Mutex<Arena>>, events: crossbeam::Sender<Event>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: ulid::Ulid::new(),
             name: name.into(),
@@ -33,6 +34,7 @@ impl Scope {
             arena,
             args: Default::default(),
             kargs: Default::default(),
+            events,
             diagnostics: Default::default(),
         }))
     }
@@ -73,6 +75,8 @@ impl Scope {
     }
 
     pub fn error(&self, message: impl Into<String>) -> &Self {
+        let message = message.into();
+        self.send(Source::error(crate::Error::message(message.clone())));
         self.emit(Diagnostic::new(self.0.trace_id).sev(crate::Severity::Error).message(message))
     }
 
@@ -102,6 +106,7 @@ impl Scope {
             arena: self.0.arena.clone(),
             args: args.into_iter().collect(),
             kargs: kargs.into(),
+            events: self.0.events.clone(),
             diagnostics: Default::default(),
         }))
     }
@@ -168,7 +173,19 @@ impl Scope {
         let id = self.0.symbols.lock().unwrap().get(&key).copied();
 
         if let Some(id) = id {
-            self.0.arena.lock().unwrap().set(&id, object.into());
+            let object = object.into();
+            let from = self
+                .0
+                .arena
+                .lock()
+                .unwrap()
+                .get(&id)
+                .and_then(|entry| entry.value.read().unwrap().as_value().cloned());
+            self.0.arena.lock().unwrap().set(&id, object.clone());
+
+            if let (Some(from), Some(to)) = (from, object.as_value()) {
+                self.send(Source::update(&key, from, to.clone()));
+            }
         } else if let Some(parent) = &self.0.parent {
             parent.set(key, object);
         } else {
@@ -182,15 +199,29 @@ impl Scope {
 
     pub fn set_local(&self, key: impl Into<String>, object: impl Into<Object>) -> &Self {
         let key = key.into();
-        let id = self.0.symbols.lock().unwrap().get(&key).copied();
+        let existing = self.0.symbols.lock().unwrap().get(&key).copied();
+        let object = object.into();
+        let from = existing.and_then(|id| {
+            self.0
+                .arena
+                .lock()
+                .unwrap()
+                .get(&id)
+                .and_then(|entry| entry.value.read().unwrap().as_value().cloned())
+        });
 
-        let id = id.unwrap_or_else(|| {
+        let id = existing.unwrap_or_else(|| {
             let id = ulid::Ulid::new();
-            self.0.symbols.lock().unwrap().insert(key, id);
+            self.0.symbols.lock().unwrap().insert(key.clone(), id);
             id
         });
 
-        self.0.arena.lock().unwrap().set(&id, object.into());
+        self.0.arena.lock().unwrap().set(&id, object.clone());
+
+        if let (Some(from), Some(to)) = (from, object.as_value()) {
+            self.send(Source::update(&key, from, to.clone()));
+        }
+
         self
     }
 
@@ -219,12 +250,26 @@ impl Scope {
         {
             let args: Vec<_> = args.into_iter().collect();
             let kargs = kargs.into();
+
+            self.send(Source::Call {
+                name: name.to_string(),
+                args: args.clone(),
+                kargs: kargs.clone(),
+            });
+
             routine.invoke(&args, &kargs, self)?;
             return Ok(None);
         }
 
         let func = self.get_func(name)?;
         let child = self.fork(name, args, kargs);
+
+        self.send(Source::Call {
+            name: name.to_string(),
+            args: child.args().to_vec(),
+            kargs: child.kargs().clone(),
+        });
+
         let result = func.invoke(child.args(), child.kargs(), &child);
         self.merge(&child);
         result
@@ -242,6 +287,15 @@ impl Scope {
 
     pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
         Ok(self.env().render_str(source, Value::from_object(self.clone()))?)
+    }
+
+    fn send(&self, source: Source) {
+        let _ = self.0.events.send(Event {
+            trace_id: self.0.trace_id,
+            path: self.0.name.clone(),
+            source,
+            timestamp: std::time::SystemTime::now(),
+        });
     }
 }
 

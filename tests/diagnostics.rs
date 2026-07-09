@@ -1,11 +1,16 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use nova::{KArgs, Scope, Severity, Value, error, info, warn};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
+    let ran = Arc::new(AtomicBool::new(false));
+    let flag = ran.clone();
     let runtime = nova::new()
-        .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
             let trace_id = *scope.trace_id();
 
             let d = info!("request {}", 7 ; [
@@ -20,12 +25,15 @@ fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
             assert_eq!(d.children[2].message.as_deref(), Some("code 500"));
             assert!(d.children.iter().all(|c| c.trace_id == trace_id));
             assert_eq!(d.severity(), Severity::Error);
+
+            flag.store(true, Ordering::SeqCst);
             Ok(())
         })
         .build()
         .unwrap();
 
     runtime.call("run", KArgs::new()).unwrap();
+    assert!(ran.load(Ordering::SeqCst), "run action never executed");
 }
 
 #[test]

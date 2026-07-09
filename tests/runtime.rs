@@ -20,7 +20,6 @@ fn collect_messages(diagnostics: &[Diagnostic]) -> Vec<String> {
 fn order_workflow_threads_state_templates_and_diagnostics_together() {
     let receipt = Arc::new(Mutex::new(String::new()));
     let sink = receipt.clone();
-
     let runtime = nova::new()
         .var("store", "nova-mart")
         .template("receipt", "{{ store }}: {{ qty }} x {{ unit }} = {{ total }}")
@@ -78,7 +77,6 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
 fn order_workflow_else_branch_rejects_and_escalates_severity() {
     let receipt = Arc::new(Mutex::new(String::from("untouched")));
     let sink = receipt.clone();
-
     let runtime = nova::new()
         .predicate("in_stock", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             Ok(kargs.get("qty") > Some(&Value::from(0)))
@@ -145,7 +143,6 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
         .unwrap();
 
     let output = runtime.call("run", [("n", 5)]).unwrap();
-
     let messages = collect_messages(&output.diagnostics);
     assert!(messages.contains(&"factorial = 120".to_string()), "{messages:?}");
 
@@ -157,7 +154,6 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
 fn template_composes_callables_and_captures_their_diagnostics() {
     let out = Arc::new(Mutex::new(String::new()));
     let sink = out.clone();
-
     let runtime = nova::new()
         .var("label", "score")
         .func("double", |args: &[Value], _kargs: &KArgs, scope: &Scope| -> FuncResult {
@@ -189,7 +185,6 @@ fn template_composes_callables_and_captures_their_diagnostics() {
 fn eval_predicate_and_call_isolation_across_a_chain() {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let calls = seen.clone();
-
     let runtime = nova::new()
         .predicate("even", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
             let n = kargs.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(1);
@@ -224,7 +219,6 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
 fn set_registers_bindings_into_the_live_scope() {
     let out = Arc::new(Mutex::new(String::new()));
     let sink = out.clone();
-
     let runtime = nova::new()
         .action(
             "setup",
@@ -347,7 +341,6 @@ fn shell_step_runs_commands_and_reports_failures() {
 fn positional_required_with_optional_keyword_arg() {
     let out = Arc::new(Mutex::new(String::new()));
     let sink = out.clone();
-
     let runtime = nova::new()
         .func("greet", |args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
             let name = args.first().map(|v| v.to_string()).unwrap_or_default();
@@ -369,12 +362,12 @@ fn positional_required_with_optional_keyword_arg() {
 }
 
 #[test]
-fn ns_debug_repro() {
+fn namespaced_manifests_resolve_across_scopes() {
     let main = nova::manifest()
         .name("main")
         .on([nova::Trigger::Run { priority: Some(5) }])
         .var("count", 3)
-        .step(nova::step().name("greet").run("{{ lib.greeting }}"))
+        .step(nova::step().name("greet").run("{{ info(lib.greeting) }}"))
         .build();
     let lib = nova::manifest()
         .name("lib")
@@ -383,5 +376,11 @@ fn ns_debug_repro() {
         .build();
     let runtime = nova::Runtime::try_from(vec![main, lib]).unwrap();
     let out = runtime.call("main", KArgs::new()).unwrap();
-    println!("{:?}", collect_messages(&out.diagnostics));
+    let messages = collect_messages(&out.diagnostics);
+
+    assert!(messages.iter().any(|m| m == "hello"), "{messages:?}");
+    assert!(
+        out.diagnostics.iter().all(|d| d.severity() != Severity::Error),
+        "cross-namespace resolution should not error: {messages:?}"
+    );
 }

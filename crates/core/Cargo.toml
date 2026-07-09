@@ -18,4 +18,4 @@ workspace = true
 ulid = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive", "rc"] }
 minijinja = { version = "2", features = ["serde"] }
-crossbeam = { version = "0.8" }
+crossbeam = { package = "crossbeam-channel", version = "0.5" }

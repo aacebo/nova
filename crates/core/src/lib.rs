@@ -2,7 +2,7 @@ mod args;
 mod builtin;
 mod diagnostic;
 mod error;
-pub mod events;
+mod event;
 mod manifest;
 mod object;
 mod output;
@@ -12,7 +12,7 @@ pub use args::*;
 pub use builtin::*;
 pub use diagnostic::*;
 pub use error::*;
-pub use events::Event;
+pub use event::*;
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
@@ -68,6 +68,8 @@ pub fn new() -> Builder {
 
 pub struct Runtime {
     scope: Scope,
+    shutdown: Option<crossbeam::Sender<()>>,
+    listener: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Runtime {
@@ -105,11 +107,23 @@ impl Runtime {
     }
 }
 
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        drop(self.shutdown.take());
+
+        if let Some(handle) = self.listener.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
 #[doc(hidden)]
 pub struct Builder {
     scope: Scope,
     templates: Vec<(String, String)>,
     manifests: Vec<Manifest>,
+    events: crossbeam::Receiver<Event>,
+    observers: Vec<Box<dyn Observer>>,
 }
 
 impl Default for Builder {
@@ -120,13 +134,21 @@ impl Default for Builder {
 
 impl Builder {
     pub fn new() -> Self {
+        let (sender, receiver) = crossbeam::unbounded();
         let builder = Self {
-            scope: Scope::new("", Default::default()),
+            scope: Scope::new("", Default::default(), sender),
             templates: Vec::new(),
             manifests: Vec::new(),
+            events: receiver,
+            observers: Vec::new(),
         };
 
         builtin::register(builder)
+    }
+
+    pub fn observe(mut self, observer: impl Observer) -> Self {
+        self.observers.push(Box::new(observer));
+        self
     }
 
     pub fn var(self, name: impl Into<String>, value: impl Into<Value>) -> Self {
@@ -220,6 +242,42 @@ impl Builder {
             root.set(name.clone(), Routine::new(name, scope, manifest.steps));
         }
 
-        Ok(Runtime { scope: root })
+        let (shutdown, listener) = if self.observers.is_empty() {
+            (None, None)
+        } else {
+            let events = self.events;
+            let observers = self.observers;
+            let (shutdown_tx, shutdown_rx) = crossbeam::bounded::<()>(0);
+            let handle = std::thread::spawn(move || {
+                loop {
+                    crossbeam::select! {
+                        recv(events) -> event => match event {
+                            Ok(event) => {
+                                for observer in &observers {
+                                    observer.on_event(event.clone());
+                                }
+                            }
+                            Err(_) => break,
+                        },
+                        recv(shutdown_rx) -> _ => {
+                            for event in events.try_iter() {
+                                for observer in &observers {
+                                    observer.on_event(event.clone());
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            });
+
+            (Some(shutdown_tx), Some(handle))
+        };
+
+        Ok(Runtime {
+            scope: root,
+            shutdown,
+            listener,
+        })
     }
 }
