@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Action, Arena, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Source, Traced, Value};
+use crate::{Action, Arena, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value, event};
 
 pub type Diagnostics = Arc<Mutex<Vec<Diagnostic>>>;
 
@@ -76,7 +76,7 @@ impl Scope {
 
     pub fn error(&self, message: impl Into<String>) -> &Self {
         let message = message.into();
-        self.send(Source::error(crate::Error::message(message.clone())));
+        self.dispatch(crate::Error::message(message.clone()));
         self.emit(Diagnostic::new(self.0.trace_id).sev(crate::Severity::Error).message(message))
     }
 
@@ -184,7 +184,7 @@ impl Scope {
             self.0.arena.lock().unwrap().set(&id, object.clone());
 
             if let (Some(from), Some(to)) = (from, object.as_value()) {
-                self.send(Source::update(&key, from, to.clone()));
+                self.dispatch(event::object::update(&key, from, to.clone()));
             }
         } else if let Some(parent) = &self.0.parent {
             parent.set(key, object);
@@ -219,7 +219,7 @@ impl Scope {
         self.0.arena.lock().unwrap().set(&id, object.clone());
 
         if let (Some(from), Some(to)) = (from, object.as_value()) {
-            self.send(Source::update(&key, from, to.clone()));
+            self.dispatch(event::object::update(&key, from, to.clone()));
         }
 
         self
@@ -251,11 +251,11 @@ impl Scope {
             let args: Vec<_> = args.into_iter().collect();
             let kargs = kargs.into();
 
-            self.send(Source::Call {
-                name: name.to_string(),
-                args: args.clone(),
-                kargs: kargs.clone(),
-            });
+            self.dispatch(event::object::call(
+                name.to_string(),
+                args.clone(),
+                kargs.clone().into_inner(),
+            ));
 
             routine.invoke(&args, &kargs, self)?;
             return Ok(None);
@@ -264,11 +264,11 @@ impl Scope {
         let func = self.get_func(name)?;
         let child = self.fork(name, args, kargs);
 
-        self.send(Source::Call {
-            name: name.to_string(),
-            args: child.args().to_vec(),
-            kargs: child.kargs().clone(),
-        });
+        self.dispatch(event::object::call(
+            name.to_string(),
+            child.args().to_vec(),
+            child.kargs().clone().into_inner(),
+        ));
 
         let result = func.invoke(child.args(), child.kargs(), &child);
         self.merge(&child);
@@ -289,13 +289,8 @@ impl Scope {
         Ok(self.env().render_str(source, Value::from_object(self.clone()))?)
     }
 
-    fn send(&self, source: Source) {
-        let _ = self.0.events.send(Event {
-            trace_id: self.0.trace_id,
-            path: self.0.name.clone(),
-            source,
-            timestamp: std::time::SystemTime::now(),
-        });
+    pub fn dispatch(&self, source: impl Into<event::Source>) {
+        let _ = self.0.events.send(event::new(self.0.trace_id, self.0.name.clone(), source));
     }
 }
 

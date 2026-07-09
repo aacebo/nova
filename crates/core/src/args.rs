@@ -11,6 +11,17 @@ impl KArgs {
         Self::default()
     }
 
+    pub fn from_kwargs(kwargs: minijinja::value::Kwargs) -> Result<Self, minijinja::Error> {
+        let mut args = Self::new();
+
+        for key in kwargs.args() {
+            args.set(key, kwargs.get::<Value>(key)?);
+        }
+
+        kwargs.assert_all_used()?;
+        Ok(args)
+    }
+
     pub fn has(&self, key: &str) -> bool {
         self.0.contains_key(key)
     }
@@ -67,6 +78,18 @@ impl KArgs {
         self.0.insert(key.into(), value.into());
         self
     }
+
+    pub fn into_inner(
+        self,
+    ) -> impl IntoIterator<IntoIter = std::collections::btree_map::IntoIter<String, Value>, Item = (String, Value)> {
+        self.0.into_iter()
+    }
+}
+
+impl From<KArgs> for Value {
+    fn from(args: KArgs) -> Self {
+        Self::from_iter(args.0)
+    }
 }
 
 impl<K: Into<String>, V: Into<Value>, T: IntoIterator<Item = (K, V)>> From<T> for KArgs {
@@ -98,25 +121,5 @@ impl std::ops::Index<&str> for KArgs {
 
     fn index(&self, index: &str) -> &Self::Output {
         self.0.index(index)
-    }
-}
-
-impl KArgs {
-    /// Consume minijinja keyword arguments into `KArgs`, asserting all were used.
-    pub fn from_kwargs(kwargs: minijinja::value::Kwargs) -> Result<Self, minijinja::Error> {
-        let mut args = Self::new();
-
-        for key in kwargs.args() {
-            args.set(key, kwargs.get::<Value>(key)?);
-        }
-
-        kwargs.assert_all_used()?;
-        Ok(args)
-    }
-}
-
-impl From<KArgs> for Value {
-    fn from(args: KArgs) -> Self {
-        Value::from_iter(args.0)
     }
 }

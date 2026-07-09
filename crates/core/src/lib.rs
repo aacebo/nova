@@ -2,7 +2,7 @@ mod args;
 mod builtin;
 mod diagnostic;
 mod error;
-mod event;
+pub mod event;
 mod manifest;
 mod object;
 mod output;
@@ -12,7 +12,7 @@ pub use args::*;
 pub use builtin::*;
 pub use diagnostic::*;
 pub use error::*;
-pub use event::*;
+pub use event::{Event, Observer};
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
@@ -254,7 +254,7 @@ impl Builder {
                         recv(events) -> event => match event {
                             Ok(event) => {
                                 for observer in &observers {
-                                    observer.on_event(event.clone());
+                                    observer.on_event(&event);
                                 }
                             }
                             Err(_) => break,
@@ -262,7 +262,7 @@ impl Builder {
                         recv(shutdown_rx) -> _ => {
                             for event in events.try_iter() {
                                 for observer in &observers {
-                                    observer.on_event(event.clone());
+                                    observer.on_event(&event);
                                 }
                             }
                             break;

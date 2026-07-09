@@ -16,6 +16,9 @@ repository = "https://www.github.com/aacebo/nova"
 result_large_err = "allow"
 type_complexity = "allow"
 
+[profile.dev]
+incremental = false
+
 [package]
 name = "nova"
 version.workspace = true

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, KArgs, Object, Reflect, Scope, Step, Value};
+use crate::{Action, KArgs, Object, Reflect, Scope, Step, Value, event};
 
 #[derive(Clone)]
 pub struct Routine {
@@ -72,9 +72,22 @@ impl Reflect for Routine {
 impl Action for Routine {
     fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
         let child = self.scope.fork(&self.name, args.to_vec(), kargs.clone());
+        let total = self.steps.len();
 
-        for step in &self.steps {
-            step.invoke(child.args(), child.kargs(), &child)?;
+        for (index, step) in self.steps.iter().enumerate() {
+            let name = step.name.clone().unwrap_or_default();
+            child.dispatch(event::step::start(&self.name, &name, index, total));
+
+            let started = std::time::Instant::now();
+            let result = step.invoke(child.args(), child.kargs(), &child);
+            let status = if result.is_ok() {
+                event::step::Status::Ok
+            } else {
+                event::step::Status::Error
+            };
+            child.dispatch(event::step::end(&self.name, &name, index, status, started.elapsed()));
+
+            result?;
         }
 
         scope.merge(&child);
