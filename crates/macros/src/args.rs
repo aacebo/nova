@@ -47,6 +47,92 @@ impl Parse for Arg {
     }
 }
 
+pub struct Args {
+    pub args: Vec<Arg>,
+}
+
+impl Args {
+    pub fn tokens(&self) -> TokenStream {
+        let positional: Vec<_> = self
+            .args
+            .iter()
+            .filter_map(|arg| match arg {
+                Arg::Positional(expr) => Some(zyn! { __args.push(::nova::Value::from({{ expr }})); }),
+                Arg::SplatArgs(expr) => Some(zyn! { __args.extend(({{ expr }}).iter().cloned()); }),
+                _ => None,
+            })
+            .collect();
+
+        let named: Vec<_> = self
+            .args
+            .iter()
+            .filter_map(|arg| match arg {
+                Arg::Named(key, expr) => {
+                    let key = LitStr::new(&key.to_string(), key.span());
+                    Some(zyn! { __kwargs.push(({{ key }}, ::nova::Value::from({{ expr }}))); })
+                }
+                Arg::SplatKargs(expr) => Some(zyn! {
+                    for (__k, __v) in ({{ expr }}).iter() {
+                        __kwargs.push((__k.as_str(), __v.clone()));
+                    }
+                }),
+                _ => None,
+            })
+            .collect();
+
+        let has_named = self
+            .args
+            .iter()
+            .any(|arg| matches!(arg, Arg::Named(..) | Arg::SplatKargs(..)));
+
+        let push_kwargs = if has_named {
+            zyn! {
+                __args.push(::nova::Value::from(::nova::Kwargs::from_iter(__kwargs)));
+            }
+        } else {
+            TokenStream::new()
+        };
+
+        zyn! {
+            ::nova::Args::try_from(&{
+                let mut __args: ::std::vec::Vec<::nova::Value> = ::std::vec::Vec::new();
+                let mut __kwargs: ::std::vec::Vec<(&str, ::nova::Value)> = ::std::vec::Vec::new();
+                @for (stmt in positional.iter()) { {{ stmt }} }
+                @for (stmt in named.iter()) { {{ stmt }} }
+                {{ push_kwargs }}
+                __args
+            }[..]).expect("args! builds a well-formed argument slice")
+        }
+    }
+}
+
+impl Parse for Args {
+    fn parse(input: ParseStream) -> zyn::syn::Result<Self> {
+        let mut args = Vec::new();
+        let mut seen_named = false;
+
+        while !input.is_empty() {
+            let arg = input.parse::<Arg>()?;
+
+            match &arg {
+                Arg::Named(..) | Arg::SplatKargs(..) => seen_named = true,
+                Arg::Positional(..) | Arg::SplatArgs(..) if seen_named => {
+                    return Err(input.error("positional argument cannot follow a named argument"));
+                }
+                _ => {}
+            }
+
+            args.push(arg);
+
+            if input.parse::<Option<Token![,]>>()?.is_none() {
+                break;
+            }
+        }
+
+        Ok(Self { args })
+    }
+}
+
 pub struct Call {
     pub name: Expr,
     pub args: Vec<Arg>,

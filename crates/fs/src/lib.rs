@@ -6,14 +6,10 @@ impl nova::Import for FileSystem {
     }
 }
 
-pub fn read(
-    args: &[nova::Value],
-    _kargs: &nova::KArgs,
-    _scope: &nova::Scope,
-) -> Result<Option<nova::Value>, Box<dyn std::error::Error>> {
+pub fn read(args: &[nova::Value], _kargs: &nova::KArgs, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
     let path = args[0].as_str().ok_or(nova::Error::message("path must be a string"))?;
     let data = std::fs::read_to_string(path)?;
-    Ok(Some(data.into()))
+    Ok(data.into())
 }
 
 pub fn write(args: &[nova::Value], _kargs: &nova::KArgs, _scope: &nova::Scope) -> Result<(), Box<dyn std::error::Error>> {

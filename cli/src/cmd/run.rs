@@ -64,7 +64,7 @@ impl Args {
         let run = std::thread::scope(|scope| {
             scope.spawn(|| {
                 for name in &names {
-                    if let Err(err) = runtime.call(name, [] as [nova::Value; 0], nova::KArgs::new()) {
+                    if let Err(err) = runtime.call(name, nova::args!()) {
                         let _ = done_tx.send(Err(err.to_string()));
                         return;
                     }

@@ -65,7 +65,7 @@ impl Reflect for Routine {
         self.invoke(positional, &kargs, &caller)
             .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
 
-        Ok(Value::UNDEFINED)
+        Ok(Value::from(()))
     }
 }
 

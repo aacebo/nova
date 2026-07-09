@@ -1,6 +1,6 @@
 #![cfg(feature = "fs")]
 
-use nova::KArgs;
+use nova::args;
 use nova::fs::FileSystem;
 
 fn runtime() -> nova::Runtime {
@@ -14,13 +14,9 @@ fn write_then_read_string_round_trip() {
     let path = path.to_str().unwrap();
     let rt = runtime();
 
-    rt.call("fs.write", [path, "hello world"], KArgs::new()).unwrap();
+    rt.call("fs.write", args!(path, "hello world")).unwrap();
 
-    let out = rt
-        .func("fs.read", [path], KArgs::new())
-        .unwrap()
-        .expect("fs.read should return a value");
-
+    let out = rt.func("fs.read", args!(path)).unwrap();
     assert_eq!(out.as_str(), Some("hello world"));
 }
 
@@ -31,9 +27,9 @@ fn write_overwrites_then_read_returns_latest() {
     let path = path.to_str().unwrap();
     let rt = runtime();
 
-    rt.call("fs.write", [path, "first"], KArgs::new()).unwrap();
-    rt.call("fs.write", [path, "second"], KArgs::new()).unwrap();
+    rt.call("fs.write", args!(path, "first")).unwrap();
+    rt.call("fs.write", args!(path, "second")).unwrap();
 
-    let out = rt.func("fs.read", [path], KArgs::new()).unwrap().unwrap();
+    let out = rt.func("fs.read", args!(path)).unwrap();
     assert_eq!(out.as_str(), Some("second"));
 }

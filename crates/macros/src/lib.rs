@@ -7,7 +7,7 @@ use zyn::proc_macro2::TokenStream;
 use zyn::syn::{Expr, parse_macro_input};
 use zyn::zyn;
 
-use crate::args::Call;
+use crate::args::{Args, Call};
 use crate::diagnostics::{Diagnostic, SeverityDiagnostic};
 use crate::key_value::KeyValue;
 
@@ -64,6 +64,12 @@ pub fn del(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 #[proc_macro]
+pub fn args(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let args = parse_macro_input!(input as Args);
+    args.tokens().into()
+}
+
+#[proc_macro]
 pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let Call { name, args, coerce } = parse_macro_input!(input as Call);
     let stmts: Vec<_> = args.iter().map(args::Arg::stmt).collect();
@@ -74,18 +80,13 @@ pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             @for (stmt in stmts.iter()) {
                 {{ stmt }}
             }
-            scope.call({{ name }}, __args, __kargs)?
+            scope.call({{ name }}, ::nova::Args::new(&__args, __kargs))?
         }
     };
 
     let expanded = match coerce {
         Some(ty) => zyn! {
-            match {{ invoke }} {
-                ::std::option::Option::Some(__v) => ::std::option::Option::Some(
-                    <{{ ty }} as ::std::convert::TryFrom<::nova::Value>>::try_from(__v)?
-                ),
-                ::std::option::Option::None => ::std::option::Option::None,
-            }
+            <{{ ty }} as ::std::convert::TryFrom<::nova::Value>>::try_from({{ invoke }})?
         },
         None => invoke,
     };

@@ -4,23 +4,23 @@ pub fn register(builder: Builder) -> Builder {
     builder
         .func("info", |args: &[Value], kargs: &KArgs, scope: &Scope| {
             emit(Severity::Info, args, kargs, scope);
-            Ok(None)
+            Ok(Value::from(()))
         })
         .func("warn", |args: &[Value], kargs: &KArgs, scope: &Scope| {
             emit(Severity::Warn, args, kargs, scope);
-            Ok(None)
+            Ok(Value::from(()))
         })
         .func("error", |args: &[Value], kargs: &KArgs, scope: &Scope| {
             emit(Severity::Error, args, kargs, scope);
-            Ok(None)
+            Ok(Value::from(()))
         })
         .func("print", |args: &[Value], kargs: &KArgs, _scope: &Scope| {
             print!("{}", message(args, kargs));
-            Ok(None)
+            Ok(Value::from(()))
         })
         .func("println", |args: &[Value], kargs: &KArgs, _scope: &Scope| {
             println!("{}", message(args, kargs));
-            Ok(None)
+            Ok(Value::from(()))
         })
 }
 

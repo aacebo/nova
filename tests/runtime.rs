@@ -3,10 +3,10 @@ mod common;
 use std::sync::{Arc, Mutex};
 
 use common::Recorder;
-use nova::{KArgs, Manifest, Scope, Value};
+use nova::{KArgs, Manifest, Scope, Value, args};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
-type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
+type FuncResult = Result<Value, Box<dyn std::error::Error>>;
 
 fn routines(recorder: &Recorder, manifests: impl IntoIterator<Item = Manifest>) -> nova::Runtime {
     let mut builder = nova::new().observe(recorder.clone());
@@ -34,14 +34,14 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
             let qty = kargs.get("qty").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
             let unit = kargs.get("unit").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
             nova::info!("priced {} units", qty).emit(scope);
-            Ok(Some(Value::from(qty * unit)))
+            Ok(Value::from(qty * unit))
         })
         .action(
             "fulfill",
             move |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
                 nova::warn!("fulfilling order").emit(scope);
 
-                let total = nova::call!("subtotal", *args, **kargs as u64).unwrap_or(0);
+                let total = nova::call!("subtotal", *args, **kargs as u64);
                 nova::set!("total", total);
 
                 *sink.lock().unwrap() = scope.render("receipt")?;
@@ -53,7 +53,7 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
             Ok(())
         })
         .action("process", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            if nova::call!("in_stock", *args, **kargs).map(|v| v.is_true()).unwrap_or(false) {
+            if nova::call!("in_stock", *args, **kargs).is_true() {
                 nova::call!("fulfill", *args, **kargs);
             } else {
                 nova::call!("reject", *args, **kargs);
@@ -63,7 +63,7 @@ fn order_workflow_threads_state_templates_and_diagnostics_together() {
         .build()
         .unwrap();
 
-    runtime.call("process", [] as [Value; 0], [("qty", 3), ("unit", 5)]).unwrap();
+    runtime.call("process", args!(qty = 3, unit = 5)).unwrap();
     drop(runtime);
 
     assert_eq!(*receipt.lock().unwrap(), "nova-mart: 3 x 5 = 15");
@@ -101,7 +101,7 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
             Ok(())
         })
         .action("process", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            if nova::call!("in_stock", *args, **kargs).map(|v| v.is_true()).unwrap_or(false) {
+            if nova::call!("in_stock", *args, **kargs).is_true() {
                 nova::call!("fulfill", *args, **kargs);
             } else {
                 nova::call!("reject", *args, **kargs);
@@ -111,7 +111,7 @@ fn order_workflow_else_branch_rejects_and_escalates_severity() {
         .build()
         .unwrap();
 
-    runtime.call("process", [] as [Value; 0], [("qty", 0)]).unwrap();
+    runtime.call("process", args!(qty = 0)).unwrap();
     drop(runtime);
 
     assert_eq!(*receipt.lock().unwrap(), "untouched");
@@ -132,22 +132,22 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
             Ok(kargs.get("n") == Some(&Value::from(0)))
         })
         .predicate("is_positive", |args: &[Value], kargs: &KArgs, scope: &Scope| {
-            Ok(!nova::call!("is_zero", *args, **kargs).map(|v| v.is_true()).unwrap_or(false))
+            Ok(!nova::call!("is_zero", *args, **kargs).is_true())
         })
         .func("fact", |_args: &[Value], kargs: &KArgs, scope: &Scope| -> FuncResult {
             let n = kargs.get("n").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
 
             if n == 0 {
-                return Ok(Some(Value::from(1u64)));
+                return Ok(Value::from(1u64));
             }
 
-            let sub = nova::call!("fact", n = n - 1 as u64).unwrap_or(1);
-            Ok(Some(Value::from(n * sub)))
+            let sub = nova::call!("fact", n = n - 1 as u64);
+            Ok(Value::from(n * sub))
         })
         .action("run", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            assert!(nova::call!("is_positive", *args, **kargs).unwrap().is_true());
+            assert!(nova::call!("is_positive", *args, **kargs).is_true());
 
-            let result = nova::call!("fact", *args, **kargs as u64).unwrap_or(0);
+            let result = nova::call!("fact", *args, **kargs as u64);
             nova::set!("result", result);
             nova::info!("factorial = {}", result).emit(scope);
             Ok(())
@@ -155,9 +155,9 @@ fn recursive_calls_accumulate_state_and_coerce_results() {
         .build()
         .unwrap();
 
-    runtime.call("run", [] as [Value; 0], [("n", 5)]).unwrap();
-    let value = runtime.func("fact", [] as [Value; 0], [("n", 5)]).unwrap();
-    assert_eq!(value, Some(Value::from(120u64)));
+    runtime.call("run", args!(n = 5)).unwrap();
+    let value = runtime.func("fact", args!(n = 5)).unwrap();
+    assert_eq!(value, Value::from(120u64));
 
     drop(runtime);
     assert!(
@@ -178,7 +178,7 @@ fn template_composes_callables_and_captures_their_diagnostics() {
         .func("double", |args: &[Value], _kargs: &KArgs, scope: &Scope| -> FuncResult {
             let n = args.first().and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
             nova::warn!("doubling {}", n).emit(scope);
-            Ok(Some(Value::from(n * 2)))
+            Ok(Value::from(n * 2))
         })
         .predicate("is_positive", |args: &[Value], _kargs: &KArgs, _scope: &Scope| {
             Ok(args.first() > Some(&Value::from(0)))
@@ -193,7 +193,7 @@ fn template_composes_callables_and_captures_their_diagnostics() {
         .build()
         .unwrap();
 
-    runtime.call("render", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("render", args!()).unwrap();
     drop(runtime);
 
     assert_eq!(*out.lock().unwrap(), "score: 42 (true)");
@@ -229,10 +229,10 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
         .build()
         .unwrap();
 
-    assert!(runtime.eval("even", [] as [Value; 0], [("n", 4)]).unwrap());
-    assert!(!runtime.eval("even", [] as [Value; 0], [("n", 3)]).unwrap());
+    assert!(runtime.eval("even", args!(n = 4)).unwrap());
+    assert!(!runtime.eval("even", args!(n = 3)).unwrap());
 
-    runtime.call("caller", [] as [Value; 0], [("n", 1)]).unwrap();
+    runtime.call("caller", args!(n = 1)).unwrap();
     let recorded = seen.lock().unwrap();
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].get("n"), Some(&Value::from(2)));
@@ -251,11 +251,11 @@ fn set_registers_bindings_into_the_live_scope() {
                     "shout",
                     nova::Object::func("shout", |_args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
                         let word = kargs.get("word").map(|v| v.to_string()).unwrap_or_default();
-                        Ok(Some(Value::from(word.to_uppercase())))
+                        Ok(Value::from(word.to_uppercase()))
                     })
                 );
 
-                let loud = nova::call!("shout", word = "hey").unwrap();
+                let loud = nova::call!("shout", word = "hey");
                 assert_eq!(loud, Value::from("HEY"));
 
                 *sink.lock().unwrap() = scope.render_str("{{ greeting }}")?;
@@ -265,7 +265,7 @@ fn set_registers_bindings_into_the_live_scope() {
         .build()
         .unwrap();
 
-    runtime.call("setup", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("setup", args!()).unwrap();
     assert_eq!(*out.lock().unwrap(), "hello");
 }
 
@@ -282,8 +282,8 @@ fn error_paths_surface_at_call_and_build_time() {
         .build()
         .unwrap();
 
-    assert!(runtime.call("missing", [] as [Value; 0], KArgs::new()).is_err());
-    assert!(runtime.call("caller", [] as [Value; 0], KArgs::new()).is_err());
+    assert!(runtime.call("missing", args!()).is_err());
+    assert!(runtime.call("caller", args!()).is_err());
     assert!(nova::new().template("t", "{{ ").build().is_err());
 }
 
@@ -306,7 +306,7 @@ fn manifest_hydrates_into_a_runnable_runtime() {
         .build();
 
     let runtime = routines(&recorder, [manifest]);
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();
@@ -340,7 +340,7 @@ fn call_step_passes_positional_and_named_args() {
     );
     let runtime = builder.routine(manifest).build().unwrap();
 
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     let seen = seen.lock().unwrap();
@@ -348,6 +348,34 @@ fn call_step_passes_positional_and_named_args() {
     assert_eq!(seen[0].0.as_str(), Some("hello"), "positional arg resolves via var");
     assert_eq!(seen[0].1.as_str(), Some("literal"), "named arg resolves as expression");
     assert!(!recorder.has_error(), "call step should not error");
+}
+
+#[test]
+fn args_macro_routes_positional_kwargs_and_empty() {
+    let runtime = nova::new()
+        .func("echo", |args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
+            let first = args.first().cloned().unwrap_or(Value::from(()));
+            let tag = kargs.get("tag").cloned().unwrap_or(Value::from(()));
+            Ok(Value::from(vec![first, tag]))
+        })
+        .build()
+        .unwrap();
+
+    // empty
+    let out = runtime.func("echo", args!()).unwrap();
+    assert_eq!(out, Value::from(vec![Value::from(()), Value::from(())]));
+
+    // positional only
+    let out = runtime.func("echo", args!("hi")).unwrap();
+    assert_eq!(out, Value::from(vec![Value::from("hi"), Value::from(())]));
+
+    // kwargs only
+    let out = runtime.func("echo", args!(tag = "t")).unwrap();
+    assert_eq!(out, Value::from(vec![Value::from(()), Value::from("t")]));
+
+    // both
+    let out = runtime.func("echo", args!("hi", tag = "t")).unwrap();
+    assert_eq!(out, Value::from(vec![Value::from("hi"), Value::from("t")]));
 }
 
 #[test]
@@ -363,7 +391,7 @@ fn builtin_diagnostic_functions_emit_positionally_from_a_block() {
         .build();
 
     let runtime = routines(&recorder, [manifest]);
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();
@@ -389,7 +417,7 @@ fn shell_step_runs_commands_and_reports_failures() {
         .build();
 
     let runtime = routines(&recorder, [manifest]);
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();
@@ -407,7 +435,7 @@ fn positional_required_with_optional_keyword_arg() {
         .func("greet", |args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
             let name = args.first().map(|v| v.to_string()).unwrap_or_default();
             let suffix = kargs.get("suffix").map(|v| v.to_string()).unwrap_or_default();
-            Ok(Some(Value::from(format!("{name}{suffix}"))))
+            Ok(Value::from(format!("{name}{suffix}")))
         })
         .action(
             "render",
@@ -419,7 +447,7 @@ fn positional_required_with_optional_keyword_arg() {
         .build()
         .unwrap();
 
-    runtime.call("render", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("render", args!()).unwrap();
     assert_eq!(*out.lock().unwrap(), "bob!");
 }
 
@@ -439,7 +467,7 @@ fn namespaced_manifests_resolve_across_scopes() {
         .build();
 
     let runtime = routines(&recorder, [main, lib]);
-    runtime.call("main", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("main", args!()).unwrap();
     drop(runtime);
 
     let messages = recorder.messages();

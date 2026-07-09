@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{Action, KArgs, Scope, Value};
+use crate::{Action, Args, KArgs, Scope, Value};
 
 pub fn step() -> build::StepBuilder {
     build::StepBuilder::new()
@@ -54,7 +54,7 @@ impl Action for Step {
                     kargs.set(key.clone(), resolve(value));
                 }
 
-                if let Err(err) = scope.call(call, positional, kargs) {
+                if let Err(err) = scope.call(call, Args::new(&positional, kargs)) {
                     scope.error(err.to_string());
                 }
             }

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::Recorder;
-use nova::{KArgs, Scope, Severity, Value, error, info, warn};
+use nova::{KArgs, Scope, Severity, Value, args, error, info, warn};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -35,7 +35,7 @@ fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
         .build()
         .unwrap();
 
-    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("run", args!()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "run action never executed");
 }
 
@@ -52,7 +52,7 @@ fn fluent_builders_and_emit_stream_each_diagnostic() {
         .build()
         .unwrap();
 
-    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("run", args!()).unwrap();
     drop(runtime);
 
     let emitted = recorder.diagnostics();

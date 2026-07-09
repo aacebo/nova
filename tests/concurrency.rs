@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use nova::{KArgs, Scope, Value, get, set};
+use nova::{KArgs, Scope, Value, args, get, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -29,6 +29,6 @@ fn scope_moves_across_threads_without_panicking() {
         .build()
         .unwrap();
 
-    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("run", args!()).unwrap();
     assert!(ran.load(Ordering::SeqCst), "run action never executed");
 }

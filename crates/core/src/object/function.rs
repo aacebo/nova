@@ -42,7 +42,7 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
         self.callback.invoke(args, kargs, scope)
     }
 }
@@ -63,11 +63,9 @@ impl Reflect for Function {
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
         let child = scope.fork(&self.name, positional.to_vec(), kargs);
-        let value = self
-            .callback
+        self.callback
             .invoke(child.args(), child.kargs(), &child)
-            .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
-        Ok(value.unwrap_or(Value::UNDEFINED))
+            .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))
     }
 }
 
@@ -91,13 +89,13 @@ impl Callback {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
                 action.invoke(args, kargs, scope)?;
-                Ok(None)
+                Ok(Value::from(()))
             }
-            Self::Predicate(predicate) => Ok(Some(Value::from(predicate.invoke(args, kargs, scope)?))),
+            Self::Predicate(predicate) => Ok(Value::from(predicate.invoke(args, kargs, scope)?)),
             Self::Func(func) => func.invoke(args, kargs, scope),
         }
     }

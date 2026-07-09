@@ -6,10 +6,10 @@ use std::sync::{Arc, Mutex};
 use common::Recorder;
 use nova::event::object::{CallEvent, UpdateEvent};
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Event, KArgs, Object, Scope, Value, event};
+use nova::{Event, KArgs, Object, Scope, Value, args, event};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
-type FuncResult = Result<Option<Value>, Box<dyn std::error::Error>>;
+type FuncResult = Result<Value, Box<dyn std::error::Error>>;
 
 #[test]
 fn listener_delivers_calls_updates_and_errors() {
@@ -23,10 +23,10 @@ fn listener_delivers_calls_updates_and_errors() {
         .func("subtotal", |_args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
             let qty = kargs.get("qty").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
             let unit = kargs.get("unit").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
-            Ok(Some(Value::from(qty * unit)))
+            Ok(Value::from(qty * unit))
         })
         .action("fulfill", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            let total = nova::call!("subtotal", *args, **kargs as u64).unwrap_or(0);
+            let total = nova::call!("subtotal", *args, **kargs as u64);
             nova::set!("total", total);
             Ok(())
         })
@@ -35,7 +35,7 @@ fn listener_delivers_calls_updates_and_errors() {
             Ok(())
         })
         .action("process", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            if nova::call!("in_stock", *args, **kargs).map(|v| v.is_true()).unwrap_or(false) {
+            if nova::call!("in_stock", *args, **kargs).is_true() {
                 nova::call!("fulfill", *args, **kargs);
             } else {
                 nova::call!("reject", *args, **kargs);
@@ -45,8 +45,8 @@ fn listener_delivers_calls_updates_and_errors() {
         .build()
         .unwrap();
 
-    runtime.call("process", [] as [Value; 0], [("qty", 3), ("unit", 5)]).unwrap();
-    runtime.call("process", [] as [Value; 0], [("qty", 0), ("unit", 5)]).unwrap();
+    runtime.call("process", args!(qty = 3, unit = 5)).unwrap();
+    runtime.call("process", args!(qty = 0, unit = 5)).unwrap();
 
     drop(runtime);
 
@@ -82,7 +82,7 @@ fn closure_observer_receives_events() {
         .build()
         .unwrap();
 
-    runtime.call("noop", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("noop", args!()).unwrap();
     drop(runtime);
 
     assert_eq!(*seen.lock().unwrap(), vec!["noop".to_string()]);
@@ -106,7 +106,7 @@ fn multiple_observers_each_receive_every_event() {
         .build()
         .unwrap();
 
-    runtime.call("bump", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("bump", args!()).unwrap();
     drop(runtime);
 
     assert_eq!(recorder.calls(), vec!["bump".to_string()]);
@@ -134,8 +134,8 @@ fn listener_accumulates_across_multiple_calls() {
         .build()
         .unwrap();
 
-    runtime.call("bump", [] as [Value; 0], KArgs::new()).unwrap();
-    runtime.call("bump_again", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("bump", args!()).unwrap();
+    runtime.call("bump_again", args!()).unwrap();
     drop(runtime);
 
     assert_eq!(recorder.calls(), vec!["bump".to_string(), "bump_again".to_string()]);
@@ -156,7 +156,7 @@ fn fresh_bindings_do_not_emit_updates() {
         .build()
         .unwrap();
 
-    runtime.call("setup", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("setup", args!()).unwrap();
     drop(runtime);
 
     let updated: Vec<String> = recorder.updates().into_iter().map(|(name, ..)| name).collect();
@@ -175,7 +175,9 @@ fn runtime_without_observers_runs_and_drops_cleanly() {
             nova::set!("count", 1);
             scope.set(
                 "fn",
-                Object::func("noop", |_: &[Value], _: &KArgs, _: &Scope| -> FuncResult { Ok(None) }),
+                Object::func("noop", |_: &[Value], _: &KArgs, _: &Scope| -> FuncResult {
+                    Ok(Value::from(()))
+                }),
             );
             nova::call!("fn");
             Ok(())
@@ -183,7 +185,7 @@ fn runtime_without_observers_runs_and_drops_cleanly() {
         .build()
         .unwrap();
 
-    runtime.call("run", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("run", args!()).unwrap();
     drop(runtime);
 }
 
@@ -198,7 +200,7 @@ fn runtime_with_routines_and_observer_joins_on_drop() {
 
     let runtime = nova::new().observe(recorder.clone()).routine(manifest).build().unwrap();
 
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     assert!(recorder.calls().contains(&"flow".to_string()), "{:?}", recorder.calls());
@@ -228,7 +230,7 @@ fn step_events_fire_for_routine_steps() {
         .build()
         .unwrap();
 
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     let starts = starts.lock().unwrap();
@@ -255,7 +257,7 @@ fn step_end_status_reflects_skip_and_shell_failure_is_a_diagnostic() {
 
     let runtime = nova::new().observe(recorder.clone()).routine(manifest).build().unwrap();
 
-    runtime.call("flow", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("flow", args!()).unwrap();
     drop(runtime);
 
     let ends = recorder.step_ends();
@@ -291,7 +293,7 @@ fn per_variant_closure_adapter_receives_only_its_variant() {
         .build()
         .unwrap();
 
-    runtime.call("bump", [] as [Value; 0], KArgs::new()).unwrap();
+    runtime.call("bump", args!()).unwrap();
     drop(runtime);
 
     assert_eq!(*call_names.lock().unwrap(), vec!["bump".to_string()]);

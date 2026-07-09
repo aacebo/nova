@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{Action, Arena, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value, event};
+use crate::{
+    Action, Arena, Args, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value, event,
+};
 
 #[derive(Clone)]
 pub struct Scope(Arc<_Scope>);
@@ -210,32 +212,24 @@ impl Scope {
         self
     }
 
-    pub fn call(
-        &self,
-        name: impl AsRef<str>,
-        args: impl IntoIterator<Item = Value>,
-        kargs: impl Into<KArgs>,
-    ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    pub fn call(&self, name: impl AsRef<str>, args: Args) -> Result<Value, Box<dyn std::error::Error>> {
         let name = name.as_ref();
 
         if let Some(slot) = self.get(name)
             && let Some(routine) = slot.as_routine()
         {
-            let args: Vec<_> = args.into_iter().collect();
-            let kargs = kargs.into();
-
             self.dispatch(event::object::call(
                 name.to_string(),
-                args.clone(),
-                kargs.clone().into_inner(),
+                args.args().to_vec(),
+                args.kargs().clone().into_inner(),
             ));
 
-            routine.invoke(&args, &kargs, self)?;
-            return Ok(None);
+            routine.invoke(args.args(), args.kargs(), self)?;
+            return Ok(Value::from(()));
         }
 
         let func = self.get_func(name)?;
-        let child = self.fork(name, args, kargs);
+        let child = self.fork(name, args.args().to_vec(), args.kargs().clone());
 
         self.dispatch(event::object::call(
             name.to_string(),

@@ -18,7 +18,7 @@ pub use state::*;
 
 pub type Value = minijinja::Value;
 pub type Environment<'a> = minijinja::Environment<'a>;
-pub use minijinja::value::Object as Reflect;
+pub use minijinja::value::{Kwargs, Object as Reflect};
 
 pub trait Action: Send + Sync {
     fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>>;
@@ -29,7 +29,7 @@ pub trait Predicate: Send + Sync {
 }
 
 pub trait Call: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>>;
 }
 
 pub trait Import {
@@ -56,9 +56,9 @@ where
 
 impl<F> Call for F
 where
-    F: Fn(&[Value], &KArgs, &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&[Value], &KArgs, &Scope) -> Result<Value, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
         self(args, kargs, scope)
     }
 }
@@ -82,35 +82,17 @@ impl Runtime {
         &self.scope
     }
 
-    pub fn call(
-        &self,
-        name: &str,
-        args: impl IntoIterator<Item = impl Into<Value>>,
-        kargs: impl Into<KArgs>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let args: Vec<Value> = args.into_iter().map(Into::into).collect();
-        self.scope.call(name, args, kargs)?;
+    pub fn call(&self, name: &str, args: Args) -> Result<(), Box<dyn std::error::Error>> {
+        self.scope.call(name, args)?;
         Ok(())
     }
 
-    pub fn eval(
-        &self,
-        name: &str,
-        args: impl IntoIterator<Item = impl Into<Value>>,
-        kargs: impl Into<KArgs>,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
-        let args: Vec<Value> = args.into_iter().map(Into::into).collect();
-        Ok(self.scope.call(name, args, kargs)?.map(|v| v.is_true()).unwrap_or(false))
+    pub fn eval(&self, name: &str, args: Args) -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(self.scope.call(name, args)?.is_true())
     }
 
-    pub fn func(
-        &self,
-        name: &str,
-        args: impl IntoIterator<Item = impl Into<Value>>,
-        kargs: impl Into<KArgs>,
-    ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
-        let args: Vec<Value> = args.into_iter().map(Into::into).collect();
-        self.scope.call(name, args, kargs)
+    pub fn func(&self, name: &str, args: Args) -> Result<Value, Box<dyn std::error::Error>> {
+        self.scope.call(name, args)
     }
 }
 
