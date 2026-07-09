@@ -1552,6 +1552,7 @@ dependencies = [
  "nova-ai",
  "nova-codec",
  "nova-core",
+ "nova-fs",
  "nova-http",
  "nova-macros",
 ]
@@ -1594,6 +1595,13 @@ dependencies = [
  "minijinja",
  "serde",
  "ulid",
+]
+
+[[package]]
+name = "nova-fs"
+version = "0.0.0"
+dependencies = [
+ "nova-core",
 ]
 
 [[package]]
