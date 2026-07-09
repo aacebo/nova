@@ -1555,6 +1555,7 @@ dependencies = [
  "nova-fs",
  "nova-http",
  "nova-macros",
+ "tempfile",
 ]
 
 [[package]]
