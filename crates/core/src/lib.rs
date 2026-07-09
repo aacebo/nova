@@ -8,7 +8,6 @@ mod object;
 mod state;
 
 pub use args::*;
-pub use builtin::*;
 pub use diagnostic::*;
 pub use error::*;
 pub use event::{Event, Observer};
