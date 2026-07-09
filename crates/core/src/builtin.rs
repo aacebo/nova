@@ -1,36 +1,44 @@
-use crate::{Builder, Diagnostic, KArgs, Scope, Severity, Value};
+use crate::{Args, Builder, Diagnostic, Scope, Severity, Value};
 
 pub fn register(builder: Builder) -> Builder {
     builder
-        .func("info", |args: &[Value], kargs: &KArgs, scope: &Scope| {
-            emit(Severity::Info, args, kargs, scope);
+        .func("info", |args: &Args, scope: &Scope| {
+            emit(Severity::Info, args, scope);
             Ok(Value::from(()))
         })
-        .func("warn", |args: &[Value], kargs: &KArgs, scope: &Scope| {
-            emit(Severity::Warn, args, kargs, scope);
+        .func("warn", |args: &Args, scope: &Scope| {
+            emit(Severity::Warn, args, scope);
             Ok(Value::from(()))
         })
-        .func("error", |args: &[Value], kargs: &KArgs, scope: &Scope| {
-            emit(Severity::Error, args, kargs, scope);
+        .func("error", |args: &Args, scope: &Scope| {
+            emit(Severity::Error, args, scope);
             Ok(Value::from(()))
         })
-        .func("print", |args: &[Value], kargs: &KArgs, _scope: &Scope| {
-            print!("{}", message(args, kargs));
+        .func("print", |args: &Args, _scope: &Scope| {
+            print!("{}", message(args));
             Ok(Value::from(()))
         })
-        .func("println", |args: &[Value], kargs: &KArgs, _scope: &Scope| {
-            println!("{}", message(args, kargs));
+        .func("println", |args: &Args, _scope: &Scope| {
+            println!("{}", message(args));
             Ok(Value::from(()))
         })
 }
 
-fn message(args: &[Value], kargs: &KArgs) -> String {
-    args.first()
-        .or_else(|| kargs.get("message"))
-        .map(|v| v.to_string())
-        .unwrap_or_default()
+fn message(args: &Args) -> String {
+    let primary = args.at(0);
+    let value = if primary.is_undefined() {
+        args.key("message")
+    } else {
+        primary
+    };
+
+    if value.is_undefined() {
+        String::new()
+    } else {
+        value.to_string()
+    }
 }
 
-fn emit(severity: Severity, args: &[Value], kargs: &KArgs, scope: &Scope) {
-    scope.emit(Diagnostic::new(*scope.trace_id()).sev(severity).message(message(args, kargs)));
+fn emit(severity: Severity, args: &Args, scope: &Scope) {
+    scope.emit(Diagnostic::new(*scope.trace_id()).sev(severity).message(message(args)));
 }

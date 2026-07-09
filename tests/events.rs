@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use common::Recorder;
 use nova::event::object::{CallEvent, UpdateEvent};
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Event, KArgs, Object, Scope, Value, args, event};
+use nova::{Args, Event, Object, Scope, Value, args, event};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Value, Box<dyn std::error::Error>>;
@@ -17,28 +17,26 @@ fn listener_delivers_calls_updates_and_errors() {
     let runtime = nova::new()
         .observe(recorder.clone())
         .var("total", 0)
-        .predicate("in_stock", |_args: &[Value], kargs: &KArgs, _scope: &Scope| {
-            Ok(kargs.get("qty") > Some(&Value::from(0)))
-        })
-        .func("subtotal", |_args: &[Value], kargs: &KArgs, _scope: &Scope| -> FuncResult {
-            let qty = kargs.get("qty").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
-            let unit = kargs.get("unit").and_then(|v| u64::try_from(v.clone()).ok()).unwrap_or(0);
+        .predicate("in_stock", |args: &Args, _scope: &Scope| Ok(args.key("qty") > Value::from(0)))
+        .func("subtotal", |args: &Args, _scope: &Scope| -> FuncResult {
+            let qty = u64::try_from(args.key("qty")).unwrap_or(0);
+            let unit = u64::try_from(args.key("unit")).unwrap_or(0);
             Ok(Value::from(qty * unit))
         })
-        .action("fulfill", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            let total = nova::call!("subtotal", *args, **kargs as u64);
+        .action("fulfill", |args: &Args, scope: &Scope| -> ActionResult {
+            let total = nova::call!("subtotal", **args as u64);
             nova::set!("total", total);
             Ok(())
         })
-        .action("reject", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("reject", |_args: &Args, scope: &Scope| -> ActionResult {
             scope.error("out of stock");
             Ok(())
         })
-        .action("process", |args: &[Value], kargs: &KArgs, scope: &Scope| -> ActionResult {
-            if nova::call!("in_stock", *args, **kargs).is_true() {
-                nova::call!("fulfill", *args, **kargs);
+        .action("process", |args: &Args, scope: &Scope| -> ActionResult {
+            if nova::call!("in_stock", **args).is_true() {
+                nova::call!("fulfill", **args);
             } else {
-                nova::call!("reject", *args, **kargs);
+                nova::call!("reject", **args);
             }
             Ok(())
         })
@@ -76,9 +74,7 @@ fn closure_observer_receives_events() {
         .observe(event::on_call(move |event: &CallEvent| {
             sink.lock().unwrap().push(event.name.clone());
         }))
-        .action("noop", |_args: &[Value], _kargs: &KArgs, _scope: &Scope| -> ActionResult {
-            Ok(())
-        })
+        .action("noop", |_args: &Args, _scope: &Scope| -> ActionResult { Ok(()) })
         .build()
         .unwrap();
 
@@ -99,7 +95,7 @@ fn multiple_observers_each_receive_every_event() {
             counter.fetch_add(1, Ordering::SeqCst);
         })
         .var("n", 0)
-        .action("bump", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("bump", |_args: &Args, scope: &Scope| -> ActionResult {
             nova::set!("n", 1);
             Ok(())
         })
@@ -120,17 +116,14 @@ fn listener_accumulates_across_multiple_calls() {
     let runtime = nova::new()
         .observe(recorder.clone())
         .var("n", 0)
-        .action("bump", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("bump", |_args: &Args, scope: &Scope| -> ActionResult {
             nova::set!("n", 1);
             Ok(())
         })
-        .action(
-            "bump_again",
-            |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-                nova::set!("n", 2);
-                Ok(())
-            },
-        )
+        .action("bump_again", |_args: &Args, scope: &Scope| -> ActionResult {
+            nova::set!("n", 2);
+            Ok(())
+        })
         .build()
         .unwrap();
 
@@ -148,7 +141,7 @@ fn fresh_bindings_do_not_emit_updates() {
     let runtime = nova::new()
         .observe(recorder.clone())
         .var("known", 1)
-        .action("setup", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("setup", |_args: &Args, scope: &Scope| -> ActionResult {
             nova::set!("known", 2);
             nova::set!("fresh", 9);
             Ok(())
@@ -171,13 +164,11 @@ fn fresh_bindings_do_not_emit_updates() {
 fn runtime_without_observers_runs_and_drops_cleanly() {
     let runtime = nova::new()
         .var("count", 0)
-        .action("run", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("run", |_args: &Args, scope: &Scope| -> ActionResult {
             nova::set!("count", 1);
             scope.set(
                 "fn",
-                Object::func("noop", |_: &[Value], _: &KArgs, _: &Scope| -> FuncResult {
-                    Ok(Value::from(()))
-                }),
+                Object::func("noop", |_args: &Args, _: &Scope| -> FuncResult { Ok(Value::from(())) }),
             );
             nova::call!("fn");
             Ok(())
@@ -286,7 +277,7 @@ fn per_variant_closure_adapter_receives_only_its_variant() {
             update_sink.fetch_add(1, Ordering::SeqCst);
         }))
         .var("n", 0)
-        .action("bump", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("bump", |_args: &Args, scope: &Scope| -> ActionResult {
             nova::set!("n", 1);
             Ok(())
         })

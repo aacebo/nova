@@ -19,7 +19,10 @@ impl Arg {
                 zyn! { __kargs.set({{ key }}, {{ expr }}); }
             }
             Self::SplatArgs(expr) => zyn! { __args = ({{ expr }}).to_vec(); },
-            Self::SplatKargs(expr) => zyn! { __kargs = ({{ expr }}).clone(); },
+            Self::SplatKargs(expr) => zyn! {
+                __args = ({{ expr }}).args().to_vec();
+                __kargs = ({{ expr }}).kargs().clone();
+            },
         }
     }
 }

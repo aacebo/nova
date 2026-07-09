@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use nova::{KArgs, Scope, Value, args, get, set};
+use nova::{Args, KArgs, Scope, Value, args, get, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -10,7 +10,7 @@ fn scope_moves_across_threads_without_panicking() {
     let ran = Arc::new(AtomicBool::new(false));
     let flag = ran.clone();
     let runtime = nova::new()
-        .action("run", move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &Args, scope: &Scope| -> ActionResult {
             set!("base", 1);
 
             let child = scope.fork("worker", Vec::new(), KArgs::new());

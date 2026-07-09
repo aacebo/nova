@@ -33,7 +33,7 @@ impl std::ops::DerefMut for Step {
 }
 
 impl Action for Step {
-    fn invoke(&self, _args: &[Value], _kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+    fn invoke(&self, _args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(cond) = &self.cond
             && !scope.eval(cond).map(|v| v.is_true()).unwrap_or(false)
         {

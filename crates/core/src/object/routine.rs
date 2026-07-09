@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, KArgs, Object, Reflect, Scope, Step, Value, event};
+use crate::{Action, Args, KArgs, Object, Reflect, Scope, Step, Value, event};
 
 #[derive(Clone)]
 pub struct Routine {
@@ -62,7 +62,8 @@ impl Reflect for Routine {
             .and_then(|v| v.downcast_object::<Scope>())
             .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
 
-        self.invoke(positional, &kargs, &caller)
+        let args = Args::new(positional, kargs);
+        self.invoke(&args, &caller)
             .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
 
         Ok(Value::from(()))
@@ -70,8 +71,8 @@ impl Reflect for Routine {
 }
 
 impl Action for Routine {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, _scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
-        let child = self.scope.fork(&self.name, args.to_vec(), kargs.clone());
+    fn invoke(&self, args: &Args, _scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        let child = self.scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
         let total = self.steps.len();
 
         for (index, step) in self.steps.iter().enumerate() {
@@ -96,7 +97,8 @@ impl Action for Routine {
             }
 
             let started = std::time::Instant::now();
-            let result = step.invoke(child.args(), child.kargs(), &child);
+            let step_args = Args::new(child.args(), child.kargs().clone());
+            let result = step.invoke(&step_args, &child);
             let elapsed = started.elapsed();
             let status = if result.is_err() {
                 event::step::Status::Error

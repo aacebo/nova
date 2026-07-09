@@ -224,7 +224,7 @@ impl Scope {
                 args.kargs().clone().into_inner(),
             ));
 
-            routine.invoke(args.args(), args.kargs(), self)?;
+            routine.invoke(&args, self)?;
             return Ok(Value::from(()));
         }
 
@@ -237,7 +237,8 @@ impl Scope {
             child.kargs().clone().into_inner(),
         ));
 
-        func.invoke(child.args(), child.kargs(), &child)
+        let child_args = Args::new(child.args(), child.kargs().clone());
+        func.invoke(&child_args, &child)
     }
 
     pub fn eval(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {

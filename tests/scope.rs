@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::Recorder;
-use nova::{KArgs, Scope, Value, args, del, get, get_mut, has, set};
+use nova::{Args, Scope, Value, args, del, get, get_mut, has, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -14,7 +14,7 @@ fn scope_bindings_lifecycle_through_macros() {
     let flag = ran.clone();
 
     let runtime = nova::new()
-        .action("run", move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &Args, scope: &Scope| -> ActionResult {
             let baseline = scope.len();
             assert!(!has!("x"));
 
@@ -53,27 +53,24 @@ fn forked_scopes_resolve_and_write_through_to_ancestors() {
 
     let runtime = nova::new()
         .observe(recorder.clone())
-        .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("child", |_args: &Args, scope: &Scope| -> ActionResult {
             assert_eq!(get!("base").unwrap().clone(), Value::from(1));
 
             set!("base", 2);
             set!("fresh", 7);
             Ok(())
         })
-        .action(
-            "parent",
-            move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-                set!("base", 1);
+        .action("parent", move |_args: &Args, scope: &Scope| -> ActionResult {
+            set!("base", 1);
 
-                nova::call!("child");
+            nova::call!("child");
 
-                assert_eq!(get!("base").unwrap().clone(), Value::from(2));
-                assert_eq!(get!("fresh").unwrap().clone(), Value::from(7));
+            assert_eq!(get!("base").unwrap().clone(), Value::from(2));
+            assert_eq!(get!("fresh").unwrap().clone(), Value::from(7));
 
-                flag.store(true, Ordering::SeqCst);
-                Ok(())
-            },
-        )
+            flag.store(true, Ordering::SeqCst);
+            Ok(())
+        })
         .build()
         .unwrap();
 
@@ -91,25 +88,22 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
 
     let runtime = nova::new()
         .observe(recorder.clone())
-        .action("child", |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("child", |_args: &Args, scope: &Scope| -> ActionResult {
             assert!(has!("x"));
             del!("x");
             Ok(())
         })
-        .action(
-            "parent",
-            move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
-                set!("x", 1);
+        .action("parent", move |_args: &Args, scope: &Scope| -> ActionResult {
+            set!("x", 1);
 
-                nova::call!("child");
+            nova::call!("child");
 
-                assert!(!has!("x"));
-                assert!(get!("x").is_none());
+            assert!(!has!("x"));
+            assert!(get!("x").is_none());
 
-                flag.store(true, Ordering::SeqCst);
-                Ok(())
-            },
-        )
+            flag.store(true, Ordering::SeqCst);
+            Ok(())
+        })
         .build()
         .unwrap();
 
@@ -125,7 +119,7 @@ fn typed_get_filters_by_object_variant() {
     let flag = ran.clone();
 
     let runtime = nova::new()
-        .action("run", move |_args: &[Value], _kargs: &KArgs, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &Args, scope: &Scope| -> ActionResult {
             set!("x", 1);
 
             {

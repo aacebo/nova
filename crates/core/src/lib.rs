@@ -21,15 +21,15 @@ pub type Environment<'a> = minijinja::Environment<'a>;
 pub use minijinja::value::{Kwargs, Object as Reflect};
 
 pub trait Action: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 pub trait Predicate: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<bool, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<bool, Box<dyn std::error::Error>>;
 }
 
 pub trait Call: Send + Sync {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>>;
 }
 
 pub trait Import {
@@ -38,28 +38,28 @@ pub trait Import {
 
 impl<F> Action for F
 where
-    F: Fn(&[Value], &KArgs, &Scope) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args, &Scope) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
-        self(args, kargs, scope)
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        self(args, scope)
     }
 }
 
 impl<F> Predicate for F
 where
-    F: Fn(&[Value], &KArgs, &Scope) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args, &Scope) -> Result<bool, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<bool, Box<dyn std::error::Error>> {
-        self(args, kargs, scope)
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<bool, Box<dyn std::error::Error>> {
+        self(args, scope)
     }
 }
 
 impl<F> Call for F
 where
-    F: Fn(&[Value], &KArgs, &Scope) -> Result<Value, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args, &Scope) -> Result<Value, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &[Value], kargs: &KArgs, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
-        self(args, kargs, scope)
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
+        self(args, scope)
     }
 }
 
