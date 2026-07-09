@@ -5,6 +5,9 @@ pub use nova_ai as ai;
 #[doc(inline)]
 pub use nova_codec as codec;
 pub use nova_core::*;
+#[cfg(feature = "fs")]
+#[doc(inline)]
+pub use nova_fs as fs;
 #[cfg(feature = "http")]
 #[doc(inline)]
 pub use nova_http as http;

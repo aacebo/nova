@@ -1,7 +1,7 @@
 #![cfg(feature = "fs")]
 
+use nova::fs::FileSystem;
 use nova::{KArgs, Value};
-use nova_fs::FileSystem;
 
 fn runtime() -> nova::Runtime {
     nova::new().import(FileSystem).unwrap().build().unwrap()
