@@ -1,5 +1,5 @@
 [package]
-name = "nova-ai"
+name = "nova-http"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,16 +8,8 @@ documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
-[lib]
-doctest = false
-
 [lints]
 workspace = true
 
 [dependencies]
-serde = { version = "1", features = ["derive", "rc"] }
-ort = { version = "1.16.3", features = ["download-binaries"] }
-tch = { version = "0.17" }
-console = { version = "0.16" }
-rust-bert = { version = "0.23", features = ["onnx", "remote"] }
 nova = { path = "../core", package = "nova-core" }

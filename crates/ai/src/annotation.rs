@@ -1,4 +1,4 @@
-use nova_core::{Reflect, Value};
+use nova::{Reflect, Value};
 
 use crate::Span;
 

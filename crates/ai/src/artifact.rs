@@ -1,4 +1,4 @@
-use nova_core::{Reflect, Value};
+use nova::{Reflect, Value};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Artifact {

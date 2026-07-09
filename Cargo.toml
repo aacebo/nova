@@ -38,6 +38,8 @@ workspace = true
 [features]
 default = ["macros"]
 ai = ["dep:nova-ai"]
+codec = ["dep:nova-codec"]
+http = ["dep:nova-http"]
 macros = ["dep:nova-macros"]
 
 [patch.crates-io]
@@ -46,4 +48,6 @@ ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
 [dependencies]
 nova-core = { path = "crates/core" }
 nova-ai = { path = "crates/ai", optional = true }
+nova-codec = { path = "crates/codec", optional = true }
+nova-http = { path = "crates/http", optional = true }
 nova-macros = { path = "crates/macros", optional = true }
