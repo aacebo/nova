@@ -1,7 +1,16 @@
-use crate::{Args, Builder, Diagnostic, Scope, Severity, Value};
+use crate::{Args, Builder, Diagnostic, Error, Scope, Severity, Value};
 
 pub fn register(builder: Builder) -> Builder {
     builder
+        .func("env", |args: &Args, _scope: &Scope| {
+            let key = args.at(0);
+            let key = key.as_str().ok_or(Error::message("name must be a string"))?;
+
+            match std::env::var(key) {
+                Ok(value) => Ok(Value::from(value)),
+                Err(_) => Ok(args.key("default")),
+            }
+        })
         .func("info", |args: &Args, scope: &Scope| {
             emit(Severity::Info, args, scope);
             Ok(Value::from(()))

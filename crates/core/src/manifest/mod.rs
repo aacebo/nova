@@ -23,6 +23,9 @@ pub struct Manifest {
     pub vars: BTreeMap<String, Value>,
 
     #[serde(default)]
+    pub env: BTreeMap<String, String>,
+
+    #[serde(default)]
     pub templates: BTreeMap<String, String>,
 
     #[serde(default)]
@@ -62,6 +65,7 @@ pub mod build {
         name: Option<String>,
         on: Vec<Trigger>,
         vars: BTreeMap<String, Value>,
+        env: BTreeMap<String, String>,
         templates: BTreeMap<String, String>,
         steps: Vec<Step>,
     }
@@ -91,6 +95,16 @@ pub mod build {
             self
         }
 
+        pub fn env(mut self, name: impl Into<String>, var: impl Into<String>) -> Self {
+            self.env.insert(name.into(), var.into());
+            self
+        }
+
+        pub fn envs(mut self, value: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>) -> Self {
+            self.env.extend(value.into_iter().map(|(k, v)| (k.into(), v.into())));
+            self
+        }
+
         pub fn template(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
             self.templates.insert(name.into(), value.into());
             self
@@ -116,6 +130,7 @@ pub mod build {
                 name: self.name.expect("manifest requires a `name`"),
                 on: self.on,
                 vars: self.vars,
+                env: self.env,
                 templates: self.templates,
                 steps: self.steps,
             }

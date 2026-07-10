@@ -219,6 +219,7 @@ impl Builder {
                 Some(existing) => {
                     existing.on.extend(manifest.on);
                     existing.vars.extend(manifest.vars);
+                    existing.env.extend(manifest.env);
                     existing.templates.extend(manifest.templates);
                     existing.steps.extend(manifest.steps);
                 }
@@ -239,6 +240,12 @@ impl Builder {
 
             for (key, value) in &manifest.vars {
                 scope.set_local(key.clone(), Object::value(value.clone()));
+            }
+
+            for (key, var) in &manifest.env {
+                if let Ok(value) = std::env::var(var) {
+                    scope.set_local(key.clone(), Object::value(value.into()));
+                }
             }
 
             root.set(name.clone(), Routine::new(name, scope, manifest.steps));
