@@ -14,6 +14,7 @@ pub use event::{Event, Observer};
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
+pub use serde_json::json;
 pub use state::*;
 
 pub type Value = minijinja::Value;

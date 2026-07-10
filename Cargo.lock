@@ -2154,6 +2154,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nova-schema"
+version = "0.0.0"
+
+[[package]]
 name = "num"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
