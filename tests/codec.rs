@@ -1,93 +1,124 @@
 #![cfg(feature = "codec")]
 
+mod common;
+
 use std::collections::BTreeMap;
 
+use common::Recorder;
 use nova::codec::Codec;
-use nova::{KArgs, Object, Value};
 
-fn runtime() -> nova::Runtime {
-    nova::new().import(Codec).unwrap().build().unwrap()
+fn sample() -> nova::Value {
+    nova::Value::from_serialize(BTreeMap::from([("name", "nova"), ("kind", "codec")]))
 }
 
-fn sample() -> Value {
-    Value::from_serialize(BTreeMap::from([("name", "nova"), ("kind", "codec")]))
+fn run(recorder: &Recorder, manifest: nova::Manifest) {
+    let runtime = nova::new()
+        .observe(recorder.clone())
+        .import(Codec)
+        .unwrap()
+        .routine(manifest)
+        .build()
+        .unwrap();
+
+    runtime.call("t", nova::args!()).unwrap();
 }
 
-fn scope_with(rt: &nova::Runtime, bindings: &[(&str, Value)]) -> nova::Scope {
-    let scope = rt.scope().fork("t", vec![], KArgs::new());
-    for (key, value) in bindings {
-        scope.set_local(*key, Object::value(value.clone()));
-    }
-    scope
+fn routine() -> nova::build::ManifestBuilder {
+    nova::manifest().name("t").on([nova::Trigger::Run { priority: None }])
 }
 
 #[test]
 fn json_round_trips_a_map() {
-    let rt = runtime();
-    let scope = scope_with(&rt, &[("x", sample())]);
-    let out = scope
-        .render_str("{{ json.decode(json.encode(x)).name }}|{{ json.decode(json.encode(x)).kind }}")
-        .unwrap();
-    assert_eq!(out, "nova|codec");
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .var("x", sample())
+            .step(nova::step().run("{{ info(json.decode(json.encode(x)).name) }}"))
+            .build(),
+    );
+    assert!(recorder.messages().iter().any(|m| m == "nova"), "{:?}", recorder.messages());
 }
 
 #[test]
 fn json_encode_produces_expected_shape() {
-    let rt = runtime();
-    let scope = scope_with(&rt, &[("x", Value::from_serialize(BTreeMap::from([("a", 1)])))]);
-    let out = scope.render_str("{{ json.encode(x) }}").unwrap();
-    assert_eq!(out, "{\"a\":1}");
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .var("x", nova::Value::from_serialize(BTreeMap::from([("a", 1)])))
+            .step(nova::step().run("{{ info(json.encode(x)) }}"))
+            .build(),
+    );
+    assert!(
+        recorder.messages().iter().any(|m| m == "{\"a\":1}"),
+        "{:?}",
+        recorder.messages()
+    );
 }
 
 #[test]
 fn json_decode_rejects_malformed() {
-    let rt = runtime();
-    let scope = scope_with(&rt, &[]);
-    assert!(scope.render_str("{{ json.decode('{not json') }}").is_err());
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine().step(nova::step().run("{{ json.decode('{not json') }}")).build(),
+    );
+    assert!(recorder.has_error());
 }
 
 #[test]
 fn yaml_round_trips_a_map() {
-    let rt = runtime();
-    let scope = scope_with(&rt, &[("x", sample())]);
-    let out = scope
-        .render_str("{{ yaml.decode(yaml.encode(x)).name }}|{{ yaml.decode(yaml.encode(x)).kind }}")
-        .unwrap();
-    assert_eq!(out, "nova|codec");
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .var("x", sample())
+            .step(nova::step().run("{{ info(yaml.decode(yaml.encode(x)).name) }}"))
+            .build(),
+    );
+    assert!(recorder.messages().iter().any(|m| m == "nova"), "{:?}", recorder.messages());
 }
 
 #[test]
 fn json_and_yaml_interoperate_through_value() {
-    let rt = runtime();
-    let scope = scope_with(&rt, &[]);
-    let out = scope
-        .render_str("{{ yaml.decode(yaml.encode(json.decode('{\"n\": 7}'))).n }}")
-        .unwrap();
-    assert_eq!(out, "7");
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .step(nova::step().run("{{ info(yaml.decode(yaml.encode(json.decode('{\"n\": 7}'))).n) }}"))
+            .build(),
+    );
+    assert!(recorder.messages().iter().any(|m| m == "7"), "{:?}", recorder.messages());
 }
 
 #[test]
 #[cfg(feature = "fs")]
 fn json_encode_write_read_decode_round_trips_through_fs() {
-    let rt = nova::new()
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("data.json");
+    let recorder = Recorder::new();
+
+    let runtime = nova::new()
+        .observe(recorder.clone())
         .import(Codec)
         .unwrap()
         .import(nova::fs::FileSystem)
         .unwrap()
+        .routine(
+            routine()
+                .var("x", sample())
+                .var("path", path.to_str().unwrap())
+                .step(nova::step().name("write").run("{{ fs.write(path, json.encode(x)) }}"))
+                .step(nova::step().name("read").run("{{ info(json.decode(fs.read(path)).name) }}"))
+                .build(),
+        )
         .build()
         .unwrap();
 
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("data.json");
-    let path = path.to_str().unwrap();
+    runtime.call("t", nova::args!()).unwrap();
+    drop(runtime);
 
-    let scope = rt.scope().fork("t", vec![], KArgs::new());
-    scope.set_local("path", Object::value(Value::from(path)));
-    scope.set_local("x", Object::value(sample()));
-
-    scope.render_str("{{ fs.write(path, json.encode(x)) }}").unwrap();
-    let out = scope
-        .render_str("{{ json.decode(fs.read(path)).name }}|{{ json.decode(fs.read(path)).kind }}")
-        .unwrap();
-    assert_eq!(out, "nova|codec");
+    assert!(recorder.messages().iter().any(|m| m == "nova"), "{:?}", recorder.messages());
+    assert!(!recorder.has_error());
 }

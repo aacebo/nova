@@ -1,42 +1,67 @@
 #![cfg(feature = "fs")]
 
-use nova::fs::FileSystem;
-use nova::{KArgs, Object, Value};
+mod common;
 
-fn runtime() -> nova::Runtime {
-    nova::new().import(FileSystem).unwrap().build().unwrap()
+use common::Recorder;
+use nova::fs::FileSystem;
+
+fn run(recorder: &Recorder, manifest: nova::Manifest) {
+    let runtime = nova::new()
+        .observe(recorder.clone())
+        .import(FileSystem)
+        .unwrap()
+        .routine(manifest)
+        .build()
+        .unwrap();
+
+    runtime.call("t", nova::args!()).unwrap();
 }
 
 #[test]
-fn write_then_read_string_round_trip() {
+fn write_then_read_round_trip() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("hello.txt");
-    let path = path.to_str().unwrap();
-    let rt = runtime();
-    let scope = rt.scope().fork("t", vec![], KArgs::new());
+    let recorder = Recorder::new();
 
-    scope.set_local("path", Object::value(Value::from(path)));
-    scope.set_local("data", Object::value(Value::from("hello world")));
-    scope.render_str("{{ fs.write(path, data) }}").unwrap();
+    run(
+        &recorder,
+        nova::manifest()
+            .name("t")
+            .on([nova::Trigger::Run { priority: None }])
+            .var("path", path.to_str().unwrap())
+            .step(nova::step().name("write").run("{{ fs.write(path, 'hello world') }}"))
+            .step(nova::step().name("read").run("{{ info(fs.read(path)) }}"))
+            .build(),
+    );
 
-    let out = scope.render_str("{{ fs.read(path) }}").unwrap();
-    assert_eq!(out, "hello world");
+    assert!(
+        recorder.messages().iter().any(|m| m == "hello world"),
+        "{:?}",
+        recorder.messages()
+    );
+    assert!(!recorder.has_error());
 }
 
 #[test]
 fn write_overwrites_then_read_returns_latest() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("data.txt");
-    let path = path.to_str().unwrap();
-    let rt = runtime();
-    let scope = rt.scope().fork("t", vec![], KArgs::new());
+    let recorder = Recorder::new();
 
-    scope.set_local("path", Object::value(Value::from(path)));
-    scope.set_local("data", Object::value(Value::from("first")));
-    scope.render_str("{{ fs.write(path, data) }}").unwrap();
-    scope.set_local("data", Object::value(Value::from("second")));
-    scope.render_str("{{ fs.write(path, data) }}").unwrap();
+    run(
+        &recorder,
+        nova::manifest()
+            .name("t")
+            .on([nova::Trigger::Run { priority: None }])
+            .var("path", path.to_str().unwrap())
+            .step(nova::step().name("first").run("{{ fs.write(path, 'first') }}"))
+            .step(nova::step().name("second").run("{{ fs.write(path, 'second') }}"))
+            .step(nova::step().name("read").run("{{ info(fs.read(path)) }}"))
+            .build(),
+    );
 
-    let out = scope.render_str("{{ fs.read(path) }}").unwrap();
-    assert_eq!(out, "second");
+    let messages = recorder.messages();
+    assert!(messages.iter().any(|m| m == "second"), "{messages:?}");
+    assert!(!messages.iter().any(|m| m == "first"), "{messages:?}");
+    assert!(!recorder.has_error());
 }
