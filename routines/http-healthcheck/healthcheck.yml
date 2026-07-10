@@ -1,0 +1,18 @@
+name: healthcheck
+on: [run(20)]
+
+vars:
+  url: https://httpbin.org/status/200
+  status_file: /tmp/nova-healthcheck.json
+
+steps:
+  - name: probe
+    run: |
+      {% set res = http.get(url) %}
+      {% if res.status >= 200 and res.status < 300 %}
+        {{ info('healthy: ' ~ url ~ ' -> ' ~ res.status) }}
+        {{ fs.write(status_file, json.encode({'url': url, 'status': res.status, 'healthy': true})) }}
+      {% else %}
+        {{ error('unhealthy: ' ~ url ~ ' -> ' ~ res.status) }}
+        {{ fs.write(status_file, json.encode({'url': url, 'status': res.status, 'healthy': false})) }}
+      {% endif %}

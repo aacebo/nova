@@ -1,0 +1,15 @@
+name: notify
+on: [run(10)]
+
+vars:
+  status_file: /tmp/nova-healthcheck.json
+
+steps:
+  - name: read_status
+    run: |
+      {% set report = json.decode(fs.read(status_file)) %}
+      {% if report.healthy %}
+        {{ info('notify: ' ~ report.url ~ ' is UP (' ~ report.status ~ ')') }}
+      {% else %}
+        {{ warn('notify: ' ~ report.url ~ ' is DOWN (' ~ report.status ~ ')') }}
+      {% endif %}

@@ -1,0 +1,26 @@
+name: batch
+on: [run]
+
+vars:
+  items:
+    - name: alpha
+      score: 82
+    - name: bravo
+      score: 47
+    - name: charlie
+      score: 95
+
+steps:
+  - name: header
+    run: |
+      {{ info('processing ' ~ (items | length) ~ ' records') }}
+
+  - name: fan_out
+    run: |
+      {% for item in items %}
+        {{ format(record=item, index=loop.index) }}
+      {% endfor %}
+
+  - name: footer
+    run: |
+      {{ info('batch complete') }}

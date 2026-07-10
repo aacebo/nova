@@ -1,0 +1,18 @@
+name: format
+on: [call]
+
+steps:
+  - if: record.score >= 60
+    name: pass
+    run: |
+      {{ info('#' ~ index ~ ' ' ~ record.name ~ ' PASS (' ~ record.score ~ ')') }}
+
+  - if: record.score < 60
+    name: fail
+    run: |
+      {{ warn('#' ~ index ~ ' ' ~ record.name ~ ' FAIL (' ~ record.score ~ ')') }}
+
+  - name: serialized
+    run: |
+      {% set restored = yaml.decode(yaml.encode(record)) %}
+      {{ info('yaml round-trip -> ' ~ restored.name ~ '=' ~ restored.score) }}

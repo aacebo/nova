@@ -1,0 +1,34 @@
+name: pipeline
+on: [run(30)]
+
+vars:
+  artifact: /tmp/nova-build-pipeline.json
+  build:
+    target: web
+    version: 3
+    stages: [lint, compile, test]
+
+steps:
+  - name: write_manifest
+    run: |
+      {{ fs.write(artifact, json.encode(build)) }}
+      {{ info('wrote build manifest for ' ~ build.target ~ ' v' ~ build.version) }}
+
+  - name: run_stages
+    run: |
+      {% for stage in build.stages %}
+        {{ info('stage ' ~ loop.index ~ '/' ~ (build.stages | length) ~ ': ' ~ stage) }}
+      {% endfor %}
+
+  - if: build.stages | length > 0
+    name: announce
+    shell: echo "pipeline ready with {{ build.stages | length }} stages"
+
+  - name: verify_round_trip
+    run: |
+      {% set parsed = json.decode(fs.read(artifact)) %}
+      {% if parsed.version == build.version %}
+        {{ info('verified artifact: ' ~ parsed.target ~ ' v' ~ parsed.version) }}
+      {% else %}
+        {{ error('artifact version mismatch') }}
+      {% endif %}

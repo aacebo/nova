@@ -43,24 +43,25 @@ impl Args {
 
         let names: Vec<String> = entries.iter().map(|(name, _)| name.clone()).collect();
         let board = Board::new(&names);
-
         let diagnostics: Arc<Mutex<Vec<nova::Diagnostic>>> = Default::default();
         let sink = diagnostics.clone();
-
         let mut builder = nova::new()
             .observe(board.clone())
             .observe(nova::event::on_diagnostic(move |d: &nova::Diagnostic| {
                 sink.lock().unwrap().push(d.clone());
             }));
 
+        builder = builder
+            .import(nova::fs::FileSystem)?
+            .import(nova::codec::Codec)?
+            .import(nova::http::Http)?;
+
         for manifest in manifests {
             builder = builder.routine(manifest);
         }
 
         let runtime = builder.build()?;
-
         let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
-
         let run = std::thread::scope(|scope| {
             scope.spawn(|| {
                 for name in &names {
@@ -75,7 +76,6 @@ impl Args {
 
             let mut painter = widgets::Painter::new();
             let mut tick = 0usize;
-
             let run = loop {
                 match done_rx.recv_timeout(Duration::from_millis(100)) {
                     Ok(result) => break result,

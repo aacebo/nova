@@ -8,11 +8,22 @@ pub struct Http;
 
 impl nova::Import for Http {
     fn import(self, builder: nova::Builder) -> Result<nova::Builder, Box<dyn std::error::Error>> {
-        Ok(builder
-            .func("http.get", get)
-            .func("http.post", post)
-            .func("http.put", put)
-            .func("http.patch", patch))
+        Ok(builder.var("http", nova::Value::from_object(Client)))
+    }
+}
+
+#[derive(Debug)]
+pub struct Client;
+
+impl nova::Reflect for Client {
+    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+        match key.as_str()? {
+            "get" => Some(nova::Value::from_object(nova::Function::func("http.get", get))),
+            "post" => Some(nova::Value::from_object(nova::Function::func("http.post", post))),
+            "put" => Some(nova::Value::from_object(nova::Function::func("http.put", put))),
+            "patch" => Some(nova::Value::from_object(nova::Function::func("http.patch", patch))),
+            _ => None,
+        }
     }
 }
 

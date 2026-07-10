@@ -1,0 +1,11 @@
+name: report
+on: [run(10)]
+
+vars:
+  artifact: /tmp/nova-build-pipeline.json
+
+steps:
+  - name: summarize
+    run: |
+      {% set build = json.decode(fs.read(artifact)) %}
+      {{ info('report: ' ~ build.target ~ ' shipped ' ~ (build.stages | length) ~ ' stages at v' ~ build.version) }}
