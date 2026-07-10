@@ -13,3 +13,4 @@ workspace = true
 
 [dependencies]
 nova = { path = "../core", package = "nova-core" }
+reqwest = { version = "0.13", features = ["json", "blocking"] }

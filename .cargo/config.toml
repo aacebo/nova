@@ -10,3 +10,4 @@ retry = 3
 
 [alias]
 lint = "clippy --workspace --all-features -- -D warnings"
+tests = "test --all-features -- --ignored"
