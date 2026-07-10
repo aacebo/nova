@@ -12,5 +12,6 @@
   "terminal.integrated.cursorStyle": "block",
   "terminal.integrated.cursorBlinking": true,
   "terminal.integrated.defaultProfile.windows": "Git Bash",
-  "editor.fontSize": 12
+  "editor.fontSize": 12,
+  "yaml.schemaStore.enable": false
 }

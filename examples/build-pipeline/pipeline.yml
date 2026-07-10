@@ -2,27 +2,37 @@ name: pipeline
 on: [run(30)]
 
 vars:
-  artifact: /tmp/nova-build-pipeline.json
+  workspace: /tmp/nova-build-pipeline
+  artifact: /tmp/nova-build-pipeline/manifest.json
   build:
     target: web
     version: 3
     stages: [lint, compile, test]
 
 steps:
+  - name: prepare_workspace
+    shell: |
+      mkdir -p {{ workspace }}
+      echo "prepared workspace at {{ workspace }}"
+
   - name: write_manifest
     run: |
       {{ fs.write(artifact, json.encode(build)) }}
       {{ info('wrote build manifest for ' ~ build.target ~ ' v' ~ build.version) }}
 
   - name: run_stages
-    run: |
+    shell: |
       {% for stage in build.stages %}
-        {{ info('stage ' ~ loop.index ~ '/' ~ (build.stages | length) ~ ': ' ~ stage) }}
+      echo "[{{ loop.index }}/{{ build.stages | length }}] running {{ stage }}..."
+      touch {{ workspace }}/{{ stage }}.done
       {% endfor %}
 
   - if: build.stages | length > 0
-    name: announce
-    shell: echo "pipeline ready with {{ build.stages | length }} stages"
+    name: assert_stages_complete
+    shell: |
+      completed=$(ls {{ workspace }}/*.done 2>/dev/null | wc -l | tr -d ' ')
+      echo "completed $completed of {{ build.stages | length }} stages"
+      test "$completed" -eq "{{ build.stages | length }}"
 
   - name: verify_round_trip
     run: |

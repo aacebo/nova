@@ -12,6 +12,10 @@ steps:
     run: |
       {{ warn('#' ~ index ~ ' ' ~ record.name ~ ' FAIL (' ~ record.score ~ ')') }}
 
+  - name: append_log
+    shell: |
+      echo "{{ record.name }} {{ record.score }} {{ 'PASS' if record.score >= 60 else 'FAIL' }}" >> {{ log }}
+
   - name: serialized
     run: |
       {% set restored = yaml.decode(yaml.encode(record)) %}

@@ -6,6 +6,16 @@ vars:
   status_file: /tmp/nova-healthcheck.json
 
 steps:
+  - name: dns_precheck
+    shell: |
+      target=$(echo "{{ url }}" | sed -E 's#https?://([^/]+).*#\1#')
+      echo "resolving $target..."
+      if nslookup "$target" >/dev/null 2>&1; then
+        echo "$target resolves"
+      else
+        echo "$target lookup skipped (continuing)"
+      fi
+
   - name: probe
     run: |
       {% set res = http.get(url) %}
@@ -16,3 +26,7 @@ steps:
         {{ error('unhealthy: ' ~ url ~ ' -> ' ~ res.status) }}
         {{ fs.write(status_file, json.encode({'url': url, 'status': res.status, 'healthy': false})) }}
       {% endif %}
+
+  - name: stamp
+    shell: |
+      echo "checked {{ url }} at $(date -u +%H:%M:%SZ)"

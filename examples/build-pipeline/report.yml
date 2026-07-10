@@ -2,10 +2,21 @@ name: report
 on: [run(10)]
 
 vars:
-  artifact: /tmp/nova-build-pipeline.json
+  workspace: /tmp/nova-build-pipeline
+  artifact: /tmp/nova-build-pipeline/manifest.json
 
 steps:
   - name: summarize
     run: |
       {% set build = json.decode(fs.read(artifact)) %}
       {{ info('report: ' ~ build.target ~ ' shipped ' ~ (build.stages | length) ~ ' stages at v' ~ build.version) }}
+
+  - name: artifact_size
+    shell: |
+      size=$(wc -c < {{ artifact }} | tr -d ' ')
+      echo "artifact is $size bytes"
+
+  - name: cleanup
+    shell: |
+      rm -rf {{ workspace }}
+      echo "cleaned workspace {{ workspace }}"

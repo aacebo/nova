@@ -2,6 +2,7 @@ name: batch
 on: [run]
 
 vars:
+  log: /tmp/nova-batch-report.log
   items:
     - name: alpha
       score: 82
@@ -12,14 +13,21 @@ vars:
 
 steps:
   - name: header
-    run: |
-      {{ info('processing ' ~ (items | length) ~ ' records') }}
+    shell: |
+      : > {{ log }}
+      echo "processing {{ items | length }} records"
 
   - name: fan_out
     run: |
       {% for item in items %}
-        {{ format(record=item, index=loop.index) }}
+        {{ format(record=item, index=loop.index, log=log) }}
       {% endfor %}
+
+  - name: aggregate
+    shell: |
+      passed=$(grep -c PASS {{ log }})
+      failed=$(grep -c FAIL {{ log }})
+      echo "aggregate: $passed passed, $failed failed"
 
   - name: footer
     run: |

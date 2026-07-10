@@ -13,3 +13,15 @@ steps:
       {% else %}
         {{ warn('notify: ' ~ report.url ~ ' is DOWN (' ~ report.status ~ ')') }}
       {% endif %}
+
+  - name: dump_status
+    shell: |
+      echo "raw status payload:"
+      cat {{ status_file }}
+      echo
+
+  - name: archive
+    shell: |
+      archive=/tmp/nova-healthcheck-$(date -u +%Y%m%d).json
+      cp {{ status_file }} "$archive"
+      echo "archived to $archive"
