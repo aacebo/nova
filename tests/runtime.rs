@@ -444,3 +444,34 @@ fn namespaced_manifests_resolve_across_scopes() {
         "cross-namespace resolution should not error: {messages:?}"
     );
 }
+
+#[test]
+fn runtime_render_resolves_named_template_against_root_vars() {
+    let runtime = nova::new()
+        .var("store", "nova-mart")
+        .var("qty", 3)
+        .template("receipt", "{{ store }}: {{ qty }}")
+        .build()
+        .unwrap();
+
+    assert_eq!(runtime.render("receipt").unwrap(), "nova-mart: 3");
+}
+
+#[test]
+fn runtime_render_str_renders_inline_source_against_root_vars() {
+    let runtime = nova::new().var("greeting", "hello").build().unwrap();
+
+    assert_eq!(runtime.render_str("{{ greeting }}!").unwrap(), "hello!");
+}
+
+#[test]
+fn runtime_render_errors_on_unknown_template() {
+    let runtime = nova::new().build().unwrap();
+    assert!(runtime.render("missing").is_err());
+}
+
+#[test]
+fn runtime_render_str_errors_on_invalid_source() {
+    let runtime = nova::new().build().unwrap();
+    assert!(runtime.render_str("{{ ").is_err());
+}

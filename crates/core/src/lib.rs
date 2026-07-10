@@ -94,6 +94,14 @@ impl Runtime {
     pub fn func(&self, name: &str, args: Args) -> Result<Value, Box<dyn std::error::Error>> {
         self.scope.call(name, args)
     }
+
+    pub fn render(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        self.scope.render(name)
+    }
+
+    pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
+        self.scope.render_str(source)
+    }
 }
 
 impl Drop for Runtime {
