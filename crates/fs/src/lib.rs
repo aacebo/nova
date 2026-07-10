@@ -1,8 +1,23 @@
+use std::sync::Arc;
+
 pub struct FileSystem;
 
 impl nova::Import for FileSystem {
     fn import(self, builder: nova::Builder) -> Result<nova::Builder, Box<dyn std::error::Error>> {
-        Ok(builder.func("fs.read", read).action("fs.write", write))
+        Ok(builder.var("fs", nova::Value::from_object(Fs)))
+    }
+}
+
+#[derive(Debug)]
+pub struct Fs;
+
+impl nova::Reflect for Fs {
+    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+        match key.as_str()? {
+            "read" => Some(nova::Value::from_object(nova::Function::func("fs.read", read))),
+            "write" => Some(nova::Value::from_object(nova::Function::action("fs.write", write))),
+            _ => None,
+        }
     }
 }
 
