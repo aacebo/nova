@@ -1,9 +1,5 @@
 name: report
-on: [run(10)]
-
-vars:
-  workspace: /tmp/nova-build-pipeline
-  artifact: /tmp/nova-build-pipeline/manifest.json
+on: [call]
 
 steps:
   - name: summarize

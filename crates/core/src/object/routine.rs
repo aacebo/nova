@@ -2,21 +2,28 @@ use std::sync::Arc;
 
 use minijinja::value::Kwargs;
 
-use crate::{Action, Args, KArgs, Object, Reflect, Scope, Step, Value, event};
+use crate::{Action, Args, Error, KArgs, Object, Reflect, Scope, Step, Value, event};
 
 #[derive(Clone)]
 pub struct Routine {
     name: String,
     scope: Scope,
     steps: Vec<Step>,
+    validator: Option<Arc<jsonschema::Validator>>,
 }
 
 impl Routine {
-    pub fn new(name: impl Into<String>, scope: Scope, steps: impl IntoIterator<Item = impl Into<Step>>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        scope: Scope,
+        steps: impl IntoIterator<Item = impl Into<Step>>,
+        validator: Option<Arc<jsonschema::Validator>>,
+    ) -> Self {
         Self {
             name: name.into(),
             scope,
             steps: steps.into_iter().map(Into::into).collect(),
+            validator,
         }
     }
 
@@ -40,6 +47,32 @@ impl Routine {
             Object::Func(func) => Some(Value::from_object(func.clone())),
             Object::Routine(rt) => Some(Value::from_object(rt.clone())),
         }
+    }
+
+    fn validate(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(validator) = &self.validator else {
+            return Ok(());
+        };
+
+        let mut instance = serde_json::Map::new();
+
+        for (key, value) in args {
+            instance.insert(key.to_string(), serde_json::to_value(&value)?);
+        }
+
+        let instance = serde_json::Value::Object(instance);
+        let errors: Vec<String> = validator
+            .iter_errors(&instance)
+            .map(|err| format!("{} ({})", err, err.instance_path()))
+            .collect();
+
+        if errors.is_empty() {
+            return Ok(());
+        }
+
+        let message = format!("invalid args for `{}`: {}", self.name, errors.join("; "));
+        scope.error(message.clone());
+        Err(Box::new(Error::action(scope.trace_id().to_string(), &self.name, message)))
     }
 }
 
@@ -71,7 +104,9 @@ impl Reflect for Routine {
 }
 
 impl Action for Routine {
-    fn invoke(&self, args: &Args, _scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        self.validate(args, scope)?;
+
         let child = self.scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
         let total = self.steps.len();
 
@@ -93,6 +128,7 @@ impl Action for Routine {
                     event::step::Status::Skipped,
                     std::time::Duration::ZERO,
                 ));
+
                 continue;
             }
 

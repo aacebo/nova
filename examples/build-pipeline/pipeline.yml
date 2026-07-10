@@ -42,3 +42,9 @@ steps:
       {% else %}
         {{ error('artifact version mismatch') }}
       {% endif %}
+
+  - name: report
+    call: report
+    with:
+      artifact: artifact
+      workspace: workspace

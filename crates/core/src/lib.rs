@@ -217,11 +217,7 @@ impl Builder {
         for manifest in self.manifests {
             match merged.get_mut(&manifest.name) {
                 Some(existing) => {
-                    existing.on.extend(manifest.on);
-                    existing.vars.extend(manifest.vars);
-                    existing.env.extend(manifest.env);
-                    existing.templates.extend(manifest.templates);
-                    existing.steps.extend(manifest.steps);
+                    existing.merge(manifest);
                 }
                 None => {
                     merged.insert(manifest.name.clone(), manifest);
@@ -248,7 +244,15 @@ impl Builder {
                 }
             }
 
-            root.set(name.clone(), Routine::new(name, scope, manifest.steps));
+            let validator = match &manifest.args {
+                Some(schema) => {
+                    let schema = serde_json::to_value(schema)?;
+                    Some(std::sync::Arc::new(jsonschema::validator_for(&schema)?))
+                }
+                None => None,
+            };
+
+            root.set(name.clone(), Routine::new(name, scope, manifest.steps, validator));
         }
 
         let (shutdown, listener) = if self.observers.is_empty() {

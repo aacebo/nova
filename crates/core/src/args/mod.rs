@@ -51,3 +51,53 @@ impl<'a> TryFrom<&'a [Value]> for Args<'a> {
         })
     }
 }
+
+pub struct ArgsIter<'a> {
+    args: std::iter::Enumerate<std::slice::Iter<'a, Value>>,
+    kargs: Box<dyn Iterator<Item = (&'a String, &'a Value)> + 'a>,
+}
+
+impl Iterator for ArgsIter<'_> {
+    type Item = (Value, Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((index, value)) = self.args.next() {
+            return Some((Value::from(index), value.clone()));
+        }
+
+        self.kargs
+            .next()
+            .map(|(key, value)| (Value::from(key.clone()), value.clone()))
+    }
+}
+
+impl<'a> IntoIterator for &'a Args<'a> {
+    type Item = (Value, Value);
+    type IntoIter = ArgsIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ArgsIter {
+            args: self.args.iter().enumerate(),
+            kargs: Box::new(self.kargs.iter()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn iterates_positional_then_keyword() {
+        let positional = [Value::from("a"), Value::from("b")];
+        let kargs = KArgs::from_iter([("name", Value::from("x"))]);
+        let args = Args::new(&positional, kargs);
+
+        let pairs: Vec<(Value, Value)> = args.into_iter().collect();
+
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(pairs[0], (Value::from(0usize), Value::from("a")));
+        assert_eq!(pairs[1], (Value::from(1usize), Value::from("b")));
+        assert_eq!(pairs[2], (Value::from("name"), Value::from("x")));
+    }
+}
