@@ -6,13 +6,7 @@ use common::Recorder;
 use nova::fs::FileSystem;
 
 fn run(recorder: &Recorder, manifest: nova::Manifest) {
-    let runtime = nova::new()
-        .observe(recorder.clone())
-        .import(FileSystem)
-        .unwrap()
-        .routine(manifest)
-        .build()
-        .unwrap();
+    let runtime = nova::new().observe(recorder.clone()).fs().routine(manifest).build().unwrap();
 
     runtime.call("t", nova::args!()).unwrap();
 }

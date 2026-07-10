@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-pub struct FileSystem;
+pub trait FileSystem {
+    fn fs(self) -> Self;
+}
 
-impl nova::Import for FileSystem {
-    fn import(self, builder: nova::Builder) -> Result<nova::Builder, Box<dyn std::error::Error>> {
-        Ok(builder.var("fs", nova::Value::from_object(Fs)))
+impl FileSystem for nova::Builder {
+    fn fs(self) -> Self {
+        self.var("fs", nova::Value::from_object(Fs))
     }
 }
 

@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
-pub struct Codec;
+pub trait Codec {
+    fn json(self) -> Self;
+    fn yaml(self) -> Self;
+}
 
-impl nova::Import for Codec {
-    fn import(self, builder: nova::Builder) -> Result<nova::Builder, Box<dyn std::error::Error>> {
-        Ok(builder
-            .var("json", nova::Value::from_object(Json))
-            .var("yaml", nova::Value::from_object(Yaml)))
+impl Codec for nova::Builder {
+    fn json(self) -> Self {
+        self.var("json", nova::Value::from_object(Json))
+    }
+
+    fn yaml(self) -> Self {
+        self.var("yaml", nova::Value::from_object(Yaml))
     }
 }
 

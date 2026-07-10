@@ -3,6 +3,9 @@ use std::time::Duration;
 
 use figment::Figment;
 use figment::providers::{Format, Yaml};
+use nova::codec::Codec;
+use nova::fs::FileSystem;
+use nova::http::Http;
 
 use crate::widgets::board::{Board, Widget};
 use crate::{Error, widgets};
@@ -51,10 +54,7 @@ impl Args {
                 sink.lock().unwrap().push(d.clone());
             }));
 
-        builder = builder
-            .import(nova::fs::FileSystem)?
-            .import(nova::codec::Codec)?
-            .import(nova::http::Http)?;
+        builder = builder.fs().json().yaml().http();
 
         for manifest in manifests {
             builder = builder.routine(manifest);

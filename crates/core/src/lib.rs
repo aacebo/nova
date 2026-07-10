@@ -32,10 +32,6 @@ pub trait Call: Send + Sync {
     fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>>;
 }
 
-pub trait Import {
-    fn import(self, builder: Builder) -> Result<Builder, Box<dyn std::error::Error>>;
-}
-
 impl<F> Action for F
 where
     F: Fn(&Args, &Scope) -> Result<(), Box<dyn std::error::Error>> + Send + Sync,
@@ -114,7 +110,6 @@ impl Drop for Runtime {
     }
 }
 
-#[doc(hidden)]
 pub struct Builder {
     scope: Scope,
     templates: Vec<(String, String)>,
@@ -141,11 +136,6 @@ impl Builder {
         };
 
         builtin::register(builder)
-    }
-
-    pub fn import(mut self, import: impl Import) -> Result<Self, Box<dyn std::error::Error>> {
-        self = import.import(self)?;
-        Ok(self)
     }
 
     pub fn observe(mut self, observer: impl Observer) -> Self {

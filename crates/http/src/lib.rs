@@ -4,11 +4,13 @@ use std::sync::Arc;
 
 pub use response::*;
 
-pub struct Http;
+pub trait Http {
+    fn http(self) -> Self;
+}
 
-impl nova::Import for Http {
-    fn import(self, builder: nova::Builder) -> Result<nova::Builder, Box<dyn std::error::Error>> {
-        Ok(builder.var("http", nova::Value::from_object(Client)))
+impl Http for nova::Builder {
+    fn http(self) -> Self {
+        self.var("http", nova::Value::from_object(Client))
     }
 }
 

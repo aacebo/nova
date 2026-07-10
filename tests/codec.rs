@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 
 use common::Recorder;
 use nova::codec::Codec;
+#[cfg(feature = "fs")]
+use nova::fs::FileSystem;
 
 fn sample() -> nova::Value {
     nova::Value::from_serialize(BTreeMap::from([("name", "nova"), ("kind", "codec")]))
@@ -14,8 +16,8 @@ fn sample() -> nova::Value {
 fn run(recorder: &Recorder, manifest: nova::Manifest) {
     let runtime = nova::new()
         .observe(recorder.clone())
-        .import(Codec)
-        .unwrap()
+        .json()
+        .yaml()
         .routine(manifest)
         .build()
         .unwrap();
@@ -101,10 +103,9 @@ fn json_encode_write_read_decode_round_trips_through_fs() {
 
     let runtime = nova::new()
         .observe(recorder.clone())
-        .import(Codec)
-        .unwrap()
-        .import(nova::fs::FileSystem)
-        .unwrap()
+        .json()
+        .yaml()
+        .fs()
         .routine(
             routine()
                 .var("x", sample())

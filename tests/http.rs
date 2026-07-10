@@ -11,8 +11,7 @@ use nova::http::Http;
 fn run(recorder: &Recorder, manifest: nova::Manifest) {
     let runtime = nova::new()
         .observe(recorder.clone())
-        .import(Http)
-        .unwrap()
+        .http()
         .routine(manifest)
         .build()
         .unwrap();
