@@ -13,7 +13,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
 
-#[proc_macro_derive(Reflect, attributes(reflect))]
+#[proc_macro_derive(Reflect, attributes(reflect, meta, field))]
 pub fn derive_reflect(tokens: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(tokens as syn::DeriveInput);
 
@@ -58,6 +58,7 @@ fn reflect_attr(attrs: TokenStream, item: &mut syn::Item) -> Option<proc_macro2:
         syn::Item::Trait(v) => Some(reflect_trait::attr(meta, v)),
         syn::Item::Struct(v) => Some(reflect_struct::attr(v)),
         syn::Item::Enum(v) => Some(reflect_enum::attr(v)),
+        syn::Item::Impl(v) => Some(reflect_impl::attr(v)),
         _ => None,
     }
 }

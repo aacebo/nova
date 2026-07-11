@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use minijinja::Environment;
-use nova_reflect::{Callable, Dynamic, Int, Map, MapType, Number, Str, ToType, ToValue, Type, Value};
+use nova_reflect::{Callable, Dynamic, Int, Map, MapType, Number, Object, Str, ToType, ToValue, Type, Value};
 use nova_reflect_macros::*;
 
 fn any_map() -> Map<'static> {
@@ -194,25 +194,24 @@ fn calls_callable_value() {
     assert_eq!(out, "42");
 }
 
-impl ToValue for Doubler {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_callable(self))
-    }
-}
-
 #[derive(Debug, Clone, Reflect)]
 pub struct Calculator {
     pub name: String,
-    pub double: Doubler,
+}
+
+#[nova_reflect::reflect]
+impl Calculator {
+    pub fn double(&self, n: i64) -> i64 {
+        n * 2
+    }
 }
 
 static CALCULATOR: std::sync::LazyLock<Calculator> = std::sync::LazyLock::new(|| Calculator {
     name: String::from("alex"),
-    double: Doubler,
 });
 
 #[test]
-fn calls_function_stored_as_object_field() {
+fn calls_method_member_from_template() {
     let env = Environment::new();
     let value = minijinja::Value::from_object(CALCULATOR.to_value());
     let out = env
@@ -220,6 +219,21 @@ fn calls_function_stored_as_object_field() {
         .unwrap();
 
     assert_eq!(out, "alex: 42");
+}
+
+#[test]
+fn object_call_invokes_method_and_field_returns_fields_only() {
+    assert_eq!(CALCULATOR.double(21), 42);
+
+    let value = CALCULATOR.to_value();
+    let obj = value.as_dynamic().unwrap();
+    let result = Object::call(obj, "double", &[Value::Number(Number::Int(Int::I64(21)))]).unwrap();
+
+    assert_eq!(result.to_i64(), Some(42));
+    assert!(obj.field("name").is_str());
+    assert!(obj.field("double").is_undefined());
+    assert!(obj.field("missing").is_undefined());
+    assert!(Object::call(obj, "missing", &[]).is_err());
 }
 
 #[test]
@@ -262,6 +276,5 @@ fn resolves_fields_through_ref() {
     }));
 
     let out = env.render_str("{{ v.name }}", minijinja::context! { v => value }).unwrap();
-
     assert_eq!(out, "alex");
 }

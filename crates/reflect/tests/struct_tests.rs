@@ -9,7 +9,7 @@ mod models {
     #[allow(dead_code)]
     #[derive(Debug, Clone, Reflect)]
     pub enum Kind {
-        #[reflect(lowercase)]
+        #[meta(lowercase)]
         Admin(String),
         Moderator,
         Basic,
@@ -26,9 +26,9 @@ mod models {
     }
 
     #[derive(Debug, Clone, Reflect)]
-    #[reflect(name = "alex")]
+    #[meta(name = "alex")]
     pub struct User {
-        #[reflect(hello = "world")]
+        #[meta(hello = "world")]
         pub kind: Kind,
         pub name: String,
         pub password: String,

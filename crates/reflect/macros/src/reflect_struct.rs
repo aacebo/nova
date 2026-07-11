@@ -1,6 +1,6 @@
 use quote::quote;
 
-use crate::{reflect_field, reflect_generics, reflect_meta, reflect_visibility};
+use crate::{parse, reflect_field, reflect_generics, reflect_meta, reflect_visibility};
 
 pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::TokenStream {
     let name = &input.ident;
@@ -14,30 +14,7 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
         vis: input.vis.clone(),
     });
 
-    let fields = match &data.fields {
-        syn::Fields::Named(named_fields) => named_fields
-            .named
-            .iter()
-            .map(|field| {
-                let field_ident = &field.ident;
-                quote!(#field_ident)
-            })
-            .collect::<Vec<_>>(),
-        syn::Fields::Unnamed(unnamed_fields) => unnamed_fields
-            .unnamed
-            .iter()
-            .enumerate()
-            .map(|(i, _)| {
-                let field_ident = syn::Member::Unnamed(syn::Index {
-                    index: i as u32,
-                    span: proc_macro2::Span::call_site(),
-                });
-
-                quote!(#field_ident)
-            })
-            .collect::<Vec<_>>(),
-        syn::Fields::Unit => vec![],
-    };
+    let arms = field_arms(&data.fields);
 
     quote! {
         impl ::nova_reflect::TypeOf for #name {
@@ -69,46 +46,76 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &::nova_reflect::FieldName) -> ::nova_reflect::Value<'_> {
-                #(
-                    if name == stringify!(#fields) {
-                        return ::nova_reflect::ToValue::to_value(&self.#fields);
-                    }
-                )*
+            fn field(&self, name: &str) -> ::nova_reflect::Value<'_> {
+                #(#arms)*
 
-                ::nova_reflect::Value::Null
+                ::nova_reflect::Value::Undefined
+            }
+
+            fn call(
+                &self,
+                name: &str,
+                args: &[::nova_reflect::Value],
+            ) -> ::std::result::Result<::nova_reflect::Value<'_>, ::std::string::String> {
+                #[allow(unused_imports)]
+                use ::nova_reflect::Methods as _;
+
+                self.call_method(name, args)
             }
         }
+    }
+}
+
+fn field_arms(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
+    match fields {
+        syn::Fields::Named(named) => named
+            .named
+            .iter()
+            .filter_map(|field| {
+                let ident = field.ident.as_ref()?;
+
+                match parse::field_attr(&field.attrs) {
+                    parse::FieldAttr::Ignore => None,
+                    parse::FieldAttr::Alias(alias) => Some(quote! {
+                        if name == #alias {
+                            return ::nova_reflect::ToValue::to_value(&self.#ident);
+                        }
+                    }),
+                    parse::FieldAttr::Default => Some(quote! {
+                        if name == stringify!(#ident) {
+                            return ::nova_reflect::ToValue::to_value(&self.#ident);
+                        }
+                    }),
+                }
+            })
+            .collect(),
+        syn::Fields::Unnamed(unnamed) => unnamed
+            .unnamed
+            .iter()
+            .enumerate()
+            .filter_map(|(i, field)| {
+                if matches!(parse::field_attr(&field.attrs), parse::FieldAttr::Ignore) {
+                    return None;
+                }
+
+                let index = syn::Index::from(i);
+                let key = i.to_string();
+
+                Some(quote! {
+                    if name == #key {
+                        return ::nova_reflect::ToValue::to_value(&self.#index);
+                    }
+                })
+            })
+            .collect(),
+        syn::Fields::Unit => vec![],
     }
 }
 
 pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
     let name = &item.ident;
     let ty = build(item);
-    let fields = match &item.fields {
-        syn::Fields::Named(named_fields) => named_fields
-            .named
-            .iter()
-            .map(|field| {
-                let field_ident = &field.ident;
-                quote!(#field_ident)
-            })
-            .collect::<Vec<_>>(),
-        syn::Fields::Unnamed(unnamed_fields) => unnamed_fields
-            .unnamed
-            .iter()
-            .enumerate()
-            .map(|(i, _)| {
-                let field_ident = syn::Member::Unnamed(syn::Index {
-                    index: i as u32,
-                    span: proc_macro2::Span::call_site(),
-                });
-
-                quote!(#field_ident)
-            })
-            .collect::<Vec<_>>(),
-        syn::Fields::Unit => vec![],
-    };
+    let arms = field_arms(&item.fields);
 
     quote! {
         impl ::nova_reflect::TypeOf for #name {
@@ -140,14 +147,21 @@ pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &::nova_reflect::FieldName) -> ::nova_reflect::Value<'_> {
-                #(
-                    if name == stringify!(#fields) {
-                        return ::nova_reflect::ToValue::to_value(&self.#fields);
-                    }
-                )*
+            fn field(&self, name: &str) -> ::nova_reflect::Value<'_> {
+                #(#arms)*
 
-                ::nova_reflect::Value::Null
+                ::nova_reflect::Value::Undefined
+            }
+
+            fn call(
+                &self,
+                name: &str,
+                args: &[::nova_reflect::Value],
+            ) -> ::std::result::Result<::nova_reflect::Value<'_>, ::std::string::String> {
+                #[allow(unused_imports)]
+                use ::nova_reflect::Methods as _;
+
+                self.call_method(name, args)
             }
         }
     }
@@ -169,13 +183,13 @@ pub fn build(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
             .named
             .iter()
             .enumerate()
-            .map(|(i, field)| reflect_field::build(field, i, true))
+            .filter_map(|(i, field)| reflect_field::build(field, i, true))
             .collect::<Vec<_>>(),
         syn::Fields::Unnamed(unnamed_fields) => unnamed_fields
             .unnamed
             .iter()
             .enumerate()
-            .map(|(i, field)| reflect_field::build(field, i, false))
+            .filter_map(|(i, field)| reflect_field::build(field, i, false))
             .collect::<Vec<_>>(),
         syn::Fields::Unit => vec![],
     };

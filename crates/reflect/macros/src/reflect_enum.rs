@@ -42,7 +42,7 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
 
             if variant_fields.is_empty() {
                 return quote! {
-                    Self::#variant_ident => ::nova_reflect::Value::Null
+                    Self::#variant_ident => ::nova_reflect::Value::Undefined
                 };
             }
 
@@ -87,7 +87,9 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &::nova_reflect::FieldName) -> ::nova_reflect::Value<'_> {
+            fn field(&self, name: &str) -> ::nova_reflect::Value<'_> {
+                let _ = name;
+
                 match self {
                     #(#variants,)*
                 }
@@ -134,7 +136,7 @@ pub fn attr(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
 
             if variant_fields.is_empty() {
                 return quote! {
-                    Self::#variant_ident => ::nova_reflect::Value::Null
+                    Self::#variant_ident => ::nova_reflect::Value::Undefined
                 };
             }
 
@@ -212,7 +214,7 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
                         .named
                         .iter()
                         .enumerate()
-                        .map(|(i, field)| reflect_field::build(field, i, true))
+                        .filter_map(|(i, field)| reflect_field::build(field, i, true))
                         .collect::<Vec<_>>();
 
                     quote! {
@@ -233,7 +235,7 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
                         .unnamed
                         .iter()
                         .enumerate()
-                        .map(|(i, field)| reflect_field::build(field, i, false))
+                        .filter_map(|(i, field)| reflect_field::build(field, i, false))
                         .collect::<Vec<_>>();
 
                     quote! {

@@ -118,10 +118,17 @@ impl<'a> crate::ToValue for Dynamic<'a> {
 }
 
 impl<'a> crate::Object for Dynamic<'a> {
-    fn field(&self, name: &crate::FieldName) -> crate::Value<'_> {
+    fn field(&self, name: &str) -> crate::Value<'_> {
         match self {
             Self::Object(v) => v.field(name),
             _ => crate::Value::Undefined,
+        }
+    }
+
+    fn call(&self, name: &str, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+        match self {
+            Self::Object(v) => v.call(name, args),
+            _ => Err(format!("no method '{}'", name)),
         }
     }
 }
@@ -176,7 +183,8 @@ impl<'a> serde::Serialize for Dynamic<'a> {
 
                 if let Some(fields) = fields {
                     for field in fields.iter() {
-                        ser.serialize_entry(&field.name().to_string(), &v.field(field.name()))?;
+                        let name = field.name().to_string();
+                        ser.serialize_entry(&name, &v.field(&name))?;
                     }
                 }
 

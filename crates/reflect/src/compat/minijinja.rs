@@ -79,6 +79,23 @@ impl Object for Value<'static> {
             _ => Err(Error::new(ErrorKind::InvalidOperation, "object is not callable")),
         }
     }
+
+    fn call_method(
+        self: &Arc<Self>,
+        _state: &State<'_, '_>,
+        name: &str,
+        args: &[minijinja::Value],
+    ) -> Result<minijinja::Value, Error> {
+        let Some(dynamic) = self.as_dynamic() else {
+            return Err(Error::new(ErrorKind::UnknownMethod, format!("no method '{}'", name)));
+        };
+
+        let args: Vec<Value> = args.iter().map(|a| a.to_value()).collect();
+
+        crate::Object::call(dynamic, name, &args)
+            .map(minijinja::Value::from_serialize)
+            .map_err(|e| Error::new(ErrorKind::InvalidOperation, e))
+    }
 }
 
 impl Object for crate::Dynamic<'static> {
@@ -95,9 +112,9 @@ impl Object for crate::Dynamic<'static> {
     fn get_value(self: &Arc<Self>, key: &minijinja::Value) -> Option<minijinja::Value> {
         if let Some(obj) = self.as_object() {
             let name = if let Some(v) = key.as_str() {
-                crate::FieldName::Key(v.to_string())
+                v.to_string()
             } else {
-                crate::FieldName::Index(key.as_usize()?)
+                key.as_usize()?.to_string()
             };
 
             match obj.field(&name) {
@@ -155,17 +172,15 @@ impl Object for crate::Dynamic<'static> {
     }
 
     fn call(self: &Arc<Self>, _state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, Error> {
-        match self.as_callable() {
-            Some(callable) => {
-                let args: Vec<Value> = args.iter().map(|a| a.to_value()).collect();
-
-                callable
-                    .call(&args)
-                    .map(minijinja::Value::from_serialize)
-                    .map_err(|e| Error::new(ErrorKind::InvalidOperation, e))
-            }
-            None => Err(Error::new(ErrorKind::InvalidOperation, "object is not callable")),
+        if !self.is_callable() {
+            return Err(Error::new(ErrorKind::InvalidOperation, "object is not callable"));
         }
+
+        let args: Vec<Value> = args.iter().map(|a| a.to_value()).collect();
+
+        crate::Dynamic::call(self.as_ref(), &args)
+            .map(minijinja::Value::from_serialize)
+            .map_err(|e| Error::new(ErrorKind::InvalidOperation, e))
     }
 }
 

@@ -195,11 +195,11 @@ where
     A: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
     B: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
 {
-    fn field(&self, name: &crate::FieldName) -> crate::Value<'_> {
-        match name.to_string().as_str() {
+    fn field(&self, name: &str) -> crate::Value<'_> {
+        match name {
             "0" => self.0.to_value(),
             "1" => self.1.to_value(),
-            _ => crate::Value::Null,
+            _ => crate::Value::Undefined,
         }
     }
 }

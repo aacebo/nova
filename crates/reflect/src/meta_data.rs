@@ -99,7 +99,7 @@ impl crate::ToValue for MetaData {
 }
 
 impl crate::Object for MetaData {
-    fn field(&self, name: &crate::FieldName) -> crate::Value<'_> {
-        self.get(&name.to_string()).unwrap().clone()
+    fn field(&self, name: &str) -> crate::Value<'_> {
+        self.get(name).cloned().unwrap_or(crate::Value::Undefined)
     }
 }
