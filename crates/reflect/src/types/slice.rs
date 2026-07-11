@@ -18,10 +18,7 @@ impl SliceType {
     }
 
     pub fn len(&self) -> usize {
-        match self.capacity {
-            None => panic!("called 'len' on unbound slice type"),
-            Some(capacity) => capacity,
-        }
+        self.capacity.unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -135,7 +132,7 @@ mod test {
         for i in 0..seq.len() {
             let v = seq.index(i);
             assert!(v.is_i32());
-            assert_eq!(i + 1, v.to_i32() as usize);
+            assert_eq!(i + 1, v.to_i32().unwrap() as usize);
         }
     }
 }

@@ -10,9 +10,12 @@ pub enum Value<'a> {
     Ref(crate::Ref<'a>),
     Dynamic(crate::Dynamic<'a>),
     Null,
+    Undefined,
 }
 
 impl<'a> Value<'a> {
+    pub const UNDEFINED: Value<'static> = Value::Undefined;
+
     pub fn to_type(&self) -> crate::Type {
         match self {
             Self::Bool(v) => v.to_type(),
@@ -22,7 +25,7 @@ impl<'a> Value<'a> {
             Self::Mut(v) => v.to_type(),
             Self::Ref(v) => v.to_type(),
             Self::Dynamic(v) => v.to_type(),
-            Self::Null => panic!("called 'to_type' on '<null>'"),
+            Self::Null | Self::Undefined => crate::Type::Void,
         }
     }
 
@@ -33,7 +36,7 @@ impl<'a> Value<'a> {
             Self::Mut(v) => v.len(),
             Self::Ref(v) => v.len(),
             Self::Dynamic(v) if v.is_sequence() => v.len(),
-            v => panic!("called 'len' on '{}'", v.to_type()),
+            _ => 0,
         }
     }
 
@@ -45,10 +48,7 @@ impl<'a> Value<'a> {
         match self {
             Self::Mut(v) => v.iter(),
             Self::Ref(v) => v.iter(),
-            v => panic!(
-                "called 'iter' on '{}'; lazy sequences cannot return std::slice::Iter, use as_dynamic().as_sequence() and index by position",
-                v.to_type()
-            ),
+            _ => [].iter(),
         }
     }
 
@@ -75,6 +75,9 @@ impl<'a> Value<'a> {
     }
     pub fn is_null(&self) -> bool {
         matches!(self, Self::Null)
+    }
+    pub fn is_undefined(&self) -> bool {
+        matches!(self, Self::Undefined)
     }
 
     pub fn as_bool(&self) -> Option<&bool> {
@@ -118,57 +121,38 @@ impl<'a> Value<'a> {
         }
     }
 
-    pub fn to_bool(&self) -> bool {
+    pub fn to_bool(&self) -> Option<bool> {
+        self.as_bool().copied()
+    }
+
+    pub fn to_number(&self) -> Option<crate::Number> {
+        self.as_number().copied()
+    }
+
+    pub fn to_mut(&self) -> Option<crate::Mut<'a>> {
         match self {
-            Self::Bool(v) => *v,
-            Self::Ref(v) => v.to_bool(),
-            Self::Mut(v) => v.to_bool(),
-            v => panic!("called 'to_bool' on '{}'", v.to_type()),
+            Self::Mut(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
-    pub fn to_number(&self) -> crate::Number {
+    pub fn to_ref(&self) -> Option<crate::Ref<'a>> {
         match self {
-            Self::Number(v) => *v,
-            Self::Ref(v) => v.to_number(),
-            Self::Mut(v) => v.to_number(),
-            v => panic!("called 'to_number' on '{}'", v.to_type()),
+            Self::Ref(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
-    pub fn to_mut(&self) -> crate::Mut<'a> {
-        match self {
-            Self::Mut(v) => v.clone(),
-            v => panic!("called 'to_mut' on '{}'", v.to_type()),
-        }
+    pub fn to_str(&self) -> Option<crate::Str<'a>> {
+        self.as_str().cloned()
     }
 
-    pub fn to_ref(&self) -> crate::Ref<'a> {
-        match self {
-            Self::Ref(v) => v.clone(),
-            v => panic!("called 'to_ref' on '{}'", v.to_type()),
-        }
+    pub fn to_dynamic(&self) -> Option<crate::Dynamic<'a>> {
+        self.as_dynamic().cloned()
     }
 
-    pub fn to_str(&self) -> crate::Str<'a> {
-        match self {
-            Self::Str(v) => v.clone(),
-            v => panic!("called 'to_str' on '{}'", v.to_type()),
-        }
-    }
-
-    pub fn to_dynamic(&self) -> crate::Dynamic<'a> {
-        match self {
-            Self::Dynamic(v) => v.clone(),
-            v => panic!("called 'to_dynamic' on '{}'", v.to_type()),
-        }
-    }
-
-    pub fn to_map(&self) -> crate::Map<'a> {
-        match self {
-            Self::Map(v) => v.clone(),
-            v => panic!("called 'to_map' on '{}'", v.to_type()),
-        }
+    pub fn to_map(&self) -> Option<crate::Map<'a>> {
+        self.as_map().cloned()
     }
 }
 
@@ -194,7 +178,7 @@ impl<'a> crate::ToType for Value<'a> {
             Self::Mut(v) => v.to_type(),
             Self::Ref(v) => v.to_type(),
             Self::Dynamic(v) => v.to_type(),
-            Self::Null => panic!("called 'ToType::to_type' on '<null>'"),
+            Self::Null | Self::Undefined => crate::Type::Void,
         }
     }
 }
@@ -212,9 +196,10 @@ impl<'a> PartialEq for Value<'a> {
             Self::Number(v) => other.as_number() == Some(v),
             Self::Str(v) => other.as_str() == Some(v),
             Self::Map(v) => other.as_map() == Some(v),
-            Self::Mut(v) => other.is_mut() && other.to_mut() == *v,
-            Self::Ref(v) => other.is_ref() && other.to_ref() == *v,
+            Self::Mut(v) => other.to_mut().as_ref() == Some(v),
+            Self::Ref(v) => other.to_ref().as_ref() == Some(v),
             Self::Null => other.is_null(),
+            Self::Undefined => other.is_undefined(),
             _ => false,
         }
     }
@@ -233,7 +218,7 @@ impl<'a> std::ops::Index<usize> for Value<'a> {
         match self {
             Self::Ref(v) => v.index(_index),
             Self::Mut(v) => v.index(_index),
-            _ => panic!("called 'Index<usize>::index' on '{}'", self.to_type()),
+            _ => &Value::UNDEFINED,
         }
     }
 }
@@ -243,8 +228,8 @@ impl<'a> std::ops::Index<&'a str> for Value<'a> {
 
     fn index(&self, index: &'a str) -> &Self::Output {
         match self {
-            Self::Map(v) => v.index(&crate::Value::Str(crate::Str(index))),
-            _ => panic!("called 'Index<&str>::index' on '{}'", self.to_type()),
+            Self::Map(v) => v.index(&crate::Value::Str(crate::Str(std::borrow::Cow::Borrowed(index)))),
+            _ => &Value::UNDEFINED,
         }
     }
 }
@@ -255,7 +240,7 @@ impl<'a> std::ops::Index<&Self> for Value<'a> {
     fn index(&self, index: &Self) -> &Self::Output {
         match self {
             Self::Map(v) => v.index(index),
-            _ => panic!("called 'Index<&Value>::index' on '{}'", self.to_type()),
+            _ => &Value::UNDEFINED,
         }
     }
 }
@@ -271,6 +256,7 @@ impl<'a> std::fmt::Display for Value<'a> {
             Self::Ref(v) => write!(f, "{}", v),
             Self::Dynamic(v) => write!(f, "{}", v),
             Self::Null => write!(f, "<null>"),
+            Self::Undefined => write!(f, "<undefined>"),
         }
     }
 }
@@ -284,7 +270,7 @@ impl<'a> Ord for Value<'a> {
         let ord = match (self, other) {
             (Self::Bool(a), Self::Bool(b)) => a.partial_cmp(b),
             (Self::Number(a), Self::Number(b)) => a.partial_cmp(b),
-            (Self::Str(a), Self::Str(b)) => a.0.partial_cmp(b.0),
+            (Self::Str(a), Self::Str(b)) => a.0.partial_cmp(&b.0),
             (Self::Mut(a), _) => a.deref().partial_cmp(other),
             (Self::Ref(a), _) => a.deref().partial_cmp(other),
             (_, Self::Mut(b)) => self.partial_cmp(b.deref()),
@@ -292,10 +278,7 @@ impl<'a> Ord for Value<'a> {
             _ => None,
         };
 
-        match ord {
-            None => panic!("called 'cmp' on '{}'", self.to_type()),
-            Some(v) => v,
-        }
+        ord.unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
@@ -316,7 +299,7 @@ impl<'a> serde::Serialize for Value<'a> {
             Self::Mut(v) => v.value.serialize(s),
             Self::Ref(v) => v.value.serialize(s),
             Self::Dynamic(v) => v.serialize(s),
-            Self::Null => s.serialize_none(),
+            Self::Null | Self::Undefined => s.serialize_none(),
         }
     }
 }

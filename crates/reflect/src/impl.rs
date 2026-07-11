@@ -14,17 +14,16 @@ pub struct Impl {
 }
 
 impl Impl {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::ImplBuilder {
-        crate::ImplBuilder::new()
-    }
-
     pub fn to_item(&self) -> crate::Item {
         crate::Item::Impl(self.clone())
     }
 
     pub fn id(&self) -> crate::TypeId {
-        let mut path = self.path.clone() + self.self_ty.path();
+        let mut path = self.path.clone();
+
+        if let Some(self_path) = self.self_ty.path() {
+            path = path + self_path;
+        }
 
         if let Some(of) = &self.of_trait {
             path = path + of;

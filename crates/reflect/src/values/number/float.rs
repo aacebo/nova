@@ -20,12 +20,12 @@ macro_rules! float {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type {
+                pub fn $to_type(&self) -> Option<$type> {
                     return match self {
                         Self::Number(v) => v.$to_type(),
                         Self::Ref(v) => v.value().$to_type(),
                         Self::Mut(v) => v.value().$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        _ => None,
                     };
                 }
             )*
@@ -44,12 +44,13 @@ macro_rules! float {
                 }
             }
 
-            impl From<crate::Value<'_>> for $type {
-                fn from(value: crate::Value<'_>) -> Self {
-                    return match value {
-                        crate::Value::Number(v) => v.to_float().$to_type(),
-                        v => panic!("called 'From<Value>::from' on type '{}'", v.to_type()),
-                    };
+            impl TryFrom<crate::Value<'_>> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Value<'_>) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
                 }
             }
 
@@ -85,10 +86,10 @@ macro_rules! float {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type {
+                pub fn $to_type(&self) -> Option<$type> {
                     return match self {
                         Self::Float(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        _ => None,
                     };
                 }
             )*
@@ -101,12 +102,13 @@ macro_rules! float {
                 }
             }
 
-            impl From<crate::Number> for $type {
-                fn from(value: crate::Number) -> Self {
-                    return match value {
-                        crate::Number::Float(v) => v.$to_type(),
-                        v => panic!("called 'From<Number>::from' on '{}'", v.to_type()),
-                    };
+            impl TryFrom<crate::Number> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Number) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
                 }
             }
 
@@ -139,9 +141,18 @@ macro_rules! float {
         /// Float: Value
         ///
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
         pub enum Float {
             $($name($type),)*
+        }
+
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for crate::Float {
+            fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+                return match self {
+                    $(Self::$name(v) => v.serialize(s),)*
+                };
+            }
         }
 
         impl Float {
@@ -159,10 +170,10 @@ macro_rules! float {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type {
+                pub fn $to_type(&self) -> Option<$type> {
                     return match self {
-                        Self::$name(v) => *v,
-                        _ => panic!("called '{}' on '{}'", stringify!($to_type), stringify!($type)),
+                        Self::$name(v) => Some(*v),
+                        _ => None,
                     };
                 }
 
@@ -185,9 +196,13 @@ macro_rules! float {
                 }
             }
 
-            impl From<crate::Float> for $type {
-                fn from(value: crate::Float) -> Self {
-                    return value.$to_type();
+            impl TryFrom<crate::Float> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Float) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
                 }
             }
 
@@ -241,7 +256,7 @@ mod test {
 
         assert!(value.is_float());
         assert!(value.is_f32());
-        assert_eq!(value.to_f32(), 300.26);
+        assert_eq!(value.to_f32(), Some(300.26));
     }
 
     #[test]
@@ -250,6 +265,6 @@ mod test {
 
         assert!(value.is_float());
         assert!(value.is_f64());
-        assert_eq!(value.to_f64(), 350.26);
+        assert_eq!(value.to_f64(), Some(350.26));
     }
 }

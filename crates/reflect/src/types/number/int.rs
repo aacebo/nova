@@ -15,10 +15,10 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
                         Self::Number(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v),
+                        _ => None,
                     };
                 }
             )*
@@ -33,10 +33,10 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
                         Self::Int(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        _ => None,
                     };
                 }
             )*
@@ -67,10 +67,10 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
-                        Self::$name(v) => v.clone(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v),
+                        Self::$name(v) => Some(v.clone()),
+                        _ => None,
                     };
                 }
             )*
@@ -160,7 +160,7 @@ macro_rules! int {
             impl PartialEq<crate::Type> for $type_name {
                 fn eq(&self, other: &crate::Type) -> bool {
                     return match other {
-                        crate::Type::Number(v) => v.$is_type() && (v.$to_type() == *self),
+                        crate::Type::Number(v) => v.$to_type() == Some(*self),
                         _ => false,
                     };
                 }

@@ -10,10 +10,10 @@ macro_rules! tuple {
 
         impl crate::Type {
             $(
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
                         Self::Tuple(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.id()),
+                        _ => None,
                     };
                 }
             )*
@@ -55,10 +55,10 @@ macro_rules! tuple {
             }
 
             $(
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
-                        Self::$name(v) => v.clone(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        Self::$name(v) => Some(v.clone()),
+                        _ => None,
                     };
                 }
             )*

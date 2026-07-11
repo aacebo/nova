@@ -61,7 +61,7 @@ mod test {
 
         assert!(value.is_bool());
         assert!(value.is_true());
-        assert!(value.to_bool());
+        assert_eq!(value.to_bool(), Some(true));
     }
 
     #[test]
@@ -70,6 +70,6 @@ mod test {
 
         assert!(value.is_bool());
         assert!(value.is_false());
-        assert!(!value.to_bool());
+        assert_eq!(value.to_bool(), Some(false));
     }
 }

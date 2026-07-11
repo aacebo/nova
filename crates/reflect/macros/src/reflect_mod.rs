@@ -30,7 +30,7 @@ pub fn build(meta: proc_macro2::TokenStream, item: &mut syn::ItemMod) -> proc_ma
     }
 
     quote! {
-        ::nova_reflect::ModType::new()
+        ::nova_reflect::mod_type()
             .path(::nova_reflect::Path::from(module_path!()))
             .meta(#meta.merge(&#inner_meta))
             .visibility(#vis)

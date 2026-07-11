@@ -20,12 +20,12 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type {
+                pub fn $to_type(&self) -> Option<$type> {
                     return match self {
                         Self::Number(v) => v.$to_type(),
                         Self::Ref(v) => v.value().$to_type(),
                         Self::Mut(v) => v.value().$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        _ => None,
                     };
                 }
             )*
@@ -44,12 +44,13 @@ macro_rules! int {
                 }
             }
 
-            impl From<crate::Value<'_>> for $type {
-                fn from(value: crate::Value<'_>) -> Self {
-                    return match value {
-                        crate::Value::Number(v) => v.to_int().$to_type(),
-                        v => panic!("called 'From<Value>::from' on type '{}'", v.to_type()),
-                    };
+            impl TryFrom<crate::Value<'_>> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Value<'_>) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
                 }
             }
 
@@ -85,10 +86,10 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type {
+                pub fn $to_type(&self) -> Option<$type> {
                     return match self {
                         Self::Int(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        _ => None,
                     };
                 }
             )*
@@ -101,12 +102,13 @@ macro_rules! int {
                 }
             }
 
-            impl From<crate::Number> for $type {
-                fn from(value: crate::Number) -> Self {
-                    return match value {
-                        crate::Number::Int(v) => v.$to_type(),
-                        v => panic!("called 'From<Number>::from' on '{}'", v.to_type()),
-                    };
+            impl TryFrom<crate::Number> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Number) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
                 }
             }
 
@@ -139,9 +141,18 @@ macro_rules! int {
         /// Int: Value
         ///
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
         pub enum Int {
             $($name($type),)*
+        }
+
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for crate::Int {
+            fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+                return match self {
+                    $(Self::$name(v) => v.serialize(s),)*
+                };
+            }
         }
 
         impl Int {
@@ -159,10 +170,10 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type {
+                pub fn $to_type(&self) -> Option<$type> {
                     return match self {
-                        Self::$name(v) => *v,
-                        _ => panic!("called '{}' on '{}'", stringify!($to_type), stringify!($type)),
+                        Self::$name(v) => Some(*v),
+                        _ => None,
                     };
                 }
 
@@ -185,9 +196,13 @@ macro_rules! int {
                 }
             }
 
-            impl From<crate::Int> for $type {
-                fn from(value: crate::Int) -> Self {
-                    return value.$to_type();
+            impl TryFrom<crate::Int> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Int) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
                 }
             }
 
@@ -249,7 +264,7 @@ mod test {
         assert!(value.is_int());
         assert!(value.to_type().is_signed());
         assert!(value.is_i8());
-        assert_eq!(value.to_i8(), 125);
+        assert_eq!(value.to_i8(), Some(125));
     }
 
     #[test]
@@ -259,7 +274,7 @@ mod test {
         assert!(value.is_int());
         assert!(value.to_type().is_signed());
         assert!(value.is_i16());
-        assert_eq!(value.to_i16(), -15);
+        assert_eq!(value.to_i16(), Some(-15));
     }
 
     #[test]
@@ -269,7 +284,7 @@ mod test {
         assert!(value.is_int());
         assert!(value.to_type().is_signed());
         assert!(value.is_i32());
-        assert_eq!(value.to_i32(), -15);
+        assert_eq!(value.to_i32(), Some(-15));
     }
 
     #[test]
@@ -279,7 +294,7 @@ mod test {
         assert!(value.is_int());
         assert!(value.to_type().is_signed());
         assert!(value.is_i64());
-        assert_eq!(value.to_i64(), -15);
+        assert_eq!(value.to_i64(), Some(-15));
     }
 
     #[test]
@@ -289,7 +304,7 @@ mod test {
         assert!(value.is_int());
         assert!(!value.to_type().is_signed());
         assert!(value.is_u8());
-        assert_eq!(value.to_u8(), 15);
+        assert_eq!(value.to_u8(), Some(15));
     }
 
     #[test]
@@ -299,7 +314,7 @@ mod test {
         assert!(value.is_int());
         assert!(!value.to_type().is_signed());
         assert!(value.is_u16());
-        assert_eq!(value.to_u16(), 15);
+        assert_eq!(value.to_u16(), Some(15));
     }
 
     #[test]
@@ -309,7 +324,7 @@ mod test {
         assert!(value.is_int());
         assert!(!value.to_type().is_signed());
         assert!(value.is_u32());
-        assert_eq!(value.to_u32(), 15);
+        assert_eq!(value.to_u32(), Some(15));
     }
 
     #[test]
@@ -319,6 +334,6 @@ mod test {
         assert!(value.is_int());
         assert!(!value.to_type().is_signed());
         assert!(value.is_u64());
-        assert_eq!(value.to_u64(), 15);
+        assert_eq!(value.to_u64(), Some(15));
     }
 }

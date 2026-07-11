@@ -49,6 +49,6 @@ mod test {
         let value = value_of!(arr);
 
         let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
-        assert_eq!(seq.index(1).to_i32(), 2);
+        assert_eq!(seq.index(1).to_i32(), Some(2));
     }
 }

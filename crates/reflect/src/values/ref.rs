@@ -53,6 +53,6 @@ impl<'a> std::fmt::Display for Ref<'a> {
 
 impl<'a> PartialEq<crate::Value<'a>> for Ref<'a> {
     fn eq(&self, other: &crate::Value<'a>) -> bool {
-        other.is_ref() && other.to_ref() == *self
+        other.to_ref().as_ref() == Some(self)
     }
 }

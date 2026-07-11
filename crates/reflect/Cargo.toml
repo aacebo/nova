@@ -17,7 +17,7 @@ workspace = true
 [features]
 macros = ["nova-reflect-macros"]
 serde = ["dep:serde"]
-minijinja = ["dep:minijinja"]
+minijinja = ["dep:minijinja", "serde"]
 json = ["serde", "dep:serde_json"]
 
 [dependencies]
@@ -30,6 +30,7 @@ nova-reflect-macros = { path = "./macros", optional = true }
 criterion = { version = "0.5", features = ["html_reports"] }
 dhat = { version = "0.3" }
 serde_json = { version = "1" }
+minijinja = { version = "2", features = ["serde"] }
 valuable = { version = "0.1", features = ["derive"] }
 nova-reflect-macros = { path = "./macros" }
 

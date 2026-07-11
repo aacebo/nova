@@ -5,10 +5,20 @@ pub use float::*;
 pub use int::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum Number {
     Int(Int),
     Float(Float),
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Number {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Int(v) => v.serialize(s),
+            Self::Float(v) => v.serialize(s),
+        }
+    }
 }
 
 impl Number {
@@ -26,11 +36,8 @@ impl Number {
         matches!(self, Self::Float(_))
     }
 
-    pub fn to_int(&self) -> Int {
-        match self {
-            Self::Int(v) => *v,
-            v => panic!("called 'to_int' on '{}'", v.to_type()),
-        }
+    pub fn to_int(&self) -> Option<Int> {
+        self.as_int().copied()
     }
 
     pub fn as_int(&self) -> Option<&Int> {
@@ -40,11 +47,8 @@ impl Number {
         }
     }
 
-    pub fn to_float(&self) -> Float {
-        match self {
-            Self::Float(v) => *v,
-            v => panic!("called 'to_float' on '{}'", v.to_type()),
-        }
+    pub fn to_float(&self) -> Option<Float> {
+        self.as_float().copied()
     }
 
     pub fn as_float(&self) -> Option<&Float> {

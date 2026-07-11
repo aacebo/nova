@@ -11,11 +11,6 @@ pub struct TypeParam {
 }
 
 impl TypeParam {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::TypeParamBuilder {
-        crate::TypeParamBuilder::new()
-    }
-
     pub fn to_generic(&self) -> crate::Generic {
         crate::Generic::Type(self.clone())
     }

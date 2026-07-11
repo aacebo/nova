@@ -41,11 +41,8 @@ impl NumberType {
         }
     }
 
-    pub fn to_int(&self) -> IntType {
-        match self {
-            Self::Int(v) => *v,
-            _ => panic!("called 'to_int' on type '{}'", self.id()),
-        }
+    pub fn to_int(&self) -> Option<IntType> {
+        self.as_int().copied()
     }
 
     pub fn as_int(&self) -> Option<&IntType> {
@@ -55,11 +52,8 @@ impl NumberType {
         }
     }
 
-    pub fn to_float(&self) -> FloatType {
-        match self {
-            Self::Float(v) => *v,
-            _ => panic!("called 'to_float' on type '{}'", self.id()),
-        }
+    pub fn to_float(&self) -> Option<FloatType> {
+        self.as_float().copied()
     }
 
     pub fn as_float(&self) -> Option<&FloatType> {

@@ -39,13 +39,12 @@ impl MetaData {
     }
 }
 
-impl<const N: usize, V: crate::ToValue + 'static> From<[(&str, V); N]> for MetaData {
+impl<const N: usize, V: Into<crate::Value<'static>>> From<[(&str, V); N]> for MetaData {
     fn from(items: [(&str, V); N]) -> Self {
         let mut data = BTreeMap::new();
 
         for (key, value) in items {
-            let v: &'static V = Box::leak(Box::new(value));
-            data.insert(key.to_string(), Arc::new(v.to_value()));
+            data.insert(key.to_string(), Arc::new(value.into()));
         }
 
         Self(data)
@@ -78,7 +77,7 @@ impl std::fmt::Display for MetaData {
 
 impl crate::TypeOf for MetaData {
     fn type_of() -> crate::Type {
-        crate::StructType::new()
+        crate::struct_type()
             .path(crate::Path::from("nova_reflect"))
             .name("MetaData")
             .visibility(crate::Visibility::Public(crate::Public::Full))

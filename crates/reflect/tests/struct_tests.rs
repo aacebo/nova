@@ -1,13 +1,12 @@
-#![allow(unused)]
-
-use nova_reflect::{ToType, ToValue, TypeOf, value_of};
+use nova_reflect::{ToType, ToValue, value_of};
 use nova_reflect_macros::*;
 
 #[reflect(version = 2)]
 mod models {
-    use nova_reflect::{ToType, TypeOf};
+    use nova_reflect::TypeOf;
     use nova_reflect_macros::*;
 
+    #[allow(dead_code)]
     #[derive(Debug, Clone, Reflect)]
     pub enum Kind {
         #[reflect(lowercase)]
@@ -18,11 +17,11 @@ mod models {
 
     impl std::fmt::Display for Kind {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            return match self {
+            match self {
                 Self::Admin(v) => write!(f, "{}", v),
                 Self::Moderator => write!(f, "mod"),
                 Self::Basic => write!(f, "basic"),
-            };
+            }
         }
     }
 
@@ -54,10 +53,13 @@ pub fn should_reflect_struct() {
 
     assert!(user.to_type().is_struct());
     assert_eq!(user.to_type().len(), 3);
-    assert!(user.to_type().to_struct().fields()["kind"].ty().is_enum());
-    assert_eq!(user.to_type().meta().len(), 1);
-    assert!(user.to_type().meta().has("name"));
-    assert_eq!(user.to_type().to_struct().meta().get("name").unwrap(), &"alex".to_value());
+    assert!(user.to_type().to_struct().unwrap().fields()["kind"].ty().is_enum());
+    assert_eq!(user.to_type().meta().unwrap().len(), 1);
+    assert!(user.to_type().meta().unwrap().has("name"));
+    assert_eq!(
+        user.to_type().to_struct().unwrap().meta().get("name").unwrap(),
+        &"alex".to_value()
+    );
 }
 
 #[test]
@@ -70,7 +72,7 @@ pub fn should_reflect_field() {
 
     assert!(user.to_type().is_struct());
 
-    let field = user.to_type().to_struct().fields()["kind"].clone();
+    let field = user.to_type().to_struct().unwrap().fields()["kind"].clone();
 
     assert!(field.ty().is_enum());
     assert_eq!(field.meta().len(), 1);
@@ -85,12 +87,18 @@ pub fn should_reflect_enum() {
 
     assert!(kind.to_type().is_enum());
     assert_eq!(kind.to_type().len(), 3);
-    assert!(kind.to_type().to_enum().has_variant("Admin"));
-    assert_eq!(kind.to_type().to_enum().variant("Admin").len(), 1);
-    assert!(kind.to_type().to_enum().variant("Admin").fields()[0].ty().is_str());
-    assert!(kind.to_type().to_enum().variant("Admin").meta().has("lowercase"));
+    assert!(kind.to_type().to_enum().unwrap().has_variant("Admin"));
+    assert_eq!(kind.to_type().to_enum().unwrap().variant("Admin").len(), 1);
+    assert!(kind.to_type().to_enum().unwrap().variant("Admin").fields()[0].ty().is_str());
+    assert!(kind.to_type().to_enum().unwrap().variant("Admin").meta().has("lowercase"));
     assert_eq!(
-        kind.to_type().to_enum().variant("Admin").meta().get("lowercase").unwrap(),
+        kind.to_type()
+            .to_enum()
+            .unwrap()
+            .variant("Admin")
+            .meta()
+            .get("lowercase")
+            .unwrap(),
         &nova_reflect::Value::Null
     );
 }
@@ -101,7 +109,7 @@ pub fn should_reflect_tuple_struct() {
 
     assert!(pos.to_type().is_struct());
     assert_eq!(pos.to_type().len(), 2);
-    assert!(pos.to_type().to_struct().fields()[0].ty().is_f64());
+    assert!(pos.to_type().to_struct().unwrap().fields()[0].ty().is_f64());
 }
 
 #[test]
@@ -109,8 +117,8 @@ pub fn should_reflect_restricted_visibility() {
     let r = models::Restricted { x: 7 };
 
     assert!(r.to_type().is_struct());
-    assert_eq!(r.to_type().to_struct().name(), "Restricted");
-    assert!(r.to_type().to_struct().vis().is_public());
+    assert_eq!(r.to_type().to_struct().unwrap().name(), "Restricted");
+    assert!(r.to_type().to_struct().unwrap().vis().is_public());
 }
 
 #[test]
@@ -121,7 +129,7 @@ pub fn should_reflect_path() {
         password: String::from("test"),
     };
 
-    assert_eq!(user.to_type().path().to_string(), "struct_tests::models");
+    assert_eq!(user.to_type().path().unwrap().to_string(), "struct_tests::models");
 }
 
 #[test]
@@ -129,33 +137,33 @@ pub fn should_reflect_mod() {
     let ty = models::type_of();
 
     assert!(ty.is_mod());
-    assert_eq!(ty.to_mod().path().name(), "models");
-    assert!(ty.to_mod().vis().is_private());
-    assert_eq!(ty.to_mod().items().len(), 5);
+    assert_eq!(ty.to_mod().unwrap().path().name(), "models");
+    assert!(ty.to_mod().unwrap().vis().is_private());
+    assert_eq!(ty.to_mod().unwrap().items().len(), 5);
 
-    let module = ty.to_mod();
+    let module = ty.to_mod().unwrap();
 
     assert!(module.meta().has("version"));
     assert_eq!(module.meta().get("version").unwrap(), &value_of!(2));
 
-    let one = &module.items()[0].to_type();
+    let one = &module.items()[0].to_type().unwrap();
 
     assert!(one.is_enum());
-    assert_eq!(one.to_enum().name(), "Kind");
+    assert_eq!(one.to_enum().unwrap().name(), "Kind");
 
     let two = &module.items()[1];
 
     assert!(two.is_impl());
-    assert_eq!(two.to_impl().self_ty().to_enum().name(), "Kind");
-    assert_eq!(two.to_impl().of_trait().unwrap().to_string(), "std::fmt::Display");
+    assert_eq!(two.to_impl().unwrap().self_ty().to_enum().unwrap().name(), "Kind");
+    assert_eq!(two.to_impl().unwrap().of_trait().unwrap().to_string(), "std::fmt::Display");
 
-    let three = &module.items()[2].to_type();
+    let three = &module.items()[2].to_type().unwrap();
 
     assert!(three.is_struct());
-    assert_eq!(three.to_struct().name(), "User");
+    assert_eq!(three.to_struct().unwrap().name(), "User");
 
-    let four = &module.items()[3].to_type();
+    let four = &module.items()[3].to_type().unwrap();
 
     assert!(four.is_struct());
-    assert_eq!(four.to_struct().name(), "Position");
+    assert_eq!(four.to_struct().unwrap().name(), "Position");
 }

@@ -33,11 +33,11 @@ impl MapType {
 }
 
 impl MapType {
-    pub fn meta(&self) -> &crate::MetaData {
+    pub fn meta(&self) -> Option<&crate::MetaData> {
         self.ty.meta()
     }
 
-    pub fn path(&self) -> &crate::Path {
+    pub fn path(&self) -> Option<&crate::Path> {
         self.ty.path()
     }
 
@@ -74,13 +74,13 @@ where
     fn type_of() -> crate::Type {
         let key = K::type_of();
         let value = V::type_of();
-        let ty = crate::StructType::new()
+        let ty = crate::struct_type()
             .path(crate::Path::from("std::collections"))
             .name("HashMap")
             .visibility(crate::Visibility::Public(crate::Public::Full))
             .generics(crate::Generics::from([
-                crate::TypeParam::new().name("K").build().to_generic(),
-                crate::TypeParam::new().name("V").build().to_generic(),
+                crate::type_param().name("K").build().to_generic(),
+                crate::type_param().name("V").build().to_generic(),
             ]))
             .build()
             .to_type();
@@ -107,13 +107,13 @@ where
     fn type_of() -> crate::Type {
         let key = K::type_of();
         let value = V::type_of();
-        let ty = crate::StructType::new()
+        let ty = crate::struct_type()
             .path(crate::Path::from("std::collections"))
             .name("BTreeMap")
             .visibility(crate::Visibility::Public(crate::Public::Full))
             .generics(crate::Generics::from([
-                crate::TypeParam::new().name("K").build().to_generic(),
-                crate::TypeParam::new().name("V").build().to_generic(),
+                crate::type_param().name("K").build().to_generic(),
+                crate::type_param().name("V").build().to_generic(),
             ]))
             .build()
             .to_type();

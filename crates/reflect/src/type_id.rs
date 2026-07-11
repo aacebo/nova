@@ -1,31 +1,14 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(transparent))]
-pub struct TypeId(&'static str);
-
-thread_local! {
-    static INTERNED: std::cell::RefCell<std::collections::HashMap<String, &'static str>>
-        = std::cell::RefCell::new(std::collections::HashMap::new());
-}
+pub struct TypeId(std::sync::Arc<str>);
 
 impl TypeId {
-    pub(crate) fn from_str(value: &'static str) -> Self {
-        Self(value)
+    pub(crate) fn from_str(value: &str) -> Self {
+        Self(std::sync::Arc::from(value))
     }
 
     pub(crate) fn from_string(value: String) -> Self {
-        let s = INTERNED.with(|m| {
-            let mut map = m.borrow_mut();
-
-            if let Some(&existing) = map.get(&value) {
-                existing
-            } else {
-                let leaked: &'static str = Box::leak(value.clone().into_boxed_str());
-                map.insert(value, leaked);
-                leaked
-            }
-        });
-
-        Self(s)
+        Self(std::sync::Arc::from(value))
     }
 }
 
@@ -39,19 +22,19 @@ impl Eq for TypeId {}
 
 impl PartialEq for TypeId {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.0, other.0) || self.0 == other.0
+        std::sync::Arc::ptr_eq(&self.0, &other.0) || self.0 == other.0
     }
 }
 
 impl PartialEq<&str> for TypeId {
     fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
+        &*self.0 == *other
     }
 }
 
 impl PartialEq<String> for TypeId {
     fn eq(&self, other: &String) -> bool {
-        self.0 == other.as_str()
+        &*self.0 == other.as_str()
     }
 }
 

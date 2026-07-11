@@ -28,19 +28,13 @@ pub use dynamic::*;
 pub use field::*;
 pub use fields::*;
 pub use generic::*;
-#[allow(unused)]
-pub use get::*;
 pub use r#impl::*;
 pub use item::*;
 pub use layout::*;
 pub use meta_data::*;
 pub use method::*;
-#[allow(unused)]
-pub use option::*;
 pub use param::*;
 pub use path::*;
-#[allow(unused)]
-pub use result::*;
 pub use r#type::*;
 pub use type_id::*;
 pub use type_of::*;
@@ -57,7 +51,5 @@ pub mod values;
 pub use nova_reflect_macros::*;
 pub use values::*;
 
-#[cfg(feature = "minijinja")]
-impl<'a> minijinja::value::Object for Value<'a> {
-
-}
+#[cfg(any(feature = "minijinja", feature = "json"))]
+mod compat;

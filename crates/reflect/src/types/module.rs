@@ -12,11 +12,6 @@ pub struct ModType {
 }
 
 impl ModType {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::ModTypeBuilder {
-        crate::ModTypeBuilder::new()
-    }
-
     pub fn to_type(&self) -> crate::Type {
         crate::Type::Mod(std::sync::Arc::new(self.clone()))
     }

@@ -33,6 +33,6 @@ mod test {
     pub fn from_expr() {
         let value = value_of!(1_i8);
         assert!(value.is_i8());
-        assert_eq!(value.to_i8(), 1);
+        assert_eq!(value.to_i8(), Some(1));
     }
 }

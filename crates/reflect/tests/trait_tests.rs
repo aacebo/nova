@@ -1,8 +1,7 @@
-#![allow(unused)]
-
-use nova_reflect::{ToType, TypeOf, type_of, value_of};
+use nova_reflect::{TypeOf, type_of, value_of};
 use nova_reflect_macros::*;
 
+#[allow(dead_code)]
 #[reflect(a = "b")]
 trait Hello<T = String> {
     fn world(&self, a: u8) -> bool;
@@ -14,17 +13,21 @@ pub fn should_reflect_trait() {
 
     assert!(ty.is_trait());
     assert_eq!(ty.len(), 1);
-    assert!(ty.to_trait().has("world"));
-    assert_eq!(ty.to_trait().get("world").unwrap().params().len(), 2);
-    assert!(ty.to_trait().get("world").unwrap().has_param("self"));
-    assert!(ty.to_trait().get("world").unwrap().has_param("a"));
-    assert!(ty.to_trait().meta().has("a"));
-    assert_eq!(ty.to_trait().meta().get("a").unwrap(), &value_of!("b"));
-    assert_eq!(ty.to_trait().generics().len(), 1);
-    assert_eq!(ty.to_trait().generics()[0].to_type().name(), "T");
-    assert_eq!(ty.to_trait().generics()[0].to_type().default().unwrap(), &type_of!(String));
+
+    let tr = ty.to_trait().unwrap();
+
+    assert!(tr.has("world"));
+    assert_eq!(tr.get("world").unwrap().params().len(), 2);
+    assert!(tr.get("world").unwrap().has_param("self"));
+    assert!(tr.get("world").unwrap().has_param("a"));
+    assert!(tr.meta().has("a"));
+    assert_eq!(tr.meta().get("a").unwrap(), &value_of!("b"));
+    assert_eq!(tr.generics().len(), 1);
+    assert_eq!(tr.generics()[0].to_type().unwrap().name(), "T");
+    assert_eq!(tr.generics()[0].to_type().unwrap().default().unwrap(), &type_of!(String));
 }
 
+#[allow(dead_code)]
 #[reflect]
 trait Borrowing {
     fn shared(&self, x: &i32) -> bool;
@@ -33,7 +36,7 @@ trait Borrowing {
 
 #[test]
 pub fn should_reflect_reference_params() {
-    let ty = type_of!(dyn Borrowing).to_trait();
+    let ty = type_of!(dyn Borrowing).to_trait().unwrap();
 
     let shared_x = ty.get("shared").unwrap().param("x");
     assert!(shared_x.ty().is_ref());

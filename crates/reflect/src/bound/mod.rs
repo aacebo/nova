@@ -27,17 +27,17 @@ impl Bound {
         matches!(self, Self::Lifetime(_))
     }
 
-    pub fn to_trait(&self) -> TraitBound {
+    pub fn to_trait(&self) -> Option<TraitBound> {
         match self {
-            Self::Trait(v) => v.clone(),
-            _ => panic!("called 'to_trait' on '{}'", self.name()),
+            Self::Trait(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
-    pub fn to_lifetime(&self) -> LifetimeBound {
+    pub fn to_lifetime(&self) -> Option<LifetimeBound> {
         match self {
-            Self::Lifetime(v) => v.clone(),
-            _ => panic!("called 'to_lifetime' on '{}'", self.name()),
+            Self::Lifetime(v) => Some(v.clone()),
+            _ => None,
         }
     }
 }

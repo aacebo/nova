@@ -106,7 +106,7 @@ impl<'a> std::ops::Index<&crate::Value<'a>> for Map<'a> {
     type Output = crate::Value<'a>;
 
     fn index(&self, index: &crate::Value<'a>) -> &Self::Output {
-        self.data.index(index)
+        self.data.get(index).unwrap_or(&crate::Value::UNDEFINED)
     }
 }
 

@@ -14,11 +14,6 @@ pub struct EnumType {
 }
 
 impl EnumType {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> EnumTypeBuilder {
-        EnumTypeBuilder::new()
-    }
-
     pub fn to_type(&self) -> crate::Type {
         crate::Type::Enum(std::sync::Arc::new(self.clone()))
     }

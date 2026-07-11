@@ -11,11 +11,6 @@ pub struct Variant {
 }
 
 impl Variant {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::VariantBuilder {
-        crate::VariantBuilder::new()
-    }
-
     pub fn meta(&self) -> &crate::MetaData {
         &self.meta
     }

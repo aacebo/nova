@@ -107,24 +107,24 @@ impl Generic {
         matches!(self, Self::Type(_))
     }
 
-    pub fn to_const(&self) -> ConstParam {
+    pub fn to_const(&self) -> Option<ConstParam> {
         match self {
-            Self::Const(v) => v.clone(),
-            _ => panic!("called 'to_const' on '{}'", self.name()),
+            Self::Const(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
-    pub fn to_lifetime(&self) -> LifetimeParam {
+    pub fn to_lifetime(&self) -> Option<LifetimeParam> {
         match self {
-            Self::Lifetime(v) => v.clone(),
-            _ => panic!("called 'to_lifetime' on '{}'", self.name()),
+            Self::Lifetime(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
-    pub fn to_type(&self) -> TypeParam {
+    pub fn to_type(&self) -> Option<TypeParam> {
         match self {
-            Self::Type(v) => v.clone(),
-            _ => panic!("called 'to_type' on '{}'", self.name()),
+            Self::Type(v) => Some(v.clone()),
+            _ => None,
         }
     }
 }

@@ -45,7 +45,7 @@ mod test {
         for i in 0..seq.len() {
             let v = seq.index(i);
             assert!(v.is_i32());
-            assert_eq!(i + 1, v.to_i32() as usize);
+            assert_eq!(i + 1, v.to_i32().unwrap() as usize);
         }
     }
 }

@@ -12,11 +12,6 @@ pub struct Field {
 }
 
 impl Field {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::FieldBuilder {
-        crate::FieldBuilder::new()
-    }
-
     pub fn meta(&self) -> &crate::MetaData {
         &self.meta
     }
@@ -60,17 +55,17 @@ impl FieldName {
         matches!(self, Self::Index(_))
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::Key(v) => v,
-            _ => panic!("called 'as_str' on 'FieldName::Index'"),
+            Self::Key(v) => Some(v),
+            _ => None,
         }
     }
 
-    pub fn as_index(&self) -> &usize {
+    pub fn as_index(&self) -> Option<&usize> {
         match self {
-            Self::Index(v) => v,
-            _ => panic!("called 'as_index' on 'FieldName::Key'"),
+            Self::Index(v) => Some(v),
+            _ => None,
         }
     }
 }
@@ -137,7 +132,7 @@ impl PartialEq<String> for FieldName {
 
 impl PartialEq<usize> for FieldName {
     fn eq(&self, other: &usize) -> bool {
-        self.as_index() == other
+        self.as_index() == Some(other)
     }
 }
 

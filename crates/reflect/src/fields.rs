@@ -12,11 +12,6 @@ pub struct Fields {
 }
 
 impl Fields {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::FieldsBuilder {
-        crate::FieldsBuilder::new()
-    }
-
     pub fn layout(&self) -> &crate::Layout {
         &self.layout
     }
@@ -48,19 +43,19 @@ impl Fields {
 
 impl From<&[crate::Field]> for Fields {
     fn from(value: &[crate::Field]) -> Self {
-        Self::new().fields(value.iter().cloned()).build()
+        crate::fields().fields(value.iter().cloned()).build()
     }
 }
 
 impl<const N: usize> From<&[crate::Field; N]> for Fields {
     fn from(value: &[crate::Field; N]) -> Self {
-        Self::new().fields(value.iter().cloned()).build()
+        crate::fields().fields(value.iter().cloned()).build()
     }
 }
 
 impl<const N: usize> From<[crate::Field; N]> for Fields {
     fn from(value: [crate::Field; N]) -> Self {
-        Self::new().fields(value).build()
+        crate::fields().fields(value).build()
     }
 }
 

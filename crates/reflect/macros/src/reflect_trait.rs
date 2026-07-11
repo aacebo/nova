@@ -115,7 +115,7 @@ pub fn build(meta: proc_macro2::TokenStream, item: &syn::ItemTrait) -> proc_macr
                     .collect::<Vec<_>>();
 
                 return Some(quote! {
-                    ::nova_reflect::Method::new()
+                    ::nova_reflect::method()
                         .name(stringify!(#fn_name))
                         .meta(#fn_meta)
                         .is_async(#fn_is_async)
@@ -131,7 +131,7 @@ pub fn build(meta: proc_macro2::TokenStream, item: &syn::ItemTrait) -> proc_macr
         .collect::<Vec<_>>();
 
     quote! {
-        ::nova_reflect::TraitType::new()
+        ::nova_reflect::trait_type()
             .path(::nova_reflect::Path::from(module_path!()))
             .name(stringify!(#name))
             .meta(#meta.merge(&#inner_meta))

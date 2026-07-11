@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct Str<'a>(pub &'a str);
+pub struct Str<'a>(pub std::borrow::Cow<'a, str>);
 
 impl<'a> Str<'a> {
     pub fn to_type(&self) -> crate::Type {
@@ -17,7 +17,7 @@ impl<'a> Str<'a> {
 
 impl<'a> AsRef<str> for Str<'a> {
     fn as_ref(&self) -> &str {
-        self.0
+        &self.0
     }
 }
 
@@ -25,7 +25,7 @@ impl<'a> std::ops::Deref for Str<'a> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.0
+        &self.0
     }
 }
 
@@ -48,21 +48,27 @@ impl<'a> PartialEq<std::string::String> for Str<'a> {
     }
 }
 
+impl From<std::string::String> for crate::Value<'static> {
+    fn from(value: std::string::String) -> Self {
+        crate::Value::Str(Str(std::borrow::Cow::Owned(value)))
+    }
+}
+
 impl crate::ToValue for std::string::String {
     fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Str(Str(self.as_str()))
+        crate::Value::Str(Str(std::borrow::Cow::Borrowed(self.as_str())))
     }
 }
 
 impl crate::ToValue for &'static str {
     fn to_value(&self) -> crate::Value<'static> {
-        crate::Value::Str(Str(self))
+        crate::Value::Str(Str(std::borrow::Cow::Borrowed(self)))
     }
 }
 
 impl crate::ToValue for str {
     fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Str(Str(self))
+        crate::Value::Str(Str(std::borrow::Cow::Borrowed(self)))
     }
 }
 

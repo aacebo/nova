@@ -15,10 +15,10 @@ macro_rules! float {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
                         Self::Number(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v),
+                        _ => None,
                     };
                 }
             )*
@@ -33,10 +33,10 @@ macro_rules! float {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
                         Self::Float(v) => v.$to_type(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        _ => None,
                     };
                 }
             )*
@@ -61,10 +61,10 @@ macro_rules! float {
                     };
                 }
 
-                pub fn $to_type(&self) -> $type_name {
+                pub fn $to_type(&self) -> Option<$type_name> {
                     return match self {
-                        Self::$name(v) => v.clone(),
-                        v => panic!("called '{}' on type '{}'", stringify!($to_type), v.to_type()),
+                        Self::$name(v) => Some(v.clone()),
+                        _ => None,
                     };
                 }
             )*
@@ -154,7 +154,7 @@ macro_rules! float {
             impl PartialEq<crate::Type> for $type_name {
                 fn eq(&self, other: &crate::Type) -> bool {
                     return match other {
-                        crate::Type::Number(v) => v.$is_type() && (v.$to_type() == *self),
+                        crate::Type::Number(v) => v.$to_type() == Some(*self),
                         _ => false,
                     };
                 }
@@ -178,7 +178,7 @@ mod test {
 
         assert!(value.is_float());
         assert!(value.is_f32());
-        assert_eq!(value.to_f32(), 300.26);
+        assert_eq!(value.to_f32(), Some(300.26));
     }
 
     #[test]
@@ -187,6 +187,6 @@ mod test {
 
         assert!(value.is_float());
         assert!(value.is_f64());
-        assert_eq!(value.to_f64(), 350.26);
+        assert_eq!(value.to_f64(), Some(350.26));
     }
 }

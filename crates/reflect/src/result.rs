@@ -2,13 +2,13 @@ use crate::TypeOf;
 
 impl<T, E> crate::TypeOf for Result<T, E> {
     fn type_of() -> crate::Type {
-        crate::EnumType::new()
+        crate::enum_type()
             .path(crate::Path::from("core::result"))
             .name("Result")
             .visibility(crate::Visibility::Public(crate::Public::Full))
             .generics(crate::Generics::from([
-                crate::TypeParam::new().name("T").build().to_generic(),
-                crate::TypeParam::new().name("E").build().to_generic(),
+                crate::type_param().name("T").build().to_generic(),
+                crate::type_param().name("E").build().to_generic(),
             ]))
             .build()
             .to_type()

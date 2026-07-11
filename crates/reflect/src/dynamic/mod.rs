@@ -45,14 +45,14 @@ impl<'a> Dynamic<'a> {
     pub fn call(&self, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
         match self {
             Self::Callable(v) => v.call(args),
-            v => panic!("called 'call' on '{}'", v.to_type()),
+            v => Err(format!("'{}' is not callable", v.to_type())),
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
             Self::Sequence(v) => v.len(),
-            v => panic!("called 'len' on '{}'", v.to_type()),
+            _ => 0,
         }
     }
 
@@ -121,7 +121,7 @@ impl<'a> crate::Object for Dynamic<'a> {
     fn field(&self, name: &crate::FieldName) -> crate::Value<'_> {
         match self {
             Self::Object(v) => v.field(name),
-            v => panic!("called 'field' on '{}'", v.to_type()),
+            _ => crate::Value::Undefined,
         }
     }
 }
@@ -130,14 +130,14 @@ impl<'a> crate::Sequence for Dynamic<'a> {
     fn len(&self) -> usize {
         match self {
             Self::Sequence(v) => v.len(),
-            v => panic!("called 'len' on '{}'", v.to_type()),
+            _ => 0,
         }
     }
 
     fn index(&self, i: usize) -> crate::Value<'_> {
         match self {
             Self::Sequence(v) => v.index(i),
-            v => panic!("called 'index' on '{}'", v.to_type()),
+            _ => crate::Value::Undefined,
         }
     }
 }
@@ -146,7 +146,7 @@ impl<'a> crate::Callable for Dynamic<'a> {
     fn call(&self, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
         match self {
             Self::Callable(v) => v.call(args),
-            v => panic!("called 'call' on '{}'", v.to_type()),
+            v => Err(format!("'{}' is not callable", v.to_type())),
         }
     }
 }
@@ -170,18 +170,21 @@ impl<'a> serde::Serialize for Dynamic<'a> {
             Self::Dyn(_) | Self::Callable(_) => serializer.serialize_none(),
             Self::Object(v) => {
                 let ty = v.to_type().to_struct();
-                let mut ser = serializer.serialize_map(Some(ty.len()))?;
+                let fields = ty.as_ref().map(|t| t.fields());
+                let len = fields.map(|f| f.len()).unwrap_or(0);
+                let mut ser = serializer.serialize_map(Some(len))?;
 
-                for field in ty.fields().iter() {
-                    ser.serialize_entry(&field.name().to_string(), &v.field(field.name()))?;
+                if let Some(fields) = fields {
+                    for field in fields.iter() {
+                        ser.serialize_entry(&field.name().to_string(), &v.field(field.name()))?;
+                    }
                 }
 
                 ser.end()
             }
             Self::Sequence(v) => {
                 use serde::ser::SerializeSeq;
-                let ty = v.to_type().to_slice();
-                let mut ser = serializer.serialize_seq(ty.capacity())?;
+                let mut ser = serializer.serialize_seq(Some(v.len()))?;
 
                 for i in 0..v.len() {
                     ser.serialize_element(&v.index(i))?;

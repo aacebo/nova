@@ -17,11 +17,6 @@ pub struct Method {
 }
 
 impl Method {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::MethodBuilder {
-        crate::MethodBuilder::new()
-    }
-
     pub fn meta(&self) -> &crate::MetaData {
         &self.meta
     }

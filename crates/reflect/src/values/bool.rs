@@ -12,11 +12,11 @@ impl crate::ToValue for bool {
 
 impl crate::Value<'_> {
     pub fn is_true(&self) -> bool {
-        self.is_bool() && self.to_bool()
+        self.to_bool() == Some(true)
     }
 
     pub fn is_false(&self) -> bool {
-        self.is_bool() && !self.to_bool()
+        self.to_bool() == Some(false)
     }
 }
 
@@ -29,7 +29,7 @@ mod test {
         let value = value_of!(true);
         assert!(value.is_bool());
         assert!(value.is_true());
-        assert!(value.to_bool());
+        assert_eq!(value.to_bool(), Some(true));
     }
 
     #[test]
@@ -37,6 +37,6 @@ mod test {
         let value = value_of!(false);
         assert!(value.is_bool());
         assert!(value.is_false());
-        assert!(!value.to_bool());
+        assert_eq!(value.to_bool(), Some(false));
     }
 }

@@ -10,7 +10,7 @@ pub fn build(item: &syn::ItemImpl) -> proc_macro2::TokenStream {
 
     match &impl_trait {
         None => quote! {
-            ::nova_reflect::Impl::new()
+            ::nova_reflect::implement()
                 .path(::nova_reflect::Path::from(module_path!()))
                 .ty(::nova_reflect::type_of!(#impl_for))
                 .meta(#impl_meta)
@@ -18,7 +18,7 @@ pub fn build(item: &syn::ItemImpl) -> proc_macro2::TokenStream {
                 .build()
         },
         Some(of) => quote! {
-            ::nova_reflect::Impl::new()
+            ::nova_reflect::implement()
                 .path(::nova_reflect::Path::from(module_path!()))
                 .ty(::nova_reflect::type_of!(#impl_for))
                 .meta(#impl_meta)

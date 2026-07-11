@@ -181,14 +181,14 @@ pub fn build(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
     };
 
     quote! {
-        ::nova_reflect::StructType::new()
+        ::nova_reflect::struct_type()
             .path(::nova_reflect::Path::from(module_path!()))
             .name(stringify!(#name))
             .visibility(#vis)
             .meta(#meta)
             .generics(#generics)
             .fields(
-                ::nova_reflect::Fields::new()
+                ::nova_reflect::fields()
                     .layout(#layout)
                     .fields([#(#fields,)*])
                     .build()

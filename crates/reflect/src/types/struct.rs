@@ -14,11 +14,6 @@ pub struct StructType {
 }
 
 impl StructType {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::StructTypeBuilder {
-        crate::StructTypeBuilder::new()
-    }
-
     pub fn to_type(&self) -> crate::Type {
         crate::Type::Struct(std::sync::Arc::new(self.clone()))
     }

@@ -49,7 +49,7 @@ pub fn build_type(param: &syn::TypeParam) -> proc_macro2::TokenStream {
     }
 
     let tokens = quote! {
-        ::nova_reflect::TypeParam::new()
+        ::nova_reflect::type_param()
             .name(stringify!(#name))
             .bounds([#(#bounds.to_bound(),)*])
     };

@@ -15,7 +15,7 @@ pub fn build(field: &syn::Field, index: usize, is_named: bool) -> proc_macro2::T
     let field_meta = reflect_meta::build(&field.attrs);
 
     quote! {
-        ::nova_reflect::Field::new()
+        ::nova_reflect::field()
             .name(#field_name)
             .ty(::nova_reflect::type_of!(#field_type))
             .visibility(#field_vis)

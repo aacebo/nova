@@ -14,11 +14,6 @@ pub struct TraitType {
 }
 
 impl TraitType {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> crate::TraitTypeBuilder {
-        crate::TraitTypeBuilder::new()
-    }
-
     pub fn to_type(&self) -> crate::Type {
         crate::Type::Trait(std::sync::Arc::new(self.clone()))
     }

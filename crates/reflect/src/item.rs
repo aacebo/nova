@@ -21,17 +21,17 @@ impl Item {
         matches!(self, Self::Impl(_))
     }
 
-    pub fn to_type(&self) -> crate::Type {
+    pub fn to_type(&self) -> Option<crate::Type> {
         match self {
-            Self::Type(v) => v.clone(),
-            _ => panic!("called 'to_type' on '{}'", self.id()),
+            Self::Type(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
-    pub fn to_impl(&self) -> crate::Impl {
+    pub fn to_impl(&self) -> Option<crate::Impl> {
         match self {
-            Self::Impl(v) => v.clone(),
-            _ => panic!("called 'to_impl' on '{}'", self.id()),
+            Self::Impl(v) => Some(v.clone()),
+            _ => None,
         }
     }
 }

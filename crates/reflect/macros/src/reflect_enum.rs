@@ -203,7 +203,7 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
 
             match &variant.fields {
                 syn::Fields::Unit => quote! {
-                    ::nova_reflect::Variant::new()
+                    ::nova_reflect::variant()
                         .name(stringify!(#variant_name))
                         .build()
                 },
@@ -216,11 +216,11 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
                         .collect::<Vec<_>>();
 
                     quote! {
-                        ::nova_reflect::Variant::new()
+                        ::nova_reflect::variant()
                             .name(stringify!(#variant_name))
                             .meta(#variant_meta)
                             .fields(
-                                ::nova_reflect::Fields::new()
+                                ::nova_reflect::fields()
                                     .layout(::nova_reflect::Layout::Key)
                                     .fields([#(#fields,)*])
                                     .build()
@@ -237,11 +237,11 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
                         .collect::<Vec<_>>();
 
                     quote! {
-                        ::nova_reflect::Variant::new()
+                        ::nova_reflect::variant()
                             .name(stringify!(#variant_name))
                             .meta(#variant_meta)
                             .fields(
-                                ::nova_reflect::Fields::new()
+                                ::nova_reflect::fields()
                                     .layout(::nova_reflect::Layout::Index)
                                     .fields([#(#fields,)*])
                                     .build()
@@ -254,7 +254,7 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
         .collect::<Vec<_>>();
 
     quote! {
-        ::nova_reflect::EnumType::new()
+        ::nova_reflect::enum_type()
             .path(::nova_reflect::Path::from(module_path!()))
             .name(stringify!(#name))
             .meta(#meta)
