@@ -1,10 +1,14 @@
+pub fn mod_type() -> crate::ModTypeBuilder {
+    crate::ModTypeBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ModType {
-    pub(crate) path: crate::Path,
-    pub(crate) meta: crate::MetaData,
-    pub(crate) vis: crate::Visibility,
-    pub(crate) items: Vec<crate::Item>,
+    pub path: crate::Path,
+    pub meta: crate::MetaData,
+    pub vis: crate::Visibility,
+    pub items: Vec<crate::Item>,
 }
 
 impl ModType {
@@ -14,7 +18,7 @@ impl ModType {
     }
 
     pub fn to_type(&self) -> crate::Type {
-        crate::Type::Mod(std::rc::Rc::new(self.clone()))
+        crate::Type::Mod(std::sync::Arc::new(self.clone()))
     }
 
     pub fn id(&self) -> crate::TypeId {
@@ -56,7 +60,7 @@ impl ModType {
 
 impl crate::ToType for ModType {
     fn to_type(&self) -> crate::Type {
-        crate::Type::Mod(std::rc::Rc::new(self.clone()))
+        crate::Type::Mod(std::sync::Arc::new(self.clone()))
     }
 }
 
@@ -98,6 +102,7 @@ impl std::fmt::Display for ModType {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct ModTypeBuilder(crate::ModType);
 
 impl Default for ModTypeBuilder {

@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
-pub struct MutType(pub(crate) std::rc::Rc<crate::Type>);
+pub struct MutType(pub std::sync::Arc<crate::Type>);
 
 impl MutType {
     pub fn new(ty: crate::Type) -> Self {
-        Self(std::rc::Rc::new(ty))
+        Self(std::sync::Arc::new(ty))
     }
 
     pub fn to_type(&self) -> crate::Type {

@@ -1,9 +1,13 @@
+pub fn type_param() -> crate::TypeParamBuilder {
+    crate::TypeParamBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TypeParam {
-    pub(crate) name: String,
-    pub(crate) default: Option<crate::Type>,
-    pub(crate) bounds: Vec<crate::Bound>,
+    pub name: String,
+    pub default: Option<crate::Type>,
+    pub bounds: Vec<crate::Bound>,
 }
 
 impl TypeParam {
@@ -60,6 +64,7 @@ impl std::fmt::Display for TypeParam {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct TypeParamBuilder(crate::TypeParam);
 
 impl Default for TypeParamBuilder {

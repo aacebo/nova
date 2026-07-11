@@ -2,30 +2,11 @@
 ///
 /// implemented by types that can reflect their value/type
 /// and the values of their individual elements
-pub trait Sequence: std::fmt::Debug + crate::ToType {
+pub trait Sequence: std::fmt::Debug + Send + Sync + crate::ToType {
     fn len(&self) -> usize;
     fn index(&self, i: usize) -> crate::Value<'_>;
     fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for dyn Sequence {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeSeq;
-
-        let ty = self.to_type().to_slice();
-        let mut ser = serializer.serialize_seq(ty.capacity())?;
-
-        for i in 0..self.len() {
-            ser.serialize_element(&self.index(i))?;
-        }
-
-        ser.end()
     }
 }
 
@@ -47,7 +28,7 @@ where
 {
     fn type_of() -> crate::Type {
         crate::Type::Slice(crate::SliceType {
-            ty: std::rc::Rc::new(T::type_of()),
+            ty: std::sync::Arc::new(T::type_of()),
             capacity: None,
         })
     }
@@ -64,7 +45,7 @@ where
 
 impl<T> crate::ToValue for Vec<T>
 where
-    T: std::fmt::Debug + crate::TypeOf + crate::ToValue + 'static,
+    T: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
     fn to_value(&self) -> crate::Value<'_> {
         crate::Value::Dynamic(crate::Dynamic::from_sequence(self))
@@ -73,7 +54,7 @@ where
 
 impl<T> crate::Sequence for Vec<T>
 where
-    T: std::fmt::Debug + crate::TypeOf + crate::ToValue + 'static,
+    T: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
     fn len(&self) -> usize {
         self.len()
@@ -89,7 +70,7 @@ where
 
 impl<const N: usize, T> crate::Sequence for [T; N]
 where
-    T: std::fmt::Debug + crate::TypeOf + crate::ToValue + 'static,
+    T: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
     fn len(&self) -> usize {
         N
@@ -105,7 +86,7 @@ where
 
 impl<const N: usize, T> crate::ToValue for [T; N]
 where
-    T: std::fmt::Debug + crate::TypeOf + crate::ToValue + 'static,
+    T: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
     fn to_value(&self) -> crate::Value<'_> {
         crate::Value::Dynamic(crate::Dynamic::from_sequence(self))

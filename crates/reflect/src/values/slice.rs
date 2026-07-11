@@ -3,7 +3,7 @@ impl<'a> crate::ToType for &'a [crate::Value<'a>] {
         let elem = self.first().map(crate::ToType::to_type).unwrap_or(crate::Type::Any);
 
         crate::Type::Slice(crate::SliceType {
-            ty: std::rc::Rc::new(elem),
+            ty: std::sync::Arc::new(elem),
             capacity: None,
         })
     }

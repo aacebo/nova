@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SliceType {
-    pub(crate) ty: std::rc::Rc<crate::Type>,
-    pub(crate) capacity: Option<usize>,
+    pub ty: std::sync::Arc<crate::Type>,
+    pub capacity: Option<usize>,
 }
 
 impl SliceType {
@@ -69,7 +69,7 @@ where
         let ty = T::type_of();
 
         crate::Type::Slice(SliceType {
-            ty: std::rc::Rc::new(ty),
+            ty: std::sync::Arc::new(ty),
             capacity: Some(N),
         })
     }
@@ -83,7 +83,7 @@ where
         let ty = T::type_of();
 
         crate::Type::Slice(SliceType {
-            ty: std::rc::Rc::new(ty),
+            ty: std::sync::Arc::new(ty),
             capacity: None,
         })
     }
@@ -97,7 +97,7 @@ where
         let ty = T::type_of();
 
         crate::Type::Slice(SliceType {
-            ty: std::rc::Rc::new(ty),
+            ty: std::sync::Arc::new(ty),
             capacity: Some(N),
         })
     }
@@ -111,7 +111,7 @@ where
         let ty = T::type_of();
 
         crate::Type::Slice(SliceType {
-            ty: std::rc::Rc::new(ty),
+            ty: std::sync::Arc::new(ty),
             capacity: None,
         })
     }

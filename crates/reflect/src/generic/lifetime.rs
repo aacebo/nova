@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LifetimeParam {
-    pub(crate) name: String,
-    pub(crate) bounds: Vec<crate::LifetimeBound>,
+    pub name: String,
+    pub bounds: Vec<crate::LifetimeBound>,
 }
 
 impl LifetimeParam {

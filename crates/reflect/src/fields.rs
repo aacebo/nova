@@ -1,10 +1,14 @@
 use crate::{Field, FieldName};
 
+pub fn fields() -> crate::FieldsBuilder {
+    crate::FieldsBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Fields {
-    pub(crate) layout: crate::Layout,
-    pub(crate) fields: Vec<Field>,
+    pub layout: crate::Layout,
+    pub fields: Vec<Field>,
 }
 
 impl Fields {
@@ -142,6 +146,7 @@ impl std::fmt::Display for Fields {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct FieldsBuilder(crate::Fields);
 
 impl Default for FieldsBuilder {

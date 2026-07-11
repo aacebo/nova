@@ -1,12 +1,16 @@
+pub fn enum_type() -> crate::EnumTypeBuilder {
+    crate::EnumTypeBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EnumType {
-    pub(crate) path: crate::Path,
-    pub(crate) meta: crate::MetaData,
-    pub(crate) vis: crate::Visibility,
-    pub(crate) name: String,
-    pub(crate) generics: crate::Generics,
-    pub(crate) variants: Vec<crate::Variant>,
+    pub path: crate::Path,
+    pub meta: crate::MetaData,
+    pub vis: crate::Visibility,
+    pub name: String,
+    pub generics: crate::Generics,
+    pub variants: Vec<crate::Variant>,
 }
 
 impl EnumType {
@@ -16,7 +20,7 @@ impl EnumType {
     }
 
     pub fn to_type(&self) -> crate::Type {
-        crate::Type::Enum(std::rc::Rc::new(self.clone()))
+        crate::Type::Enum(std::sync::Arc::new(self.clone()))
     }
 
     pub fn id(&self) -> crate::TypeId {
@@ -78,7 +82,7 @@ impl EnumType {
 
 impl crate::ToType for EnumType {
     fn to_type(&self) -> crate::Type {
-        crate::Type::Enum(std::rc::Rc::new(self.clone()))
+        crate::Type::Enum(std::sync::Arc::new(self.clone()))
     }
 }
 
@@ -106,6 +110,7 @@ impl std::fmt::Display for EnumType {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct EnumTypeBuilder(crate::EnumType);
 
 impl Default for EnumTypeBuilder {

@@ -8,7 +8,7 @@ pub use r#type::*;
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Generics(pub(crate) Vec<Generic>);
+pub struct Generics(pub Vec<Generic>);
 
 impl Default for Generics {
     fn default() -> Self {

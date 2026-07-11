@@ -24,8 +24,8 @@ macro_rules! btree_map {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Map<'a> {
-    pub(crate) ty: crate::MapType,
-    pub(crate) data: std::collections::BTreeMap<crate::Value<'a>, crate::Value<'a>>,
+    pub ty: crate::MapType,
+    pub data: std::collections::BTreeMap<crate::Value<'a>, crate::Value<'a>>,
 }
 
 impl<'a> Map<'a> {
@@ -37,7 +37,7 @@ impl<'a> Map<'a> {
     }
 
     pub fn to_type(&self) -> crate::Type {
-        crate::Type::Map(std::rc::Rc::new(self.ty.clone()))
+        crate::Type::Map(std::sync::Arc::new(self.ty.clone()))
     }
 
     pub fn iter(&self) -> std::collections::btree_map::Iter<'_, crate::Value<'a>, crate::Value<'a>> {
@@ -92,7 +92,7 @@ impl<'a> serde::Serialize for Map<'a> {
 
 impl<'a> crate::ToType for Map<'a> {
     fn to_type(&self) -> crate::Type {
-        crate::Type::Map(std::rc::Rc::new(self.ty.clone()))
+        crate::Type::Map(std::sync::Arc::new(self.ty.clone()))
     }
 }
 

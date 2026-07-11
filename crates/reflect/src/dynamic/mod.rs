@@ -1,7 +1,9 @@
+mod callable;
 mod r#dyn;
 mod object;
 mod sequence;
 
+pub use callable::*;
 pub use r#dyn::*;
 pub use object::*;
 pub use sequence::*;
@@ -11,6 +13,7 @@ pub enum Dynamic<'a> {
     Dyn(&'a (dyn crate::Dyn + 'a)),
     Object(&'a (dyn crate::Object + 'a)),
     Sequence(&'a (dyn crate::Sequence + 'a)),
+    Callable(&'a (dyn crate::Callable + 'a)),
 }
 
 impl<'a> Dynamic<'a> {
@@ -26,11 +29,23 @@ impl<'a> Dynamic<'a> {
         Self::Sequence(value)
     }
 
+    pub fn from_callable<T: crate::Callable + 'a>(value: &'a T) -> Self {
+        Self::Callable(value)
+    }
+
     pub fn to_type(&self) -> crate::Type {
         match self {
             Self::Dyn(v) => v.to_type(),
             Self::Object(v) => v.to_type(),
             Self::Sequence(v) => v.to_type(),
+            Self::Callable(v) => v.to_type(),
+        }
+    }
+
+    pub fn call(&self, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+        match self {
+            Self::Callable(v) => v.call(args),
+            v => panic!("called 'call' on '{}'", v.to_type()),
         }
     }
 
@@ -53,6 +68,10 @@ impl<'a> Dynamic<'a> {
         matches!(self, Self::Sequence(_))
     }
 
+    pub fn is_callable(&self) -> bool {
+        matches!(self, Self::Callable(_))
+    }
+
     pub fn as_object(&self) -> Option<&(dyn crate::Object + 'a)> {
         match self {
             Self::Object(v) => Some(*v),
@@ -63,6 +82,13 @@ impl<'a> Dynamic<'a> {
     pub fn as_sequence(&self) -> Option<&(dyn crate::Sequence + 'a)> {
         match self {
             Self::Sequence(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub fn as_callable(&self) -> Option<&(dyn crate::Callable + 'a)> {
+        match self {
+            Self::Callable(v) => Some(*v),
             _ => None,
         }
     }
@@ -80,6 +106,7 @@ impl<'a> crate::ToType for Dynamic<'a> {
             Self::Dyn(v) => v.to_type(),
             Self::Object(v) => v.to_type(),
             Self::Sequence(v) => v.to_type(),
+            Self::Callable(v) => v.to_type(),
         }
     }
 }
@@ -115,6 +142,15 @@ impl<'a> crate::Sequence for Dynamic<'a> {
     }
 }
 
+impl<'a> crate::Callable for Dynamic<'a> {
+    fn call(&self, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+        match self {
+            Self::Callable(v) => v.call(args),
+            v => panic!("called 'call' on '{}'", v.to_type()),
+        }
+    }
+}
+
 impl<'a> std::fmt::Display for Dynamic<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ty = self.to_type();
@@ -129,8 +165,9 @@ impl<'a> serde::Serialize for Dynamic<'a> {
         S: serde::Serializer,
     {
         use serde::ser::SerializeMap;
+
         match self {
-            Self::Dyn(_) => serializer.serialize_none(),
+            Self::Dyn(_) | Self::Callable(_) => serializer.serialize_none(),
             Self::Object(v) => {
                 let ty = v.to_type().to_struct();
                 let mut ser = serializer.serialize_map(Some(ty.len()))?;
@@ -138,6 +175,7 @@ impl<'a> serde::Serialize for Dynamic<'a> {
                 for field in ty.fields().iter() {
                     ser.serialize_entry(&field.name().to_string(), &v.field(field.name()))?;
                 }
+
                 ser.end()
             }
             Self::Sequence(v) => {
@@ -148,6 +186,7 @@ impl<'a> serde::Serialize for Dynamic<'a> {
                 for i in 0..v.len() {
                     ser.serialize_element(&v.index(i))?;
                 }
+
                 ser.end()
             }
         }

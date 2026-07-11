@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ref<'a> {
-    pub(crate) ty: crate::RefType,
-    pub(crate) value: &'a crate::Value<'a>,
+    pub ty: crate::RefType,
+    pub value: &'a crate::Value<'a>,
 }
 
 impl<'a> Ref<'a> {

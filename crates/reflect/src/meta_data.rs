@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
-pub struct MetaData(BTreeMap<String, Rc<crate::Value<'static>>>);
+pub struct MetaData(BTreeMap<String, Arc<crate::Value<'static>>>);
 
 impl MetaData {
     pub fn new() -> Self {
@@ -18,7 +18,7 @@ impl MetaData {
         self.0.is_empty()
     }
 
-    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, String, Rc<crate::Value<'static>>> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, String, Arc<crate::Value<'static>>> {
         self.0.iter()
     }
 
@@ -27,7 +27,7 @@ impl MetaData {
     }
 
     pub fn get(&self, key: &str) -> Option<&crate::Value<'static>> {
-        self.0.get(key).map(Rc::as_ref)
+        self.0.get(key).map(Arc::as_ref)
     }
 
     pub fn merge(mut self, other: &Self) -> Self {
@@ -45,7 +45,7 @@ impl<const N: usize, V: crate::ToValue + 'static> From<[(&str, V); N]> for MetaD
 
         for (key, value) in items {
             let v: &'static V = Box::leak(Box::new(value));
-            data.insert(key.to_string(), Rc::new(v.to_value()));
+            data.insert(key.to_string(), Arc::new(v.to_value()));
         }
 
         Self(data)

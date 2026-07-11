@@ -1,22 +1,22 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MapType {
-    pub(crate) ty: std::rc::Rc<crate::Type>,
-    pub(crate) key: std::rc::Rc<crate::Type>,
-    pub(crate) value: std::rc::Rc<crate::Type>,
+    pub ty: std::sync::Arc<crate::Type>,
+    pub key: std::sync::Arc<crate::Type>,
+    pub value: std::sync::Arc<crate::Type>,
 }
 
 impl MapType {
     pub fn new(ty: crate::Type, key: crate::Type, value: crate::Type) -> Self {
         Self {
-            ty: std::rc::Rc::new(ty),
-            key: std::rc::Rc::new(key),
-            value: std::rc::Rc::new(value),
+            ty: std::sync::Arc::new(ty),
+            key: std::sync::Arc::new(key),
+            value: std::sync::Arc::new(value),
         }
     }
 
     pub fn to_type(&self) -> crate::Type {
-        crate::Type::Map(std::rc::Rc::new(self.clone()))
+        crate::Type::Map(std::sync::Arc::new(self.clone()))
     }
 
     pub fn id(&self) -> crate::TypeId {
@@ -62,7 +62,7 @@ impl std::fmt::Display for MapType {
 
 impl crate::ToType for MapType {
     fn to_type(&self) -> crate::Type {
-        crate::Type::Map(std::rc::Rc::new(self.clone()))
+        crate::Type::Map(std::sync::Arc::new(self.clone()))
     }
 }
 

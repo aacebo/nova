@@ -1,9 +1,13 @@
+pub fn variant() -> crate::VariantBuilder {
+    crate::VariantBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Variant {
-    pub(crate) meta: crate::MetaData,
-    pub(crate) name: String,
-    pub(crate) fields: crate::Fields,
+    pub meta: crate::MetaData,
+    pub name: String,
+    pub fields: crate::Fields,
 }
 
 impl Variant {
@@ -43,6 +47,7 @@ impl std::fmt::Display for Variant {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct VariantBuilder(crate::Variant);
 
 impl Default for VariantBuilder {

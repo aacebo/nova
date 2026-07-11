@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LifetimeBound {
-    pub(crate) name: String,
+    pub name: String,
 }
 
 impl LifetimeBound {

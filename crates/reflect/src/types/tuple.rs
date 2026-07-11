@@ -48,7 +48,7 @@ macro_rules! tuple {
                 };
             }
 
-            pub fn get(&self) -> &[std::rc::Rc<crate::Type>] {
+            pub fn get(&self) -> &[std::sync::Arc<crate::Type>] {
                 return match self {
                     $(Self::$name(v) => v.get_ref(),)*
                 };
@@ -66,7 +66,7 @@ macro_rules! tuple {
 
         impl crate::ToType for TupleType {
             fn to_type(&self) -> crate::Type {
-                return crate::Type::Tuple(std::rc::Rc::new(self.clone()));
+                return crate::Type::Tuple(std::sync::Arc::new(self.clone()));
             }
         }
 
@@ -91,10 +91,10 @@ macro_rules! tuple {
         $(
             #[derive(Debug, Clone, PartialEq)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
-            pub struct $type_name([std::rc::Rc<crate::Type>; $len]);
+            pub struct $type_name([std::sync::Arc<crate::Type>; $len]);
 
             impl $type_name {
-                pub fn new(types: [std::rc::Rc<crate::Type>; $len]) -> Self {
+                pub fn new(types: [std::sync::Arc<crate::Type>; $len]) -> Self {
                     return Self(types);
                 }
 
@@ -128,18 +128,18 @@ macro_rules! tuple {
                     return ty.is_tuple();
                 }
 
-                pub fn get(&self) -> [std::rc::Rc<crate::Type>; $len] {
+                pub fn get(&self) -> [std::sync::Arc<crate::Type>; $len] {
                     return self.0.clone();
                 }
 
-                pub fn get_ref(&self) -> &[std::rc::Rc<crate::Type>] {
+                pub fn get_ref(&self) -> &[std::sync::Arc<crate::Type>] {
                     return &self.0;
                 }
             }
 
             impl crate::ToType for $type_name {
                 fn to_type(&self) -> crate::Type {
-                    return crate::Type::Tuple(std::rc::Rc::new(crate::TupleType::$name(self.clone())));
+                    return crate::Type::Tuple(std::sync::Arc::new(crate::TupleType::$name(self.clone())));
                 }
             }
 
@@ -166,7 +166,7 @@ where
     B: crate::TypeOf,
 {
     fn type_of() -> crate::Type {
-        T2Type::new([std::rc::Rc::new(A::type_of()), std::rc::Rc::new(B::type_of())]).to_type()
+        T2Type::new([std::sync::Arc::new(A::type_of()), std::sync::Arc::new(B::type_of())]).to_type()
     }
 }
 
@@ -176,14 +176,14 @@ where
     B: Clone + crate::ToType + crate::ToValue + 'static,
 {
     fn to_type(&self) -> crate::Type {
-        T2Type::new([std::rc::Rc::new(self.0.to_type()), std::rc::Rc::new(self.1.to_type())]).to_type()
+        T2Type::new([std::sync::Arc::new(self.0.to_type()), std::sync::Arc::new(self.1.to_type())]).to_type()
     }
 }
 
 impl<A, B> crate::ToValue for (A, B)
 where
-    A: Clone + std::fmt::Debug + crate::ToType + crate::ToValue + 'static,
-    B: Clone + std::fmt::Debug + crate::ToType + crate::ToValue + 'static,
+    A: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
+    B: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
 {
     fn to_value(&self) -> crate::Value<'_> {
         crate::Value::Dynamic(crate::Dynamic::from_object(self))
@@ -192,8 +192,8 @@ where
 
 impl<A, B> crate::Object for (A, B)
 where
-    A: Clone + std::fmt::Debug + crate::ToType + crate::ToValue + 'static,
-    B: Clone + std::fmt::Debug + crate::ToType + crate::ToValue + 'static,
+    A: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
+    B: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
 {
     fn field(&self, name: &crate::FieldName) -> crate::Value<'_> {
         match name.to_string().as_str() {
@@ -212,9 +212,9 @@ where
 {
     fn type_of() -> crate::Type {
         T3Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
         ])
         .to_type()
     }
@@ -228,9 +228,9 @@ where
 {
     fn to_type(&self) -> crate::Type {
         T3Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
         ])
         .to_type()
     }
@@ -245,10 +245,10 @@ where
 {
     fn type_of() -> crate::Type {
         T4Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
         ])
         .to_type()
     }
@@ -263,10 +263,10 @@ where
 {
     fn to_type(&self) -> crate::Type {
         T4Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
         ])
         .to_type()
     }
@@ -282,11 +282,11 @@ where
 {
     fn type_of() -> crate::Type {
         T5Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
-            std::rc::Rc::new(E::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
+            std::sync::Arc::new(E::type_of()),
         ])
         .to_type()
     }
@@ -302,11 +302,11 @@ where
 {
     fn to_type(&self) -> crate::Type {
         T5Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
-            std::rc::Rc::new(E::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
+            std::sync::Arc::new(E::type_of()),
         ])
         .to_type()
     }
@@ -323,12 +323,12 @@ where
 {
     fn type_of() -> crate::Type {
         T6Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
-            std::rc::Rc::new(E::type_of()),
-            std::rc::Rc::new(F::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
+            std::sync::Arc::new(E::type_of()),
+            std::sync::Arc::new(F::type_of()),
         ])
         .to_type()
     }
@@ -345,12 +345,12 @@ where
 {
     fn to_type(&self) -> crate::Type {
         T6Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
-            std::rc::Rc::new(E::type_of()),
-            std::rc::Rc::new(F::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
+            std::sync::Arc::new(E::type_of()),
+            std::sync::Arc::new(F::type_of()),
         ])
         .to_type()
     }
@@ -368,13 +368,13 @@ where
 {
     fn type_of() -> crate::Type {
         T7Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
-            std::rc::Rc::new(E::type_of()),
-            std::rc::Rc::new(F::type_of()),
-            std::rc::Rc::new(G::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
+            std::sync::Arc::new(E::type_of()),
+            std::sync::Arc::new(F::type_of()),
+            std::sync::Arc::new(G::type_of()),
         ])
         .to_type()
     }
@@ -392,13 +392,13 @@ where
 {
     fn to_type(&self) -> crate::Type {
         T7Type::new([
-            std::rc::Rc::new(A::type_of()),
-            std::rc::Rc::new(B::type_of()),
-            std::rc::Rc::new(C::type_of()),
-            std::rc::Rc::new(D::type_of()),
-            std::rc::Rc::new(E::type_of()),
-            std::rc::Rc::new(F::type_of()),
-            std::rc::Rc::new(G::type_of()),
+            std::sync::Arc::new(A::type_of()),
+            std::sync::Arc::new(B::type_of()),
+            std::sync::Arc::new(C::type_of()),
+            std::sync::Arc::new(D::type_of()),
+            std::sync::Arc::new(E::type_of()),
+            std::sync::Arc::new(F::type_of()),
+            std::sync::Arc::new(G::type_of()),
         ])
         .to_type()
     }

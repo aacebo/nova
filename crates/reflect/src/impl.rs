@@ -1,12 +1,16 @@
+pub fn implement() -> crate::ImplBuilder {
+    crate::ImplBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Impl {
-    pub(crate) path: crate::Path,
-    pub(crate) meta: crate::MetaData,
-    pub(crate) of_trait: Option<crate::Path>,
-    pub(crate) self_ty: crate::Type,
-    pub(crate) generics: crate::Generics,
-    pub(crate) methods: Vec<crate::Method>,
+    pub path: crate::Path,
+    pub meta: crate::MetaData,
+    pub of_trait: Option<crate::Path>,
+    pub self_ty: crate::Type,
+    pub generics: crate::Generics,
+    pub methods: Vec<crate::Method>,
 }
 
 impl Impl {
@@ -99,6 +103,7 @@ impl std::fmt::Display for Impl {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct ImplBuilder(crate::Impl);
 
 impl Default for ImplBuilder {

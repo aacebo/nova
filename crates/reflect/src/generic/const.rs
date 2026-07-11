@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConstParam {
-    pub(crate) name: String,
-    pub(crate) ty: crate::Type,
-    pub(crate) default: Option<crate::Value<'static>>,
+    pub name: String,
+    pub ty: crate::Type,
+    pub default: Option<crate::Value<'static>>,
 }
 
 impl ConstParam {

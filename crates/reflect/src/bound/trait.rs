@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TraitBound {
-    pub(crate) path: crate::Path,
-    pub(crate) modifier: TraitBoundModifier,
+    pub path: crate::Path,
+    pub modifier: TraitBoundModifier,
 }
 
 impl TraitBound {

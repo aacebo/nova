@@ -2313,6 +2313,7 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "dhat",
+ "minijinja",
  "nova-reflect-macros",
  "serde",
  "serde_json",

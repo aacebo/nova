@@ -56,3 +56,8 @@ pub mod values;
 #[cfg(feature = "macros")]
 pub use nova_reflect_macros::*;
 pub use values::*;
+
+#[cfg(feature = "minijinja")]
+impl<'a> minijinja::value::Object for Value<'a> {
+
+}

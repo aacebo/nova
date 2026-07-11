@@ -1,12 +1,16 @@
+pub fn trait_type() -> crate::TraitTypeBuilder {
+    crate::TraitTypeBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitType {
-    pub(crate) path: crate::Path,
-    pub(crate) meta: crate::MetaData,
-    pub(crate) vis: crate::Visibility,
-    pub(crate) name: String,
-    pub(crate) generics: crate::Generics,
-    pub(crate) methods: Vec<crate::Method>,
+    pub path: crate::Path,
+    pub meta: crate::MetaData,
+    pub vis: crate::Visibility,
+    pub name: String,
+    pub generics: crate::Generics,
+    pub methods: Vec<crate::Method>,
 }
 
 impl TraitType {
@@ -16,7 +20,7 @@ impl TraitType {
     }
 
     pub fn to_type(&self) -> crate::Type {
-        crate::Type::Trait(std::rc::Rc::new(self.clone()))
+        crate::Type::Trait(std::sync::Arc::new(self.clone()))
     }
 
     pub fn id(&self) -> crate::TypeId {
@@ -84,7 +88,7 @@ impl TraitType {
 
 impl crate::ToType for TraitType {
     fn to_type(&self) -> crate::Type {
-        crate::Type::Trait(std::rc::Rc::new(self.clone()))
+        crate::Type::Trait(std::sync::Arc::new(self.clone()))
     }
 }
 
@@ -152,6 +156,7 @@ impl std::fmt::Display for TraitType {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct TraitTypeBuilder(crate::TraitType);
 
 impl Default for TraitTypeBuilder {

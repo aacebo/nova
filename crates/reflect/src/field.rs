@@ -1,10 +1,14 @@
+pub fn field() -> crate::FieldBuilder {
+    crate::FieldBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Field {
-    pub(crate) meta: crate::MetaData,
-    pub(crate) vis: crate::Visibility,
-    pub(crate) name: FieldName,
-    pub(crate) ty: std::rc::Rc<crate::Type>,
+    pub meta: crate::MetaData,
+    pub vis: crate::Visibility,
+    pub name: FieldName,
+    pub ty: std::sync::Arc<crate::Type>,
 }
 
 impl Field {
@@ -150,6 +154,7 @@ impl std::fmt::Display for FieldName {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct FieldBuilder(crate::Field);
 
 impl Default for FieldBuilder {
@@ -164,7 +169,7 @@ impl FieldBuilder {
             meta: crate::MetaData::new(),
             vis: crate::Visibility::Private,
             name: crate::FieldName::from(""),
-            ty: std::rc::Rc::new(crate::Type::Any),
+            ty: std::sync::Arc::new(crate::Type::Any),
         })
     }
 
@@ -174,7 +179,7 @@ impl FieldBuilder {
     }
 
     pub fn ty(mut self, ty: crate::Type) -> Self {
-        self.0.ty = std::rc::Rc::new(ty);
+        self.0.ty = std::sync::Arc::new(ty);
         self
     }
 

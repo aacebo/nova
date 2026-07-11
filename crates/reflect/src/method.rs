@@ -1,15 +1,19 @@
 use crate::{Param, Visibility};
 
+pub fn method() -> crate::MethodBuilder {
+    crate::MethodBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Method {
-    pub(crate) meta: crate::MetaData,
-    pub(crate) is_async: bool,
-    pub(crate) vis: Visibility,
-    pub(crate) name: String,
-    pub(crate) generics: crate::Generics,
-    pub(crate) params: Vec<Param>,
-    pub(crate) return_type: std::rc::Rc<crate::Type>,
+    pub meta: crate::MetaData,
+    pub is_async: bool,
+    pub vis: Visibility,
+    pub name: String,
+    pub generics: crate::Generics,
+    pub params: Vec<Param>,
+    pub return_type: std::sync::Arc<crate::Type>,
 }
 
 impl Method {
@@ -93,6 +97,7 @@ impl std::fmt::Display for Method {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct MethodBuilder(crate::Method);
 
 impl Default for MethodBuilder {
@@ -110,7 +115,7 @@ impl MethodBuilder {
             name: String::from(""),
             generics: crate::Generics::new(),
             params: vec![],
-            return_type: std::rc::Rc::new(crate::Type::Void),
+            return_type: std::sync::Arc::new(crate::Type::Void),
         })
     }
 
@@ -150,7 +155,7 @@ impl MethodBuilder {
     }
 
     pub fn return_type(mut self, ty: crate::Type) -> Self {
-        self.0.return_type = std::rc::Rc::new(ty);
+        self.0.return_type = std::sync::Arc::new(ty);
         self
     }
 

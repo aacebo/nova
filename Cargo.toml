@@ -42,7 +42,8 @@ fs = ["dep:nova-fs"]
 codec = ["dep:nova-codec"]
 http = ["dep:nova-http"]
 macros = ["dep:nova-macros", "nova-reflect/macros"]
-reflect = ["dep:nova-reflect"]
+reflect = ["dep:nova-reflect", "nova-reflect/serde", "nova-reflect/minijinja"]
+json = ["nova-reflect/json"]
 
 [patch.crates-io]
 ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }

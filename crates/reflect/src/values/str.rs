@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct Str<'a>(pub(crate) &'a str);
+pub struct Str<'a>(pub &'a str);
 
 impl<'a> Str<'a> {
     pub fn to_type(&self) -> crate::Type {

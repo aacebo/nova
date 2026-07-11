@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mut<'a> {
-    pub(crate) ty: crate::MutType,
-    pub(crate) value: &'a crate::Value<'a>,
+    pub ty: crate::MutType,
+    pub value: &'a crate::Value<'a>,
 }
 
 impl<'a> Mut<'a> {

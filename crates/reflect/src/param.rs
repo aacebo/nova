@@ -1,15 +1,15 @@
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Param {
-    pub(crate) name: String,
-    pub(crate) ty: std::rc::Rc<crate::Type>,
+    pub name: String,
+    pub ty: std::sync::Arc<crate::Type>,
 }
 
 impl Param {
     pub fn new(name: &str, ty: crate::Type) -> Self {
         Self {
             name: name.to_string(),
-            ty: std::rc::Rc::new(ty),
+            ty: std::sync::Arc::new(ty),
         }
     }
 

@@ -1,12 +1,16 @@
+pub fn struct_type() -> crate::StructTypeBuilder {
+    crate::StructTypeBuilder::new()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StructType {
-    pub(crate) path: crate::Path,
-    pub(crate) meta: crate::MetaData,
-    pub(crate) vis: crate::Visibility,
-    pub(crate) name: String,
-    pub(crate) generics: crate::Generics,
-    pub(crate) fields: crate::Fields,
+    pub path: crate::Path,
+    pub meta: crate::MetaData,
+    pub vis: crate::Visibility,
+    pub name: String,
+    pub generics: crate::Generics,
+    pub fields: crate::Fields,
 }
 
 impl StructType {
@@ -16,7 +20,7 @@ impl StructType {
     }
 
     pub fn to_type(&self) -> crate::Type {
-        crate::Type::Struct(std::rc::Rc::new(self.clone()))
+        crate::Type::Struct(std::sync::Arc::new(self.clone()))
     }
 
     pub fn id(&self) -> crate::TypeId {
@@ -66,7 +70,7 @@ impl StructType {
 
 impl crate::ToType for StructType {
     fn to_type(&self) -> crate::Type {
-        crate::Type::Struct(std::rc::Rc::new(self.clone()))
+        crate::Type::Struct(std::sync::Arc::new(self.clone()))
     }
 }
 
@@ -84,6 +88,7 @@ impl std::fmt::Display for StructType {
 /// Builder
 ///
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct StructTypeBuilder(crate::StructType);
 
 impl Default for StructTypeBuilder {
