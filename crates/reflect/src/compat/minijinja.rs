@@ -28,38 +28,22 @@ impl ToValue for minijinja::Value {
     }
 }
 
-impl<'a> Object for Value<'a> {
+impl Object for Value<'static> {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
         match self.as_ref() {
             Value::Map(_) => ObjectRepr::Map,
-            Value::Dynamic(d) if d.is_object() => ObjectRepr::Map,
-            Value::Dynamic(d) if d.is_sequence() => ObjectRepr::Seq,
+            Value::Dynamic(d) => Arc::new(d.clone()).repr(),
             _ => ObjectRepr::Plain,
         }
     }
 
     fn get_value(self: &Arc<Self>, key: &minijinja::Value) -> Option<minijinja::Value> {
         match self.as_ref() {
-            Value::Map(m) => {
-                let k = key.to_value();
-                m.get(&k).map(minijinja::Value::from_serialize)
-            }
-            Value::Dynamic(d) => {
-                if let Some(obj) = d.as_object() {
-                    let name = field_name(key)?;
-                    Some(minijinja::Value::from_serialize(obj.field(&name)))
-                } else if let Some(seq) = d.as_sequence() {
-                    let i = key.as_usize()?;
-
-                    if i < seq.len() {
-                        Some(minijinja::Value::from_serialize(seq.index(i)))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
+            Value::Map(m) => match m.get(&key.to_value().into_owned())?.clone() {
+                Value::Dynamic(d) => Some(minijinja::Value::from_object(d)),
+                v => Some(minijinja::Value::from_serialize(v)),
+            },
+            Value::Dynamic(d) => Arc::new(d.clone()).get_value(key),
             Value::Ref(r) => Arc::new(r.value().clone()).get_value(key),
             Value::Mut(m) => Arc::new(m.value().clone()).get_value(key),
             _ => None,
@@ -72,20 +56,7 @@ impl<'a> Object for Value<'a> {
                 let keys: Vec<minijinja::Value> = m.keys().map(minijinja::Value::from_serialize).collect();
                 Enumerator::Values(keys)
             }
-            Value::Dynamic(d) if d.is_object() => {
-                let keys: Vec<minijinja::Value> = d
-                    .to_type()
-                    .to_struct()
-                    .map(|ty| {
-                        ty.fields()
-                            .iter()
-                            .map(|f| minijinja::Value::from(f.name().to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                Enumerator::Values(keys)
-            }
-            Value::Dynamic(d) if d.is_sequence() => Enumerator::Seq(d.len()),
+            Value::Dynamic(d) => Arc::new(d.clone()).enumerate(),
             _ => Enumerator::NonEnumerable,
         }
     }
@@ -93,8 +64,7 @@ impl<'a> Object for Value<'a> {
     fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
         match self.as_ref() {
             Value::Map(m) => Some(m.len()),
-            Value::Dynamic(d) if d.is_object() => d.to_type().to_struct().map(|t| t.len()),
-            Value::Dynamic(d) if d.is_sequence() => Some(d.len()),
+            Value::Dynamic(d) => Arc::new(d.clone()).enumerator_len(),
             _ => None,
         }
     }
@@ -103,13 +73,89 @@ impl<'a> Object for Value<'a> {
         write!(f, "{}", self.as_ref())
     }
 
-    fn call(self: &Arc<Self>, _state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, Error> {
-        let callable = match self.as_ref() {
-            Value::Dynamic(d) => d.as_callable(),
-            _ => None,
-        };
+    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, Error> {
+        match self.as_ref() {
+            Value::Dynamic(d) => Arc::new(d.clone()).call(state, args),
+            _ => Err(Error::new(ErrorKind::InvalidOperation, "object is not callable")),
+        }
+    }
+}
 
-        match callable {
+impl Object for crate::Dynamic<'static> {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        if self.is_object() {
+            ObjectRepr::Map
+        } else if self.is_sequence() {
+            ObjectRepr::Seq
+        } else {
+            ObjectRepr::Plain
+        }
+    }
+
+    fn get_value(self: &Arc<Self>, key: &minijinja::Value) -> Option<minijinja::Value> {
+        if let Some(obj) = self.as_object() {
+            let name = if let Some(v) = key.as_str() {
+                crate::FieldName::Key(v.to_string())
+            } else {
+                crate::FieldName::Index(key.as_usize()?)
+            };
+
+            match obj.field(&name) {
+                Value::Dynamic(d) => Some(minijinja::Value::from_object(d)),
+                v => Some(minijinja::Value::from_serialize(v)),
+            }
+        } else if let Some(seq) = self.as_sequence() {
+            let i = key.as_usize()?;
+
+            if i < seq.len() {
+                match seq.index(i) {
+                    Value::Dynamic(d) => Some(minijinja::Value::from_object(d)),
+                    v => Some(minijinja::Value::from_serialize(v)),
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        if self.is_object() {
+            let keys: Vec<minijinja::Value> = self
+                .to_type()
+                .to_struct()
+                .map(|ty| {
+                    ty.fields()
+                        .iter()
+                        .map(|f| minijinja::Value::from(f.name().to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            Enumerator::Values(keys)
+        } else if self.is_sequence() {
+            Enumerator::Seq(self.len())
+        } else {
+            Enumerator::NonEnumerable
+        }
+    }
+
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+        if self.is_object() {
+            self.to_type().to_struct().map(|t| t.len())
+        } else if self.is_sequence() {
+            Some(self.len())
+        } else {
+            None
+        }
+    }
+
+    fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_ref())
+    }
+
+    fn call(self: &Arc<Self>, _state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, Error> {
+        match self.as_callable() {
             Some(callable) => {
                 let args: Vec<Value> = args.iter().map(|a| a.to_value()).collect();
 
@@ -120,14 +166,6 @@ impl<'a> Object for Value<'a> {
             }
             None => Err(Error::new(ErrorKind::InvalidOperation, "object is not callable")),
         }
-    }
-}
-
-fn field_name(key: &minijinja::Value) -> Option<crate::FieldName> {
-    if let Some(v) = key.as_str() {
-        Some(crate::FieldName::Key(v.to_string()))
-    } else {
-        key.as_usize().map(crate::FieldName::Index)
     }
 }
 

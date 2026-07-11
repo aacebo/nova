@@ -154,8 +154,14 @@ fn renders_sequence_index_and_iteration() {
     assert_eq!(iterated, "10;20;30;");
 }
 
-#[derive(Debug)]
-struct Doubler;
+#[derive(Debug, Clone)]
+pub struct Doubler;
+
+impl nova_reflect::TypeOf for Doubler {
+    fn type_of() -> Type {
+        Type::Any
+    }
+}
 
 impl ToType for Doubler {
     fn to_type(&self) -> Type {
@@ -186,6 +192,34 @@ fn calls_callable_value() {
     let out = env.render_str("{{ f(21) }}", minijinja::context! { f => value }).unwrap();
 
     assert_eq!(out, "42");
+}
+
+impl ToValue for Doubler {
+    fn to_value(&self) -> Value<'_> {
+        Value::Dynamic(Dynamic::from_callable(self))
+    }
+}
+
+#[derive(Debug, Clone, Reflect)]
+pub struct Calculator {
+    pub name: String,
+    pub double: Doubler,
+}
+
+static CALCULATOR: std::sync::LazyLock<Calculator> = std::sync::LazyLock::new(|| Calculator {
+    name: String::from("alex"),
+    double: Doubler,
+});
+
+#[test]
+fn calls_function_stored_as_object_field() {
+    let env = Environment::new();
+    let value = minijinja::Value::from_object(CALCULATOR.to_value());
+    let out = env
+        .render_str("{{ v.name }}: {{ v.double(21) }}", minijinja::context! { v => value })
+        .unwrap();
+
+    assert_eq!(out, "alex: 42");
 }
 
 #[test]

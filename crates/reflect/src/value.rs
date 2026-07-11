@@ -16,6 +16,28 @@ pub enum Value<'a> {
 impl<'a> Value<'a> {
     pub const UNDEFINED: Value<'static> = Value::Undefined;
 
+    pub fn into_owned(self) -> Value<'static> {
+        match self {
+            Self::Bool(v) => Value::Bool(v),
+            Self::Number(v) => Value::Number(v),
+            Self::Str(v) => Value::Str(crate::Str(std::borrow::Cow::Owned(v.0.into_owned()))),
+            Self::Null => Value::Null,
+            Self::Undefined => Value::Undefined,
+            Self::Map(v) => {
+                let mut map = crate::Map::new(&v.ty);
+
+                for (k, val) in v.data {
+                    map.insert(k.into_owned(), val.into_owned());
+                }
+
+                Value::Map(map)
+            }
+            Self::Ref(v) => v.value.clone().into_owned(),
+            Self::Mut(v) => v.value.clone().into_owned(),
+            Self::Dynamic(_) => Value::Undefined,
+        }
+    }
+
     pub fn to_type(&self) -> crate::Type {
         match self {
             Self::Bool(v) => v.to_type(),

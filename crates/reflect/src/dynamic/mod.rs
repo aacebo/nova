@@ -72,21 +72,21 @@ impl<'a> Dynamic<'a> {
         matches!(self, Self::Callable(_))
     }
 
-    pub fn as_object(&self) -> Option<&(dyn crate::Object + 'a)> {
+    pub fn as_object(&self) -> Option<&'a (dyn crate::Object + 'a)> {
         match self {
             Self::Object(v) => Some(*v),
             _ => None,
         }
     }
 
-    pub fn as_sequence(&self) -> Option<&(dyn crate::Sequence + 'a)> {
+    pub fn as_sequence(&self) -> Option<&'a (dyn crate::Sequence + 'a)> {
         match self {
             Self::Sequence(v) => Some(*v),
             _ => None,
         }
     }
 
-    pub fn as_callable(&self) -> Option<&(dyn crate::Callable + 'a)> {
+    pub fn as_callable(&self) -> Option<&'a (dyn crate::Callable + 'a)> {
         match self {
             Self::Callable(v) => Some(*v),
             _ => None,
