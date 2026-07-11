@@ -10,20 +10,20 @@ pub fn build(item: &syn::ItemImpl) -> proc_macro2::TokenStream {
 
     match &impl_trait {
         None => quote! {
-            ::ayr_reflect::Impl::new()
-                .path(::ayr_reflect::Path::from(module_path!()))
-                .ty(::ayr_reflect::type_of!(#impl_for))
+            ::nova_reflect::Impl::new()
+                .path(::nova_reflect::Path::from(module_path!()))
+                .ty(::nova_reflect::type_of!(#impl_for))
                 .meta(#impl_meta)
                 .generics(#impl_generics)
                 .build()
         },
         Some(of) => quote! {
-            ::ayr_reflect::Impl::new()
-                .path(::ayr_reflect::Path::from(module_path!()))
-                .ty(::ayr_reflect::type_of!(#impl_for))
+            ::nova_reflect::Impl::new()
+                .path(::nova_reflect::Path::from(module_path!()))
+                .ty(::nova_reflect::type_of!(#impl_for))
                 .meta(#impl_meta)
                 .generics(#impl_generics)
-                .of(::ayr_reflect::Path::from(stringify!(#of)))
+                .of(::nova_reflect::Path::from(stringify!(#of)))
                 .build()
         },
     }

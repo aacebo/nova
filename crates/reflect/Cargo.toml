@@ -1,5 +1,5 @@
 [package]
-name = "ayr-reflect"
+name = "nova-reflect"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,19 +15,19 @@ doctest = false
 workspace = true
 
 [features]
-macros = ["ayr-reflect-macros"]
+macros = ["nova-reflect-macros"]
 serde = ["dep:serde"]
 
 [dependencies]
-serde = { workspace = true, features = ["derive", "rc"], optional = true }
-ayr-reflect-macros = { path = "./macros", optional = true }
+serde = { version = "1", features = ["derive", "rc"], optional = true }
+nova-reflect-macros = { path = "./macros", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 dhat = { version = "0.3" }
 serde_json = { version = "1" }
 valuable = { version = "0.1", features = ["derive"] }
-ayr-reflect-macros = { path = "./macros" }
+nova-reflect-macros = { path = "./macros" }
 
 [[bench]]
 name = "reflect_bench"

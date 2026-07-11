@@ -212,7 +212,7 @@ macro_rules! float {
 
         impl PartialEq<crate::Value<'_>> for crate::Float {
             fn eq(&self, other: &crate::Value) -> bool {
-                return other.is_float() && other.as_number().as_float() == self;
+                return other.as_number().and_then(|n| n.as_float()) == Some(self);
             }
         }
 

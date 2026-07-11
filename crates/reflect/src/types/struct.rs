@@ -20,7 +20,7 @@ impl StructType {
     }
 
     pub fn id(&self) -> crate::TypeId {
-        crate::TypeId::from_string(format!("{}::{}", &self.path, &self.name))
+        crate::TypeId::from_string(format!("{}::{}", self.path, self.name))
     }
 
     pub fn len(&self) -> usize {
@@ -73,10 +73,10 @@ impl crate::ToType for StructType {
 impl std::fmt::Display for StructType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.vis != crate::Visibility::Private {
-            write!(f, "{} ", &self.vis)?;
+            write!(f, "{} ", self.vis)?;
         }
 
-        write!(f, "struct {}{}{}", &self.name, &self.generics, &self.fields)
+        write!(f, "struct {}{}{}", self.name, self.generics, self.fields)
     }
 }
 

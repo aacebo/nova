@@ -88,7 +88,7 @@ macro_rules! float {
 
         impl PartialEq<crate::Type> for FloatType {
             fn eq(&self, other: &crate::Type) -> bool {
-                return other.is_float() && other.as_number().as_float() == self;
+                return other.as_float() == Some(self);
             }
         }
 

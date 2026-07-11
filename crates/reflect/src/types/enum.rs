@@ -20,7 +20,7 @@ impl EnumType {
     }
 
     pub fn id(&self) -> crate::TypeId {
-        crate::TypeId::from_string(format!("{}::{}", &self.path, &self.name))
+        crate::TypeId::from_string(format!("{}::{}", self.path, self.name))
     }
 
     pub fn len(&self) -> usize {
@@ -85,10 +85,10 @@ impl crate::ToType for EnumType {
 impl std::fmt::Display for EnumType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.vis != crate::Visibility::Private {
-            write!(f, "{} ", &self.vis)?;
+            write!(f, "{} ", self.vis)?;
         }
 
-        write!(f, "enum {}{} {{", &self.name, &self.generics)?;
+        write!(f, "enum {}{} {{", self.name, self.generics)?;
 
         for variant in &self.variants {
             write!(f, "\n\t{},", variant)?;

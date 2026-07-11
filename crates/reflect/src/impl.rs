@@ -75,13 +75,13 @@ impl Impl {
 
 impl std::fmt::Display for Impl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "impl{}", &self.generics)?;
+        write!(f, "impl{}", self.generics)?;
 
         if let Some(of) = &self.of_trait {
             write!(f, " {} for ", of.name())?;
         }
 
-        write!(f, " {} {{", &self.self_ty)?;
+        write!(f, " {} {{", self.self_ty)?;
 
         for method in &self.methods {
             write!(f, "\n\t{}", method)?;

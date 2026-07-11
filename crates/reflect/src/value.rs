@@ -77,44 +77,44 @@ impl<'a> Value<'a> {
         matches!(self, Self::Null)
     }
 
-    pub fn as_bool(&self) -> &bool {
+    pub fn as_bool(&self) -> Option<&bool> {
         match self {
-            Self::Bool(v) => v,
+            Self::Bool(v) => Some(v),
             Self::Ref(v) => v.as_bool(),
             Self::Mut(v) => v.as_bool(),
-            v => panic!("called 'as_bool' on '{}'", v.to_type()),
+            _ => None,
         }
     }
 
-    pub fn as_number(&self) -> &crate::Number {
+    pub fn as_number(&self) -> Option<&crate::Number> {
         match self {
-            Self::Number(v) => v,
+            Self::Number(v) => Some(v),
             Self::Ref(v) => v.as_number(),
             Self::Mut(v) => v.as_number(),
-            v => panic!("called 'as_number' on '{}'", v.to_type()),
+            _ => None,
         }
     }
 
-    pub fn as_str(&self) -> &crate::Str<'a> {
+    pub fn as_str(&self) -> Option<&crate::Str<'a>> {
         match self {
-            Self::Str(v) => v,
-            v => panic!("called 'as_str' on '{}'", v.to_type()),
+            Self::Str(v) => Some(v),
+            _ => None,
         }
     }
 
-    pub fn as_dynamic(&self) -> &crate::Dynamic<'a> {
+    pub fn as_dynamic(&self) -> Option<&crate::Dynamic<'a>> {
         match self {
-            Self::Dynamic(v) => v,
+            Self::Dynamic(v) => Some(v),
             Self::Ref(v) => v.as_dynamic(),
             Self::Mut(v) => v.as_dynamic(),
-            v => panic!("called 'as_dynamic' on '{}'", v.to_type()),
+            _ => None,
         }
     }
 
-    pub fn as_map(&self) -> &crate::Map<'a> {
+    pub fn as_map(&self) -> Option<&crate::Map<'a>> {
         match self {
-            Self::Map(v) => v,
-            v => panic!("called 'as_map' on '{}'", v.to_type()),
+            Self::Map(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -208,10 +208,10 @@ impl<'a> crate::ToValue for Value<'a> {
 impl<'a> PartialEq for Value<'a> {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Self::Bool(v) => other.is_bool() && other.as_bool() == v,
-            Self::Number(v) => other.is_number() && other.as_number() == v,
-            Self::Str(v) => other.is_str() && other.as_str() == v,
-            Self::Map(v) => other.is_map() && other.as_map() == v,
+            Self::Bool(v) => other.as_bool() == Some(v),
+            Self::Number(v) => other.as_number() == Some(v),
+            Self::Str(v) => other.as_str() == Some(v),
+            Self::Map(v) => other.as_map() == Some(v),
             Self::Mut(v) => other.is_mut() && other.to_mut() == *v,
             Self::Ref(v) => other.is_ref() && other.to_ref() == *v,
             Self::Null => other.is_null(),
@@ -279,12 +279,16 @@ impl<'a> Eq for Value<'a> {}
 
 impl<'a> Ord for Value<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let ord = match self {
-            Self::Bool(v) => v.partial_cmp(other.as_bool()),
-            Self::Number(v) => v.partial_cmp(other.as_number()),
-            Self::Str(v) => v.0.partial_cmp(other.as_str().0),
-            Self::Mut(v) => v.as_ref().partial_cmp(other.to_mut().as_ref()),
-            Self::Ref(v) => v.as_ref().partial_cmp(other.to_ref().as_ref()),
+        use std::ops::Deref;
+
+        let ord = match (self, other) {
+            (Self::Bool(a), Self::Bool(b)) => a.partial_cmp(b),
+            (Self::Number(a), Self::Number(b)) => a.partial_cmp(b),
+            (Self::Str(a), Self::Str(b)) => a.0.partial_cmp(b.0),
+            (Self::Mut(a), _) => a.deref().partial_cmp(other),
+            (Self::Ref(a), _) => a.deref().partial_cmp(other),
+            (_, Self::Mut(b)) => self.partial_cmp(b.deref()),
+            (_, Self::Ref(b)) => self.partial_cmp(b.deref()),
             _ => None,
         };
 
@@ -314,5 +318,41 @@ impl<'a> serde::Serialize for Value<'a> {
             Self::Dynamic(v) => v.serialize(s),
             Self::Null => s.serialize_none(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::*;
+
+    #[test]
+    pub fn as_returns_none_on_mismatch() {
+        assert_eq!(value_of!(true).as_number(), None);
+        assert_eq!(value_of!(1_i32).as_str(), None);
+        assert_eq!(value_of!("x").as_bool(), None);
+        assert!(value_of!(true).as_dynamic().is_none());
+    }
+
+    #[test]
+    pub fn as_returns_some_on_match() {
+        assert!(value_of!(true).as_bool().is_some());
+        assert!(value_of!(1_i32).as_number().is_some());
+        assert!(value_of!("x").as_str().is_some());
+    }
+
+    #[test]
+    pub fn map_key_ordering_stays_total() {
+        let map = btree_map! {
+            "b".to_string() => 2_i32,
+            "a".to_string() => 1_i32,
+            "c".to_string() => 3_i32
+        };
+        let value = value_of!(map);
+
+        assert!(value.is_map());
+        assert_eq!(value.len(), 3);
+        assert_eq!(value["a"], value_of!(1_i32));
+        assert_eq!(value["b"], value_of!(2_i32));
+        assert_eq!(value["c"], value_of!(3_i32));
     }
 }

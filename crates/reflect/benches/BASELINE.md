@@ -1,13 +1,13 @@
-# `ayr-reflect` performance baseline
+# `nova-reflect` performance baseline
 
 ## How to reproduce
 
 ```powershell
 # Timing (criterion):
-cargo bench -p ayr-reflect --features serde --bench reflect_bench
+cargo bench -p nova-reflect --features serde --bench reflect_bench
 
 # Allocation counts (dhat, 10_000 iters per bench):
-cargo bench -p ayr-reflect --features "serde dhat-heap" --bench reflect_bench
+cargo bench -p nova-reflect --features "serde dhat-heap" --bench reflect_bench
 ```
 
 The dhat run averages over 10,000 iterations; numbers below are **per
@@ -244,17 +244,17 @@ It uses a visitor pattern but never builds a type tree — it just walks the
 live value in place.
 
 ```powershell
-cargo bench -p ayr-reflect --features serde
+cargo bench -p nova-reflect --features serde
 ```
 
 Date captured: 2026-05-08.
 
-| Bench | `ayr-reflect` | `valuable` | Notes |
+| Bench | `nova-reflect` | `valuable` | Notes |
 |---|---|---|---|
-| `type_of_struct` / `visit_struct` | 4.31 ns | 17.2 ns | ayr-reflect wins — thread_local cache |
+| `type_of_struct` / `visit_struct` | 4.31 ns | 17.2 ns | nova-reflect wins — thread_local cache |
 | `assignable_to_primitive` | 9.91 ns | — | no valuable equivalent |
 | `clone_struct_type` | 1.89 ns | — | no valuable equivalent |
-| `to_value_vec_string` / `visit_vec_string` | 150 ns | 2.01 ns | valuable borrows; ayr-reflect allocates Vec<Value> |
+| `to_value_vec_string` / `visit_vec_string` | 150 ns | 2.01 ns | valuable borrows; nova-reflect allocates Vec<Value> |
 | `serialize_object_json` | 726 ns | — | no valuable equivalent |
 
 ## Re-run on darwin (2026-05-09)
@@ -263,7 +263,7 @@ Date: 2026-05-09.
 
 Environment:
 - Host: macOS (Darwin 25.4.0), Rust workspace pin (Edition 2024).
-- `cargo bench -p ayr-reflect --features serde --bench reflect_bench`
+- `cargo bench -p nova-reflect --features serde --bench reflect_bench`
 - Allocation counts captured via `-- --profile-time 1` (dhat profiler is wired
   into the criterion harness; per-iteration allocs derived from the bench
   body — see notes below the table).
@@ -278,10 +278,10 @@ Environment:
 
 Valuable comparison on darwin:
 
-| Bench | `ayr-reflect` | `valuable` | Notes |
+| Bench | `nova-reflect` | `valuable` | Notes |
 |---|---|---|---|
-| `type_of_struct` / `visit_struct` | 2.88 ns | 10.1 ns | ayr-reflect wins — thread_local cache |
-| `to_value_vec_string` / `visit_vec_string` | 74.4 ns | 1.50 ns | valuable borrows; ayr-reflect allocates `Vec<Value>` |
+| `type_of_struct` / `visit_struct` | 2.88 ns | 10.1 ns | nova-reflect wins — thread_local cache |
+| `to_value_vec_string` / `visit_vec_string` | 74.4 ns | 1.50 ns | valuable borrows; nova-reflect allocates `Vec<Value>` |
 
 Notes:
 - The platform shift (windows → darwin) accounts for most of the speedup;
@@ -326,7 +326,7 @@ Changes:
 
 Valuable comparison after this batch:
 
-| Bench | `ayr-reflect` | `valuable` |
+| Bench | `nova-reflect` | `valuable` |
 |---|---|---|
 | `type_of_struct` / `visit_struct` | 2.86 ns | 10.3 ns |
 | `to_value_vec_string` / `visit_vec_string` | **0.876 ns** | 1.50 ns |

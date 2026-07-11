@@ -33,10 +33,10 @@ impl Field {
 impl std::fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.vis.is_private() {
-            write!(f, "{} ", &self.vis)?;
+            write!(f, "{} ", self.vis)?;
         }
 
-        write!(f, "{}: {},", &self.name, &self.ty)
+        write!(f, "{}: {},", self.name, self.ty)
     }
 }
 

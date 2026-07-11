@@ -28,7 +28,7 @@ impl TraitBound {
 
 impl std::fmt::Display for TraitBound {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", &self.modifier, &self.path)
+        write!(f, "{}{}", self.modifier, self.path)
     }
 }
 

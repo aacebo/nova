@@ -1,9 +1,6 @@
 impl<'a> crate::ToType for &'a [crate::Value<'a>] {
     fn to_type(&self) -> crate::Type {
-        let elem = self
-            .first()
-            .map(crate::ToType::to_type)
-            .unwrap_or(crate::Type::Any);
+        let elem = self.first().map(crate::ToType::to_type).unwrap_or(crate::Type::Any);
 
         crate::Type::Slice(crate::SliceType {
             ty: std::rc::Rc::new(elem),
@@ -44,7 +41,7 @@ mod test {
         assert!(value.is_dynamic());
         assert_eq!(value.len(), 3);
 
-        let seq = value.as_dynamic().as_sequence();
+        let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
         for i in 0..seq.len() {
             let v = seq.index(i);
             assert!(v.is_i32());

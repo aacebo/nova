@@ -2,10 +2,10 @@ use quote::{ToTokens, quote};
 
 pub fn build(vis: &syn::Visibility) -> proc_macro2::TokenStream {
     match vis {
-        syn::Visibility::Inherited => quote!(::ayr_reflect::Visibility::Private),
+        syn::Visibility::Inherited => quote!(::nova_reflect::Visibility::Private),
         syn::Visibility::Public(_) => quote! {
-            ::ayr_reflect::Visibility::Public(
-                ::ayr_reflect::Public::Full
+            ::nova_reflect::Visibility::Public(
+                ::nova_reflect::Public::Full
             )
         },
         syn::Visibility::Restricted(v) => {
@@ -13,23 +13,23 @@ pub fn build(vis: &syn::Visibility) -> proc_macro2::TokenStream {
 
             match path.as_str() {
                 "self" => quote! {
-                    ::ayr_reflect::Visibility::Public(
-                        ::ayr_reflect::Public::Type
+                    ::nova_reflect::Visibility::Public(
+                        ::nova_reflect::Public::Type
                     )
                 },
                 "crate" => quote! {
-                    ::ayr_reflect::Visibility::Public(
-                        ::ayr_reflect::Public::Crate
+                    ::nova_reflect::Visibility::Public(
+                        ::nova_reflect::Public::Crate
                     )
                 },
                 "super" => quote! {
-                    ::ayr_reflect::Visibility::Public(
-                        ::ayr_reflect::Public::Super
+                    ::nova_reflect::Visibility::Public(
+                        ::nova_reflect::Public::Super
                     )
                 },
                 other => quote! {
-                    ::ayr_reflect::Visibility::Public(
-                        ::ayr_reflect::Public::Mod(#other.to_string())
+                    ::nova_reflect::Visibility::Public(
+                        ::nova_reflect::Public::Mod(#other.to_string())
                     )
                 },
             }

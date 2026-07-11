@@ -218,10 +218,10 @@ impl Type {
         }
     }
 
-    pub fn as_bool(&self) -> &crate::BoolType {
+    pub fn as_bool(&self) -> Option<&crate::BoolType> {
         match self {
-            Self::Bool(v) => v,
-            _ => panic!("called 'as_bool' on '{}'", self.id()),
+            Self::Bool(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -232,10 +232,10 @@ impl Type {
         }
     }
 
-    pub fn as_enum(&self) -> &crate::EnumType {
+    pub fn as_enum(&self) -> Option<&crate::EnumType> {
         match self {
-            Self::Enum(v) => v.as_ref(),
-            _ => panic!("called 'as_enum' on '{}'", self.id()),
+            Self::Enum(v) => Some(v.as_ref()),
+            _ => None,
         }
     }
 
@@ -247,10 +247,10 @@ impl Type {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn as_ref(&self) -> &crate::RefType {
+    pub fn as_ref(&self) -> Option<&crate::RefType> {
         match self {
-            Self::Ref(v) => v,
-            _ => panic!("called 'as_ref' on '{}'", self.id()),
+            Self::Ref(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -261,10 +261,10 @@ impl Type {
         }
     }
 
-    pub fn as_slice(&self) -> &crate::SliceType {
+    pub fn as_slice(&self) -> Option<&crate::SliceType> {
         match self {
-            Self::Slice(v) => v,
-            _ => panic!("called 'as_slice' on '{}'", self.id()),
+            Self::Slice(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -275,10 +275,10 @@ impl Type {
         }
     }
 
-    pub fn as_struct(&self) -> &crate::StructType {
+    pub fn as_struct(&self) -> Option<&crate::StructType> {
         match self {
-            Self::Struct(v) => v.as_ref(),
-            _ => panic!("called 'as_struct' on '{}'", self.id()),
+            Self::Struct(v) => Some(v.as_ref()),
+            _ => None,
         }
     }
 
@@ -289,10 +289,10 @@ impl Type {
         }
     }
 
-    pub fn as_number(&self) -> &crate::NumberType {
+    pub fn as_number(&self) -> Option<&crate::NumberType> {
         match self {
-            Self::Number(v) => v,
-            _ => panic!("called 'as_number' on '{}'", self.id()),
+            Self::Number(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -303,10 +303,10 @@ impl Type {
         }
     }
 
-    pub fn as_int(&self) -> &crate::IntType {
+    pub fn as_int(&self) -> Option<&crate::IntType> {
         match self {
             Self::Number(v) => v.as_int(),
-            _ => panic!("called 'as_int' on '{}'", self.id()),
+            _ => None,
         }
     }
 
@@ -317,10 +317,10 @@ impl Type {
         }
     }
 
-    pub fn as_float(&self) -> &crate::FloatType {
+    pub fn as_float(&self) -> Option<&crate::FloatType> {
         match self {
             Self::Number(v) => v.as_float(),
-            _ => panic!("called 'as_float' on '{}'", self.id()),
+            _ => None,
         }
     }
 
@@ -331,10 +331,10 @@ impl Type {
         }
     }
 
-    pub fn as_str(&self) -> &crate::StrType {
+    pub fn as_str(&self) -> Option<&crate::StrType> {
         match self {
-            Self::Str(v) => v,
-            _ => panic!("called 'as_str' on '{}'", self.id()),
+            Self::Str(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -345,10 +345,10 @@ impl Type {
         }
     }
 
-    pub fn as_self(&self) -> &crate::ThisType {
+    pub fn as_self(&self) -> Option<&crate::ThisType> {
         match self {
-            Self::This(v) => v,
-            _ => panic!("called 'as_self' on '{}'", self.id()),
+            Self::This(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -359,10 +359,10 @@ impl Type {
         }
     }
 
-    pub fn as_tuple(&self) -> &crate::TupleType {
+    pub fn as_tuple(&self) -> Option<&crate::TupleType> {
         match self {
-            Self::Tuple(v) => v.as_ref(),
-            _ => panic!("called 'as_tuple' on '{}'", self.id()),
+            Self::Tuple(v) => Some(v.as_ref()),
+            _ => None,
         }
     }
 
@@ -373,10 +373,10 @@ impl Type {
         }
     }
 
-    pub fn as_trait(&self) -> &crate::TraitType {
+    pub fn as_trait(&self) -> Option<&crate::TraitType> {
         match self {
-            Self::Trait(v) => v.as_ref(),
-            _ => panic!("called 'as_trait' on '{}'", self.id()),
+            Self::Trait(v) => Some(v.as_ref()),
+            _ => None,
         }
     }
 
@@ -387,10 +387,10 @@ impl Type {
         }
     }
 
-    pub fn as_mut(&self) -> &crate::MutType {
+    pub fn as_mut(&self) -> Option<&crate::MutType> {
         match self {
-            Self::Mut(v) => v,
-            _ => panic!("called 'as_mut' on '{}'", self.id()),
+            Self::Mut(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -401,10 +401,10 @@ impl Type {
         }
     }
 
-    pub fn as_mod(&self) -> &crate::ModType {
+    pub fn as_mod(&self) -> Option<&crate::ModType> {
         match self {
-            Self::Mod(v) => v.as_ref(),
-            _ => panic!("called 'as_mod' on '{}'", self.id()),
+            Self::Mod(v) => Some(v.as_ref()),
+            _ => None,
         }
     }
 
@@ -415,10 +415,10 @@ impl Type {
         }
     }
 
-    pub fn as_map(&self) -> &crate::MapType {
+    pub fn as_map(&self) -> Option<&crate::MapType> {
         match self {
-            Self::Map(v) => v.as_ref(),
-            _ => panic!("called 'as_map' on '{}'", self.id()),
+            Self::Map(v) => Some(v.as_ref()),
+            _ => None,
         }
     }
 
@@ -480,5 +480,26 @@ impl std::fmt::Display for Type {
             Self::Map(v) => write!(f, "{}", v),
             Self::Void => write!(f, "void"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::*;
+
+    #[test]
+    pub fn as_returns_none_on_mismatch() {
+        assert_eq!(Type::Any.as_map(), None);
+        assert_eq!(Type::Any.as_number(), None);
+        assert_eq!(Type::Void.as_bool(), None);
+        assert_eq!(type_of!(i32).as_str(), None);
+    }
+
+    #[test]
+    pub fn as_returns_some_on_match() {
+        assert!(type_of!(bool).as_bool().is_some());
+        assert!(type_of!(i32).as_number().is_some());
+        assert!(type_of!(i32).as_int().is_some());
+        assert!(type_of!(f64).as_float().is_some());
     }
 }

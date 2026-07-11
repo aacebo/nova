@@ -34,7 +34,7 @@ impl TypeParam {
 
 impl std::fmt::Display for TypeParam {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.name)?;
+        write!(f, "{}", self.name)?;
 
         if !self.bounds.is_empty() {
             write!(f, ": ")?;

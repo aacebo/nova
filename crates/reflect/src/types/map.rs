@@ -56,7 +56,7 @@ impl MapType {
 
 impl std::fmt::Display for MapType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.ty)
+        write!(f, "{}", self.ty)
     }
 }
 
@@ -143,7 +143,7 @@ mod test {
         let ty = type_of!(HashMap<String, bool>);
 
         assert!(ty.is_map());
-        assert_eq!(ty.as_map().key(), &type_of!(String));
-        assert_eq!(ty.as_map().value(), &type_of!(bool));
+        assert_eq!(ty.as_map().unwrap().key(), &type_of!(String));
+        assert_eq!(ty.as_map().unwrap().value(), &type_of!(bool));
     }
 }

@@ -1,12 +1,12 @@
 #![allow(unused)]
 
-use ayr_reflect::{ToType, ToValue, TypeOf, value_of};
-use ayr_reflect_macros::*;
+use nova_reflect::{ToType, ToValue, TypeOf, value_of};
+use nova_reflect_macros::*;
 
 #[reflect(version = 2)]
 mod models {
-    use ayr_reflect::{ToType, TypeOf};
-    use ayr_reflect_macros::*;
+    use nova_reflect::{ToType, TypeOf};
+    use nova_reflect_macros::*;
 
     #[derive(Debug, Clone, Reflect)]
     pub enum Kind {
@@ -57,10 +57,7 @@ pub fn should_reflect_struct() {
     assert!(user.to_type().to_struct().fields()["kind"].ty().is_enum());
     assert_eq!(user.to_type().meta().len(), 1);
     assert!(user.to_type().meta().has("name"));
-    assert_eq!(
-        user.to_type().to_struct().meta().get("name").unwrap(),
-        &"alex".to_value()
-    );
+    assert_eq!(user.to_type().to_struct().meta().get("name").unwrap(), &"alex".to_value());
 }
 
 #[test]
@@ -90,26 +87,11 @@ pub fn should_reflect_enum() {
     assert_eq!(kind.to_type().len(), 3);
     assert!(kind.to_type().to_enum().has_variant("Admin"));
     assert_eq!(kind.to_type().to_enum().variant("Admin").len(), 1);
-    assert!(
-        kind.to_type().to_enum().variant("Admin").fields()[0]
-            .ty()
-            .is_str()
-    );
-    assert!(
-        kind.to_type()
-            .to_enum()
-            .variant("Admin")
-            .meta()
-            .has("lowercase")
-    );
+    assert!(kind.to_type().to_enum().variant("Admin").fields()[0].ty().is_str());
+    assert!(kind.to_type().to_enum().variant("Admin").meta().has("lowercase"));
     assert_eq!(
-        kind.to_type()
-            .to_enum()
-            .variant("Admin")
-            .meta()
-            .get("lowercase")
-            .unwrap(),
-        &ayr_reflect::Value::Null
+        kind.to_type().to_enum().variant("Admin").meta().get("lowercase").unwrap(),
+        &nova_reflect::Value::Null
     );
 }
 
@@ -165,10 +147,7 @@ pub fn should_reflect_mod() {
 
     assert!(two.is_impl());
     assert_eq!(two.to_impl().self_ty().to_enum().name(), "Kind");
-    assert_eq!(
-        two.to_impl().of_trait().unwrap().to_string(),
-        "std::fmt::Display"
-    );
+    assert_eq!(two.to_impl().of_trait().unwrap().to_string(), "std::fmt::Display");
 
     let three = &module.items()[2].to_type();
 

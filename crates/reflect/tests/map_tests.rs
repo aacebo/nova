@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use ayr_reflect::{ToType, TypeOf, type_of, value_of};
-use ayr_reflect_macros::*;
+use nova_reflect::{ToType, TypeOf, type_of, value_of};
+use nova_reflect_macros::*;
 
 #[derive(Debug, Clone, Reflect)]
 pub struct Tester(HashMap<u8, i8>);

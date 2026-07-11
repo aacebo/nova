@@ -36,7 +36,7 @@ impl crate::ToType for BoolType {
 
 impl PartialEq<crate::Type> for BoolType {
     fn eq(&self, other: &crate::Type) -> bool {
-        other.is_bool() && other.as_bool() == self
+        other.as_bool() == Some(self)
     }
 }
 

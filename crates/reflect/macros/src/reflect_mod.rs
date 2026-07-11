@@ -5,15 +5,11 @@ use crate::{reflect_meta, reflect_visibility};
 pub fn attr(meta: proc_macro2::TokenStream, item: &mut syn::ItemMod) -> proc_macro2::TokenStream {
     if item.content.is_some() {
         let value = build(meta, item);
-        item.content
-            .as_mut()
-            .unwrap()
-            .1
-            .push(syn::Item::Verbatim(quote! {
-                pub fn type_of() -> ::ayr_reflect::Type {
-                    return #value;
-                }
-            }));
+        item.content.as_mut().unwrap().1.push(syn::Item::Verbatim(quote! {
+            pub fn type_of() -> ::nova_reflect::Type {
+                return #value;
+            }
+        }));
     }
 
     quote!(#item)
@@ -34,8 +30,8 @@ pub fn build(meta: proc_macro2::TokenStream, item: &mut syn::ItemMod) -> proc_ma
     }
 
     quote! {
-        ::ayr_reflect::ModType::new()
-            .path(::ayr_reflect::Path::from(module_path!()))
+        ::nova_reflect::ModType::new()
+            .path(::nova_reflect::Path::from(module_path!()))
             .meta(#meta.merge(&#inner_meta))
             .visibility(#vis)
             .items([#(#children,)*])

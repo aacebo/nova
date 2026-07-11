@@ -77,7 +77,7 @@ impl std::ops::IndexMut<usize> for ModType {
 impl std::fmt::Display for ModType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.vis.is_private() {
-            write!(f, "{} ", &self.vis)?;
+            write!(f, "{} ", self.vis)?;
         }
 
         write!(f, "{} {{", self.path.name())?;

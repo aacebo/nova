@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = [".", "cli", "crates/*"]
-default-members = [".", "cli", "crates/*"]
+members = [".", "cli", "crates/*", "crates/*/macros"]
+default-members = [".", "cli", "crates/*", "crates/*/macros"]
 
 [workspace.package]
 version = "0.0.0"
@@ -41,7 +41,8 @@ ai = ["dep:nova-ai"]
 fs = ["dep:nova-fs"]
 codec = ["dep:nova-codec"]
 http = ["dep:nova-http"]
-macros = ["dep:nova-macros"]
+macros = ["dep:nova-macros", "nova-reflect/macros"]
+reflect = ["dep:nova-reflect"]
 
 [patch.crates-io]
 ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
@@ -53,6 +54,7 @@ nova-fs = { path = "crates/fs", optional = true }
 nova-codec = { path = "crates/codec", optional = true }
 nova-http = { path = "crates/http", optional = true }
 nova-macros = { path = "crates/macros", optional = true }
+nova-reflect = { path = "crates/reflect", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

@@ -67,7 +67,7 @@ impl<const N: usize> From<[&str; N]> for Path {
 
 impl std::fmt::Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.0.join("::"))
+        write!(f, "{}", self.0.join("::"))
     }
 }
 

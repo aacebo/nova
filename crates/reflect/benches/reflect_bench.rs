@@ -1,7 +1,7 @@
-//! Performance baseline for ayr-reflect vs valuable.
+//! Performance baseline for nova-reflect vs valuable.
 //!
 //! Run with:
-//!   cargo bench -p ayr-reflect --features serde
+//!   cargo bench -p nova-reflect --features serde
 //!
 //! Each benchmark emits a criterion timing line plus a dhat allocation delta
 //! on stderr, e.g.:
@@ -14,9 +14,9 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 
 use std::path::Path;
 
-use ayr_reflect::{ToType, ToValue, TypeOf};
-use ayr_reflect_macros::Reflect;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use nova_reflect::{ToType, ToValue, TypeOf};
+use nova_reflect_macros::Reflect;
 use valuable::Valuable;
 
 // ----- dhat criterion profiler -----
@@ -81,10 +81,10 @@ fn sample_strings() -> Vec<String> {
     vec!["a".to_string(), "b".to_string(), "c".to_string()]
 }
 
-// ----- ayr-reflect bench bodies -----
+// ----- nova-reflect bench bodies -----
 
 #[inline(never)]
-fn bench_type_of_struct() -> ayr_reflect::Type {
+fn bench_type_of_struct() -> nova_reflect::Type {
     <User as TypeOf>::type_of()
 }
 
@@ -96,7 +96,7 @@ fn bench_assignable_to_primitive() -> bool {
 }
 
 #[inline(never)]
-fn bench_clone_struct_type(t: &ayr_reflect::Type) -> ayr_reflect::Type {
+fn bench_clone_struct_type(t: &nova_reflect::Type) -> nova_reflect::Type {
     t.clone()
 }
 
@@ -107,7 +107,7 @@ fn bench_to_value_vec_string(v: &Vec<String>) {
 
 #[inline(never)]
 fn bench_serialize_object_json(user: &User) -> String {
-    let dynamic = ayr_reflect::Dynamic::from_object(user);
+    let dynamic = nova_reflect::Dynamic::from_object(user);
     serde_json::to_string(&dynamic).expect("serialize")
 }
 
@@ -143,7 +143,7 @@ fn bench_valuable_visit_vec_string(v: &Vec<String>) {
     v.visit(&mut NoopVisitor);
 }
 
-// ----- ayr-reflect criterion fns -----
+// ----- nova-reflect criterion fns -----
 
 fn type_of_struct(c: &mut Criterion) {
     c.bench_function("type_of_struct", |b| {

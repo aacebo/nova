@@ -94,7 +94,7 @@ macro_rules! int {
 
         impl PartialEq<crate::Type> for IntType {
             fn eq(&self, other: &crate::Type) -> bool {
-                return other.is_int() && other.as_number().as_int() == self;
+                return other.as_int() == Some(self);
             }
         }
 

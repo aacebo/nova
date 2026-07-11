@@ -40,10 +40,10 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
     };
 
     quote! {
-        impl ::ayr_reflect::TypeOf for #name {
-            fn type_of() -> ::ayr_reflect::Type {
+        impl ::nova_reflect::TypeOf for #name {
+            fn type_of() -> ::nova_reflect::Type {
                 ::std::thread_local! {
-                    static CACHED: ::std::cell::RefCell<::std::option::Option<::ayr_reflect::Type>>
+                    static CACHED: ::std::cell::RefCell<::std::option::Option<::nova_reflect::Type>>
                         = ::std::cell::RefCell::new(::std::option::Option::None);
                 }
                 CACHED.with(|c| {
@@ -56,27 +56,27 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
             }
         }
 
-        impl ::ayr_reflect::ToType for #name {
-            fn to_type(&self) -> ::ayr_reflect::Type {
-                <Self as ::ayr_reflect::TypeOf>::type_of()
+        impl ::nova_reflect::ToType for #name {
+            fn to_type(&self) -> ::nova_reflect::Type {
+                <Self as ::nova_reflect::TypeOf>::type_of()
             }
         }
 
-        impl ::ayr_reflect::ToValue for #name {
-            fn to_value(&self) -> ::ayr_reflect::Value<'_> {
-                ::ayr_reflect::Value::Dynamic(::ayr_reflect::Dynamic::from_object(self))
+        impl ::nova_reflect::ToValue for #name {
+            fn to_value(&self) -> ::nova_reflect::Value<'_> {
+                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(self))
             }
         }
 
-        impl ::ayr_reflect::Object for #name {
-            fn field(&self, name: &::ayr_reflect::FieldName) -> ::ayr_reflect::Value<'_> {
+        impl ::nova_reflect::Object for #name {
+            fn field(&self, name: &::nova_reflect::FieldName) -> ::nova_reflect::Value<'_> {
                 #(
                     if name == stringify!(#fields) {
-                        return ::ayr_reflect::ToValue::to_value(&self.#fields);
+                        return ::nova_reflect::ToValue::to_value(&self.#fields);
                     }
                 )*
 
-                ::ayr_reflect::Value::Null
+                ::nova_reflect::Value::Null
             }
         }
     }
@@ -111,10 +111,10 @@ pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
     };
 
     quote! {
-        impl ::ayr_reflect::TypeOf for #name {
-            fn type_of() -> ::ayr_reflect::Type {
+        impl ::nova_reflect::TypeOf for #name {
+            fn type_of() -> ::nova_reflect::Type {
                 ::std::thread_local! {
-                    static CACHED: ::std::cell::RefCell<::std::option::Option<::ayr_reflect::Type>>
+                    static CACHED: ::std::cell::RefCell<::std::option::Option<::nova_reflect::Type>>
                         = ::std::cell::RefCell::new(::std::option::Option::None);
                 }
                 CACHED.with(|c| {
@@ -127,27 +127,27 @@ pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
             }
         }
 
-        impl ::ayr_reflect::ToType for #name {
-            fn to_type(&self) -> ::ayr_reflect::Type {
-                <Self as ::ayr_reflect::TypeOf>::type_of()
+        impl ::nova_reflect::ToType for #name {
+            fn to_type(&self) -> ::nova_reflect::Type {
+                <Self as ::nova_reflect::TypeOf>::type_of()
             }
         }
 
-        impl ::ayr_reflect::ToValue for #name {
-            fn to_value(&self) -> ::ayr_reflect::Value<'_> {
-                ::ayr_reflect::Value::Dynamic(::ayr_reflect::Dynamic::from_object(self))
+        impl ::nova_reflect::ToValue for #name {
+            fn to_value(&self) -> ::nova_reflect::Value<'_> {
+                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(self))
             }
         }
 
-        impl ::ayr_reflect::Object for #name {
-            fn field(&self, name: &::ayr_reflect::FieldName) -> ::ayr_reflect::Value<'_> {
+        impl ::nova_reflect::Object for #name {
+            fn field(&self, name: &::nova_reflect::FieldName) -> ::nova_reflect::Value<'_> {
                 #(
                     if name == stringify!(#fields) {
-                        return ::ayr_reflect::ToValue::to_value(&self.#fields);
+                        return ::nova_reflect::ToValue::to_value(&self.#fields);
                     }
                 )*
 
-                ::ayr_reflect::Value::Null
+                ::nova_reflect::Value::Null
             }
         }
     }
@@ -159,9 +159,9 @@ pub fn build(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
     let meta = reflect_meta::build(&item.attrs);
     let generics = reflect_generics::build(&item.generics);
     let layout = match &item.fields {
-        syn::Fields::Named(_) => quote!(::ayr_reflect::Layout::Key),
-        syn::Fields::Unnamed(_) => quote!(::ayr_reflect::Layout::Index),
-        syn::Fields::Unit => quote!(::ayr_reflect::Layout::Unit),
+        syn::Fields::Named(_) => quote!(::nova_reflect::Layout::Key),
+        syn::Fields::Unnamed(_) => quote!(::nova_reflect::Layout::Index),
+        syn::Fields::Unit => quote!(::nova_reflect::Layout::Unit),
     };
 
     let fields = match &item.fields {
@@ -181,14 +181,14 @@ pub fn build(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
     };
 
     quote! {
-        ::ayr_reflect::StructType::new()
-            .path(::ayr_reflect::Path::from(module_path!()))
+        ::nova_reflect::StructType::new()
+            .path(::nova_reflect::Path::from(module_path!()))
             .name(stringify!(#name))
             .visibility(#vis)
             .meta(#meta)
             .generics(#generics)
             .fields(
-                ::ayr_reflect::Fields::new()
+                ::nova_reflect::Fields::new()
                     .layout(#layout)
                     .fields([#(#fields,)*])
                     .build()

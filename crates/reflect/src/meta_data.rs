@@ -79,7 +79,7 @@ impl std::fmt::Display for MetaData {
 impl crate::TypeOf for MetaData {
     fn type_of() -> crate::Type {
         crate::StructType::new()
-            .path(crate::Path::from("ayr_reflect"))
+            .path(crate::Path::from("nova_reflect"))
             .name("MetaData")
             .visibility(crate::Visibility::Public(crate::Public::Full))
             .build()

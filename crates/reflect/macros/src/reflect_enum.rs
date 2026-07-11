@@ -42,29 +42,29 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
 
             if variant_fields.is_empty() {
                 return quote! {
-                    Self::#variant_ident => ::ayr_reflect::Value::Null
+                    Self::#variant_ident => ::nova_reflect::Value::Null
                 };
             }
 
             if variant_fields.len() == 1 {
                 return quote! {
-                    Self::#variant_ident(v) => ::ayr_reflect::ToValue::to_value(v)
+                    Self::#variant_ident(v) => ::nova_reflect::ToValue::to_value(v)
                 };
             }
 
             quote! {
                 Self::#variant_ident(#(#variant_fields,)*) => {
-                    ::ayr_reflect::value_of!((#(#variant_fields.clone(),)*))
+                    ::nova_reflect::value_of!((#(#variant_fields.clone(),)*))
                 }
             }
         })
         .collect::<Vec<_>>();
 
     quote! {
-        impl ::ayr_reflect::TypeOf for #name {
-            fn type_of() -> ::ayr_reflect::Type {
+        impl ::nova_reflect::TypeOf for #name {
+            fn type_of() -> ::nova_reflect::Type {
                 ::std::thread_local! {
-                    static CACHED: ::std::cell::RefCell<::std::option::Option<::ayr_reflect::Type>>
+                    static CACHED: ::std::cell::RefCell<::std::option::Option<::nova_reflect::Type>>
                         = ::std::cell::RefCell::new(::std::option::Option::None);
                 }
 
@@ -80,23 +80,23 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
             }
         }
 
-        impl ::ayr_reflect::ToType for #name {
-            fn to_type(&self) -> ::ayr_reflect::Type {
-                <Self as ::ayr_reflect::TypeOf>::type_of()
+        impl ::nova_reflect::ToType for #name {
+            fn to_type(&self) -> ::nova_reflect::Type {
+                <Self as ::nova_reflect::TypeOf>::type_of()
             }
         }
 
-        impl ::ayr_reflect::Object for #name {
-            fn field(&self, name: &::ayr_reflect::FieldName) -> ::ayr_reflect::Value<'_> {
+        impl ::nova_reflect::Object for #name {
+            fn field(&self, name: &::nova_reflect::FieldName) -> ::nova_reflect::Value<'_> {
                 match self {
                     #(#variants,)*
                 }
             }
         }
 
-        impl ::ayr_reflect::ToValue for #name {
-            fn to_value(&self) -> ::ayr_reflect::Value<'_> {
-                ::ayr_reflect::Value::Dynamic(::ayr_reflect::Dynamic::from_object(self))
+        impl ::nova_reflect::ToValue for #name {
+            fn to_value(&self) -> ::nova_reflect::Value<'_> {
+                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(self))
             }
         }
 
@@ -134,29 +134,29 @@ pub fn attr(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
 
             if variant_fields.is_empty() {
                 return quote! {
-                    Self::#variant_ident => ::ayr_reflect::Value::Null
+                    Self::#variant_ident => ::nova_reflect::Value::Null
                 };
             }
 
             if variant_fields.len() == 1 {
                 return quote! {
-                    Self::#variant_ident(v) => ::ayr_reflect::ToValue::to_value(v)
+                    Self::#variant_ident(v) => ::nova_reflect::ToValue::to_value(v)
                 };
             }
 
             quote! {
                 Self::#variant_ident(#(#variant_fields,)*) => {
-                    ::ayr_reflect::value_of!((#(#variant_fields.clone(),)*))
+                    ::nova_reflect::value_of!((#(#variant_fields.clone(),)*))
                 }
             }
         })
         .collect::<Vec<_>>();
 
     quote! {
-        impl ::ayr_reflect::TypeOf for #name {
-            fn type_of() -> ::ayr_reflect::Type {
+        impl ::nova_reflect::TypeOf for #name {
+            fn type_of() -> ::nova_reflect::Type {
                 ::std::thread_local! {
-                    static CACHED: ::std::cell::RefCell<::std::option::Option<::ayr_reflect::Type>>
+                    static CACHED: ::std::cell::RefCell<::std::option::Option<::nova_reflect::Type>>
                         = ::std::cell::RefCell::new(::std::option::Option::None);
                 }
 
@@ -172,14 +172,14 @@ pub fn attr(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
             }
         }
 
-        impl ::ayr_reflect::ToType for #name {
-            fn to_type(&self) -> ::ayr_reflect::Type {
-                <Self as ::ayr_reflect::TypeOf>::type_of()
+        impl ::nova_reflect::ToType for #name {
+            fn to_type(&self) -> ::nova_reflect::Type {
+                <Self as ::nova_reflect::TypeOf>::type_of()
             }
         }
 
-        impl ::ayr_reflect::ToValue for #name {
-            fn to_value(&self) -> ::ayr_reflect::Value<'_> {
+        impl ::nova_reflect::ToValue for #name {
+            fn to_value(&self) -> ::nova_reflect::Value<'_> {
                 match self {
                     #(#variants,)*
                 }
@@ -203,7 +203,7 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
 
             match &variant.fields {
                 syn::Fields::Unit => quote! {
-                    ::ayr_reflect::Variant::new()
+                    ::nova_reflect::Variant::new()
                         .name(stringify!(#variant_name))
                         .build()
                 },
@@ -216,12 +216,12 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
                         .collect::<Vec<_>>();
 
                     quote! {
-                        ::ayr_reflect::Variant::new()
+                        ::nova_reflect::Variant::new()
                             .name(stringify!(#variant_name))
                             .meta(#variant_meta)
                             .fields(
-                                ::ayr_reflect::Fields::new()
-                                    .layout(::ayr_reflect::Layout::Key)
+                                ::nova_reflect::Fields::new()
+                                    .layout(::nova_reflect::Layout::Key)
                                     .fields([#(#fields,)*])
                                     .build()
                             )
@@ -237,12 +237,12 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
                         .collect::<Vec<_>>();
 
                     quote! {
-                        ::ayr_reflect::Variant::new()
+                        ::nova_reflect::Variant::new()
                             .name(stringify!(#variant_name))
                             .meta(#variant_meta)
                             .fields(
-                                ::ayr_reflect::Fields::new()
-                                    .layout(::ayr_reflect::Layout::Index)
+                                ::nova_reflect::Fields::new()
+                                    .layout(::nova_reflect::Layout::Index)
                                     .fields([#(#fields,)*])
                                     .build()
                             )
@@ -254,8 +254,8 @@ pub fn build(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
         .collect::<Vec<_>>();
 
     quote! {
-        ::ayr_reflect::EnumType::new()
-            .path(::ayr_reflect::Path::from(module_path!()))
+        ::nova_reflect::EnumType::new()
+            .path(::nova_reflect::Path::from(module_path!()))
             .name(stringify!(#name))
             .meta(#meta)
             .generics(#generics)

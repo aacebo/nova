@@ -48,10 +48,10 @@ impl NumberType {
         }
     }
 
-    pub fn as_int(&self) -> &IntType {
+    pub fn as_int(&self) -> Option<&IntType> {
         match self {
-            Self::Int(v) => v,
-            _ => panic!("called 'as_int' on type '{}'", self.id()),
+            Self::Int(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -62,10 +62,10 @@ impl NumberType {
         }
     }
 
-    pub fn as_float(&self) -> &FloatType {
+    pub fn as_float(&self) -> Option<&FloatType> {
         match self {
-            Self::Float(v) => v,
-            _ => panic!("called 'as_float' on type '{}'", self.id()),
+            Self::Float(v) => Some(v),
+            _ => None,
         }
     }
 

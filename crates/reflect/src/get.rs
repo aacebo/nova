@@ -48,7 +48,7 @@ mod test {
         let arr: [i32; 3] = [3, 2, 1];
         let value = value_of!(arr);
 
-        let seq = value.as_dynamic().as_sequence();
+        let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
         assert_eq!(seq.index(1).to_i32(), 2);
     }
 }

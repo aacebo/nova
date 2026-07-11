@@ -12,7 +12,7 @@ impl MutType {
     }
 
     pub fn id(&self) -> crate::TypeId {
-        crate::TypeId::from_string(format!("mut {}", &self.0.id()))
+        crate::TypeId::from_string(format!("mut {}", self.0.id()))
     }
 
     pub fn ty(&self) -> &crate::Type {
@@ -40,7 +40,7 @@ impl crate::ToType for MutType {
 
 impl std::fmt::Display for MutType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "mut {}", &self.0)
+        write!(f, "mut {}", self.0)
     }
 }
 

@@ -62,14 +62,14 @@ impl Method {
 impl std::fmt::Display for Method {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.vis.is_private() {
-            write!(f, "{} ", &self.vis)?;
+            write!(f, "{} ", self.vis)?;
         }
 
         if self.is_async {
             write!(f, "async ")?;
         }
 
-        write!(f, "fn {}{}(", &self.name, &self.generics)?;
+        write!(f, "fn {}{}(", self.name, self.generics)?;
 
         for (i, param) in self.params.iter().enumerate() {
             write!(f, "{}", param)?;
@@ -82,7 +82,7 @@ impl std::fmt::Display for Method {
         write!(f, ")")?;
 
         if !self.return_type.is_void() {
-            write!(f, " -> {}", &self.return_type)?;
+            write!(f, " -> {}", self.return_type)?;
         }
 
         write!(f, ";")

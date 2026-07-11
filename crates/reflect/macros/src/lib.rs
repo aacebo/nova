@@ -48,9 +48,9 @@ fn reflect_attr(attrs: TokenStream, item: &mut syn::Item) -> Option<proc_macro2:
     }
 
     let meta = if pairs.is_empty() {
-        quote!(::ayr_reflect::MetaData::new())
+        quote!(::nova_reflect::MetaData::new())
     } else {
-        quote!(::ayr_reflect::MetaData::from([#(#pairs,)*]))
+        quote!(::nova_reflect::MetaData::from([#(#pairs,)*]))
     };
 
     match item {

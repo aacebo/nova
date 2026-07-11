@@ -122,7 +122,7 @@ mod test {
         let dynamic = Dynamic::from_sequence(&vec);
 
         assert_eq!(dynamic.len(), 3);
-        assert_eq!(dynamic.as_sequence().index(1).to_i32(), 20);
+        assert_eq!(dynamic.as_sequence().unwrap().index(1).to_i32(), 20);
     }
 
     #[test]
@@ -131,7 +131,7 @@ mod test {
         let value = vec.to_value();
 
         assert!(value.is_dynamic());
-        let seq = value.as_dynamic().as_sequence();
+        let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
         assert_eq!(seq.len(), 3);
         assert_eq!(seq.index(2).to_i32(), 30);
     }
@@ -142,7 +142,7 @@ mod test {
         let value = arr.to_value();
 
         assert!(value.is_dynamic());
-        let seq = value.as_dynamic().as_sequence();
+        let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
         assert_eq!(seq.len(), 3);
         assert_eq!(seq.index(0).to_i32(), 1);
     }

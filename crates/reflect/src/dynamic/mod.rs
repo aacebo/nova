@@ -53,17 +53,17 @@ impl<'a> Dynamic<'a> {
         matches!(self, Self::Sequence(_))
     }
 
-    pub fn as_object(&self) -> &(dyn crate::Object + 'a) {
+    pub fn as_object(&self) -> Option<&(dyn crate::Object + 'a)> {
         match self {
-            Self::Object(v) => *v,
-            v => panic!("called 'as_object' on '{}'", v.to_type()),
+            Self::Object(v) => Some(*v),
+            _ => None,
         }
     }
 
-    pub fn as_sequence(&self) -> &(dyn crate::Sequence + 'a) {
+    pub fn as_sequence(&self) -> Option<&(dyn crate::Sequence + 'a)> {
         match self {
-            Self::Sequence(v) => *v,
-            v => panic!("called 'as_sequence' on '{}'", v.to_type()),
+            Self::Sequence(v) => Some(*v),
+            _ => None,
         }
     }
 }

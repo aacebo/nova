@@ -13,10 +13,10 @@ pub fn build(attributes: &[syn::Attribute]) -> proc_macro2::TokenStream {
     }
 
     if pairs.is_empty() {
-        return quote!(::ayr_reflect::MetaData::new());
+        return quote!(::nova_reflect::MetaData::new());
     }
 
     quote! {
-        ::ayr_reflect::MetaData::from([#(#pairs,)*])
+        ::nova_reflect::MetaData::from([#(#pairs,)*])
     }
 }

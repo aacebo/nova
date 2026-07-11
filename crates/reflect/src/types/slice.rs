@@ -12,10 +12,8 @@ impl SliceType {
 
     pub fn id(&self) -> crate::TypeId {
         match self.capacity {
-            None => crate::TypeId::from_string(format!("[{}]", &self.ty.id())),
-            Some(capacity) => {
-                crate::TypeId::from_string(format!("[{}; {}]", &self.ty.id(), capacity))
-            }
+            None => crate::TypeId::from_string(format!("[{}]", self.ty.id())),
+            Some(capacity) => crate::TypeId::from_string(format!("[{}; {}]", self.ty.id(), capacity)),
         }
     }
 
@@ -131,7 +129,7 @@ mod test {
         assert_eq!(value.to_type().len(), 3);
         assert_eq!(value.to_type().id(), "[i32; 3]");
 
-        let seq = value.as_dynamic().as_sequence();
+        let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
         assert_eq!(seq.len(), 3);
 
         for i in 0..seq.len() {

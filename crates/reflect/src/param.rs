@@ -14,11 +14,7 @@ impl Param {
     }
 
     pub fn is_selfish(&self) -> bool {
-        self.name == "self"
-            && (self.ty.is_self()
-                || self.ty.is_mut_self()
-                || self.ty.is_ref_self()
-                || self.ty.is_ref_mut_self())
+        self.name == "self" && (self.ty.is_self() || self.ty.is_mut_self() || self.ty.is_ref_self() || self.ty.is_ref_mut_self())
     }
 
     pub fn name(&self) -> &str {
@@ -37,6 +33,6 @@ impl std::fmt::Display for Param {
             return write!(f, "{}self", &ty[0..ty.len() - 4]);
         }
 
-        write!(f, "{}: {}", &self.name, &self.ty)
+        write!(f, "{}: {}", self.name, self.ty)
     }
 }

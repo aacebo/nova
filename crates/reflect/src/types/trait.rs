@@ -20,7 +20,7 @@ impl TraitType {
     }
 
     pub fn id(&self) -> crate::TypeId {
-        crate::TypeId::from_string(format!("{}::{}", &self.path, &self.name))
+        crate::TypeId::from_string(format!("{}::{}", self.path, self.name))
     }
 
     pub fn assignable_to(&self, ty: crate::Type) -> bool {
@@ -131,10 +131,10 @@ impl std::ops::IndexMut<&str> for TraitType {
 impl std::fmt::Display for TraitType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.vis.is_private() {
-            write!(f, "{} ", &self.vis)?;
+            write!(f, "{} ", self.vis)?;
         }
 
-        write!(f, "trait {}{} {{", &self.name, &self.generics)?;
+        write!(f, "trait {}{} {{", self.name, self.generics)?;
 
         for method in &self.methods {
             write!(f, "\n\t{}", method)?;

@@ -33,10 +33,10 @@ impl Number {
         }
     }
 
-    pub fn as_int(&self) -> &Int {
+    pub fn as_int(&self) -> Option<&Int> {
         match self {
-            Self::Int(v) => v,
-            v => panic!("called 'as_int' on '{}'", v.to_type()),
+            Self::Int(v) => Some(v),
+            _ => None,
         }
     }
 
@@ -47,10 +47,10 @@ impl Number {
         }
     }
 
-    pub fn as_float(&self) -> &Float {
+    pub fn as_float(&self) -> Option<&Float> {
         match self {
-            Self::Float(v) => v,
-            v => panic!("called 'as_float' on '{}'", v.to_type()),
+            Self::Float(v) => Some(v),
+            _ => None,
         }
     }
 }
@@ -63,7 +63,7 @@ impl crate::ToValue for Number {
 
 impl PartialEq<crate::Value<'_>> for Number {
     fn eq(&self, other: &crate::Value<'_>) -> bool {
-        other.is_number() && other.as_number() == self
+        other.as_number() == Some(self)
     }
 }
 
