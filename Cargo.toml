@@ -42,6 +42,7 @@ fs = ["dep:nova-fs"]
 codec = ["dep:nova-codec"]
 http = ["dep:nova-http"]
 macros = ["dep:nova-macros", "nova-reflect/macros"]
+schema = ["dep:nova-schema"]
 reflect = ["dep:nova-reflect", "nova-reflect/serde", "nova-reflect/minijinja"]
 json = ["nova-reflect/json"]
 
@@ -55,6 +56,7 @@ nova-fs = { path = "crates/fs", optional = true }
 nova-codec = { path = "crates/codec", optional = true }
 nova-http = { path = "crates/http", optional = true }
 nova-macros = { path = "crates/macros", optional = true }
+nova-schema = { path = "crates/schema", optional = true }
 nova-reflect = { path = "crates/reflect", optional = true }
 
 [dev-dependencies]
