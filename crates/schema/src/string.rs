@@ -8,6 +8,7 @@ pub fn string() -> StringSchema {
 pub struct StringSchema {
     min: Option<usize>,
     max: Option<usize>,
+    constant: Option<String>,
     #[serde(with = "pattern", default)]
     pattern: Option<regex::Regex>,
 }
@@ -20,6 +21,11 @@ impl StringSchema {
 
     pub fn max(mut self, value: usize) -> Self {
         self.max = Some(value);
+        self
+    }
+
+    pub fn constant(mut self, value: impl Into<String>) -> Self {
+        self.constant = Some(value.into());
         self
     }
 
@@ -46,6 +52,12 @@ impl Validate for StringSchema {
             && max < value.len()
         {
             errors.push(("max", format!("length must not be greater than {max}")).into());
+        }
+
+        if let Some(constant) = &self.constant
+            && value != constant
+        {
+            errors.push(("constant", format!("expected \"{constant}\", received \"{value}\"")).into());
         }
 
         if let Some(pattern) = &self.pattern
@@ -147,6 +159,26 @@ mod tests {
         fn succeed() -> Result<(), Error> {
             let schema = string().max(5);
             let value = "test".to_value();
+            schema.validate(&value)?;
+            Ok(())
+        }
+    }
+
+    mod constant {
+        use super::*;
+
+        #[test]
+        fn fail() {
+            let schema = string().constant("nova");
+            let value = "test".to_value();
+            let res = schema.validate(&value);
+            assert!(res.is_err());
+        }
+
+        #[test]
+        fn succeed() -> Result<(), Error> {
+            let schema = string().constant("nova");
+            let value = "nova".to_value();
             schema.validate(&value)?;
             Ok(())
         }

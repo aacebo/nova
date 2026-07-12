@@ -1,6 +1,7 @@
 mod array;
 mod bool;
 pub mod error;
+mod integer;
 mod null;
 mod number;
 mod object;
@@ -9,6 +10,7 @@ mod string;
 pub use array::*;
 pub use bool::*;
 pub use error::Error;
+pub use integer::*;
 pub use null::*;
 pub use number::*;
 pub use object::*;
@@ -23,6 +25,7 @@ pub trait Validate {
 pub enum Schema {
     String(StringSchema),
     Number(NumberSchema),
+    Integer(IntegerSchema),
     Bool(BoolSchema),
     Null(NullSchema),
     Array(ArraySchema),
@@ -38,6 +41,12 @@ impl From<StringSchema> for Schema {
 impl From<NumberSchema> for Schema {
     fn from(value: NumberSchema) -> Self {
         Self::Number(value)
+    }
+}
+
+impl From<IntegerSchema> for Schema {
+    fn from(value: IntegerSchema) -> Self {
+        Self::Integer(value)
     }
 }
 
@@ -70,6 +79,7 @@ impl Validate for Schema {
         match self {
             Self::String(schema) => schema.validate(value),
             Self::Number(schema) => schema.validate(value),
+            Self::Integer(schema) => schema.validate(value),
             Self::Bool(schema) => schema.validate(value),
             Self::Null(schema) => schema.validate(value),
             Self::Array(schema) => schema.validate(value),
@@ -82,11 +92,11 @@ impl Validate for Schema {
 mod tests {
     use reflect::ToValue;
 
-    use crate::{Error, Schema, Validate, object, string};
+    use crate::{Error, Schema, Validate, integer, object, string};
 
     #[test]
     fn round_trip() -> Result<(), Error> {
-        let schema = Schema::Object(object().field("name", Schema::String(string().min(1))));
+        let schema = Schema::Object(object().field("name", string().min(1)));
         let json = serde_json::to_string(&schema).unwrap();
         let schema: Schema = serde_json::from_str(&json).unwrap();
         let map = reflect::btree_map! {
@@ -94,6 +104,16 @@ mod tests {
         };
 
         let value = map.to_value();
+        schema.validate(&value)?;
+        Ok(())
+    }
+
+    #[test]
+    fn round_trip_integer() -> Result<(), Error> {
+        let schema = Schema::Integer(integer().min(0).max(10));
+        let json = serde_json::to_string(&schema).unwrap();
+        let schema: Schema = serde_json::from_str(&json).unwrap();
+        let value = 5_i32.to_value();
         schema.validate(&value)?;
         Ok(())
     }

@@ -19,15 +19,6 @@ macro_rules! int {
                         _ => false,
                     };
                 }
-
-                pub fn $to_type(&self) -> Option<$type> {
-                    return match self {
-                        Self::Number(v) => v.$to_type(),
-                        Self::Ref(v) => v.value().$to_type(),
-                        Self::Mut(v) => v.value().$to_type(),
-                        _ => None,
-                    };
-                }
             )*
         }
 
@@ -85,13 +76,6 @@ macro_rules! int {
                         _ => false,
                     };
                 }
-
-                pub fn $to_type(&self) -> Option<$type> {
-                    return match self {
-                        Self::Int(v) => v.$to_type(),
-                        _ => None,
-                    };
-                }
             )*
         }
 
@@ -106,9 +90,7 @@ macro_rules! int {
                 type Error = String;
 
                 fn try_from(value: crate::Number) -> Result<Self, Self::Error> {
-                    return value.$to_type().ok_or_else(|| {
-                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
-                    });
+                    return Ok(value.$to_type());
                 }
             }
 
@@ -162,6 +144,12 @@ macro_rules! int {
                 };
             }
 
+            pub fn to_i128(&self) -> i128 {
+                return match self {
+                    $(Self::$name(v) => *v as i128,)*
+                };
+            }
+
             $(
                 pub fn $is_type(&self) -> bool {
                     return match self {
@@ -170,11 +158,8 @@ macro_rules! int {
                     };
                 }
 
-                pub fn $to_type(&self) -> Option<$type> {
-                    return match self {
-                        Self::$name(v) => Some(*v),
-                        _ => None,
-                    };
+                pub fn $to_type(&self) -> $type {
+                    return self.to_i128() as $type;
                 }
 
                 pub fn $set_value(&mut self, value: $type) {
@@ -200,9 +185,7 @@ macro_rules! int {
                 type Error = String;
 
                 fn try_from(value: crate::Int) -> Result<Self, Self::Error> {
-                    return value.$to_type().ok_or_else(|| {
-                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
-                    });
+                    return Ok(value.$to_type());
                 }
             }
 

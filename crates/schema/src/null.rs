@@ -1,7 +1,7 @@
 use crate::{Error, Validate};
 
 pub fn null() -> NullSchema {
-    NullSchema::default()
+    NullSchema
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]

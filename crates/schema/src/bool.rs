@@ -6,12 +6,12 @@ pub fn bool() -> BoolSchema {
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BoolSchema {
-    value: Option<bool>,
+    constant: Option<bool>,
 }
 
 impl BoolSchema {
     pub fn constant(mut self, value: bool) -> Self {
-        self.value = Some(value);
+        self.constant = Some(value);
         self
     }
 }
@@ -23,10 +23,10 @@ impl Validate for BoolSchema {
             .as_bool()
             .ok_or(("type", format!("expected bool, received {}", value.to_type())))?;
 
-        if let Some(v) = &self.value
-            && v != value
+        if let Some(constant) = &self.constant
+            && constant != value
         {
-            errors.push(("constant", format!("expected {v}, received {value}")).into());
+            errors.push(("constant", format!("expected {constant}, received {value}")).into());
         }
 
         errors.ok()?;

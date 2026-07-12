@@ -1,56 +1,58 @@
 use crate::{Error, Validate, error};
 
-pub fn number() -> NumberSchema {
-    NumberSchema::default()
+pub fn integer() -> IntegerSchema {
+    IntegerSchema::default()
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NumberSchema {
-    min: Option<f64>,
-    max: Option<f64>,
-    constant: Option<f64>,
+pub struct IntegerSchema {
+    min: Option<i64>,
+    max: Option<i64>,
+    constant: Option<i64>,
 }
 
-impl NumberSchema {
-    pub fn min(mut self, value: f64) -> Self {
+impl IntegerSchema {
+    pub fn min(mut self, value: i64) -> Self {
         self.min = Some(value);
         self
     }
 
-    pub fn max(mut self, value: f64) -> Self {
+    pub fn max(mut self, value: i64) -> Self {
         self.max = Some(value);
         self
     }
 
-    pub fn constant(mut self, value: f64) -> Self {
+    pub fn constant(mut self, value: i64) -> Self {
         self.constant = Some(value);
         self
     }
 }
 
-impl Validate for NumberSchema {
+impl Validate for IntegerSchema {
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
-        let float = value
-            .to_f64()
-            .ok_or(("type", format!("expected number, received {}", value.to_type())))?;
+        let number = value
+            .as_number()
+            .filter(|n| n.is_int())
+            .ok_or(("type", format!("expected integer, received {}", value.to_type())))?;
+        let int = number.to_i64();
 
         if let Some(min) = self.min
-            && float < min
+            && int < min
         {
             errors.push(("min", format!("must not be less than {min}")).into());
         }
 
         if let Some(max) = self.max
-            && float > max
+            && int > max
         {
             errors.push(("max", format!("must not be greater than {max}")).into());
         }
 
         if let Some(constant) = self.constant
-            && constant != float
+            && constant != int
         {
-            errors.push(("constant", format!("expected {constant}, received {float}")).into());
+            errors.push(("constant", format!("expected {constant}, received {int}")).into());
         }
 
         errors.ok()?;
@@ -62,19 +64,19 @@ impl Validate for NumberSchema {
 mod tests {
     use reflect::ToValue;
 
-    use crate::{Error, Validate, number};
+    use crate::{Error, Validate, integer};
 
     #[test]
     fn fail() {
-        let schema = number();
-        let value = "test".to_value();
+        let schema = integer();
+        let value = 4.5_f64.to_value();
         let res = schema.validate(&value);
         assert!(res.is_err());
     }
 
     #[test]
     fn succeed() -> Result<(), Error> {
-        let schema = number();
+        let schema = integer();
         let value = 42_i32.to_value();
         schema.validate(&value)?;
         Ok(())
@@ -85,7 +87,7 @@ mod tests {
 
         #[test]
         fn fail() {
-            let schema = number().min(5.0);
+            let schema = integer().min(5);
             let value = 4_i32.to_value();
             let res = schema.validate(&value);
             assert!(res.is_err());
@@ -93,7 +95,7 @@ mod tests {
 
         #[test]
         fn succeed() -> Result<(), Error> {
-            let schema = number().min(5.0);
+            let schema = integer().min(5);
             let value = 6_i32.to_value();
             schema.validate(&value)?;
             Ok(())
@@ -105,7 +107,7 @@ mod tests {
 
         #[test]
         fn fail() {
-            let schema = number().max(5.0);
+            let schema = integer().max(5);
             let value = 6_i32.to_value();
             let res = schema.validate(&value);
             assert!(res.is_err());
@@ -113,7 +115,7 @@ mod tests {
 
         #[test]
         fn succeed() -> Result<(), Error> {
-            let schema = number().max(5.0);
+            let schema = integer().max(5);
             let value = 4_i32.to_value();
             schema.validate(&value)?;
             Ok(())
@@ -125,7 +127,7 @@ mod tests {
 
         #[test]
         fn fail() {
-            let schema = number().constant(5.0);
+            let schema = integer().constant(5);
             let value = 4_i32.to_value();
             let res = schema.validate(&value);
             assert!(res.is_err());
@@ -133,7 +135,7 @@ mod tests {
 
         #[test]
         fn succeed() -> Result<(), Error> {
-            let schema = number().constant(5.0);
+            let schema = integer().constant(5);
             let value = 5_i32.to_value();
             schema.validate(&value)?;
             Ok(())
