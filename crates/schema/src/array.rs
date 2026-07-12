@@ -72,7 +72,7 @@ impl Validate for ArraySchema {
 mod tests {
     use reflect::ToValue;
 
-    use crate::{Error, Schema, Validate, array, number};
+    use crate::{Error, Validate, array, number};
 
     #[test]
     fn fail() {
