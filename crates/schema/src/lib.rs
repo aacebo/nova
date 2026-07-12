@@ -1,6 +1,8 @@
+mod bool;
 pub mod error;
 mod string;
 
+pub use bool::*;
 pub use error::Error;
 pub use string::*;
 
