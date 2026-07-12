@@ -2336,6 +2336,7 @@ dependencies = [
  "nova-reflect",
  "regex",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

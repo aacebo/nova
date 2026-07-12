@@ -13,5 +13,8 @@ workspace = true
 
 [dependencies]
 reflect = { package = "nova-reflect", path = "../reflect", features = ["serde"] }
-serde = { version = "1", features = ["derive", "rc"], optional = true }
+serde = { version = "1", features = ["derive", "rc"] }
 regex = { version = "1" }
+
+[dev-dependencies]
+serde_json = { version = "1" }

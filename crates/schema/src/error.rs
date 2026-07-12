@@ -4,6 +4,14 @@ pub fn group() -> ErrorGroup {
     ErrorGroup::default()
 }
 
+pub fn object() -> ObjectError {
+    ObjectError::default()
+}
+
+pub fn list() -> ListError {
+    ListError::default()
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Error {
@@ -73,11 +81,19 @@ impl std::fmt::Display for ErrorGroup {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct ObjectError(BTreeMap<String, Vec<Error>>);
 
 impl ObjectError {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn ok(self) -> Result<(), Error> {
+        if self.0.is_empty() { Ok(()) } else { Err(self.into()) }
+    }
+
     pub fn field(mut self, name: impl std::fmt::Display, error: Error) -> Self {
         let errors = self.0.entry(name.to_string()).or_default();
         errors.push(error);
@@ -105,11 +121,19 @@ impl std::fmt::Display for ObjectError {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct ListError(BTreeMap<usize, Vec<Error>>);
 
 impl ListError {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn ok(self) -> Result<(), Error> {
+        if self.0.is_empty() { Ok(()) } else { Err(self.into()) }
+    }
+
     pub fn index(mut self, index: usize, error: Error) -> Self {
         let errors = self.0.entry(index).or_default();
         errors.push(error);
