@@ -2332,6 +2332,11 @@ dependencies = [
 [[package]]
 name = "nova-schema"
 version = "0.0.0"
+dependencies = [
+ "nova-reflect",
+ "regex",
+ "serde",
+]
 
 [[package]]
 name = "num"

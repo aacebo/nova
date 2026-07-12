@@ -12,3 +12,6 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+reflect = { package = "nova-reflect", path = "../reflect", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"], optional = true }
+regex = { version = "1" }
