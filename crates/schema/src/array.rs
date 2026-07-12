@@ -156,4 +156,22 @@ mod tests {
             Ok(())
         }
     }
+
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn round_trip() -> Result<(), Error> {
+            let schema = array().min(1).max(3).items(number().min(0.0));
+            let json = serde_json::to_string(&schema).unwrap();
+            let schema: crate::ArraySchema = serde_json::from_str(&json).unwrap();
+
+            let ok = vec![1_i32, 2, 3];
+            schema.validate(&ok.to_value())?;
+
+            let bad = vec![-1_i32];
+            assert!(schema.validate(&bad.to_value()).is_err());
+            Ok(())
+        }
+    }
 }

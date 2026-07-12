@@ -75,4 +75,19 @@ mod tests {
             Ok(())
         }
     }
+
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn round_trip() -> Result<(), Error> {
+            let schema = bool().constant(true);
+            let json = serde_json::to_string(&schema).unwrap();
+            let schema: crate::BoolSchema = serde_json::from_str(&json).unwrap();
+
+            schema.validate(&true.to_value())?;
+            assert!(schema.validate(&false.to_value()).is_err());
+            Ok(())
+        }
+    }
 }

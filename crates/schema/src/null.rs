@@ -38,4 +38,18 @@ mod tests {
         schema.validate(&value)?;
         Ok(())
     }
+
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn round_trip() -> Result<(), Error> {
+            let json = serde_json::to_string(&null()).unwrap();
+            let schema: crate::NullSchema = serde_json::from_str(&json).unwrap();
+
+            schema.validate(&reflect::Value::Null)?;
+            assert!(schema.validate(&true.to_value()).is_err());
+            Ok(())
+        }
+    }
 }

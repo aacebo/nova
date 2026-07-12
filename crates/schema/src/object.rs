@@ -85,4 +85,22 @@ mod tests {
             Ok(())
         }
     }
+
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn round_trip() -> Result<(), Error> {
+            let schema = object().field("name", string().min(1));
+            let json = serde_json::to_string(&schema).unwrap();
+            let schema: crate::ObjectSchema = serde_json::from_str(&json).unwrap();
+
+            let ok = btree_map! { "name".to_string() => "nova".to_string() };
+            schema.validate(&ok.to_value())?;
+
+            let bad = btree_map! { "name".to_string() => "".to_string() };
+            assert!(schema.validate(&bad.to_value()).is_err());
+            Ok(())
+        }
+    }
 }

@@ -141,4 +141,19 @@ mod tests {
             Ok(())
         }
     }
+
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn round_trip() -> Result<(), Error> {
+            let schema = integer().min(0).max(10).constant(5);
+            let json = serde_json::to_string(&schema).unwrap();
+            let schema: crate::IntegerSchema = serde_json::from_str(&json).unwrap();
+
+            schema.validate(&5_i32.to_value())?;
+            assert!(schema.validate(&4_i32.to_value()).is_err());
+            Ok(())
+        }
+    }
 }

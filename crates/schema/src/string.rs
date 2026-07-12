@@ -203,4 +203,36 @@ mod tests {
             Ok(())
         }
     }
+
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn round_trip() -> Result<(), Error> {
+            let schema = string().min(1).max(10).constant("nova");
+            let json = serde_json::to_string(&schema).unwrap();
+            let schema: crate::StringSchema = serde_json::from_str(&json).unwrap();
+
+            schema.validate(&"nova".to_value())?;
+            assert!(schema.validate(&"other".to_value()).is_err());
+            Ok(())
+        }
+
+        #[test]
+        fn round_trip_pattern() -> Result<(), Error> {
+            let schema = string().pattern("^[0-9]+$").unwrap();
+            let json = serde_json::to_string(&schema).unwrap();
+            let schema: crate::StringSchema = serde_json::from_str(&json).unwrap();
+
+            schema.validate(&"123".to_value())?;
+            assert!(schema.validate(&"12a".to_value()).is_err());
+            Ok(())
+        }
+
+        #[test]
+        fn deserializes_without_pattern() {
+            let schema: crate::StringSchema = serde_json::from_str("{}").unwrap();
+            assert!(schema.validate(&"anything".to_value()).is_ok());
+        }
+    }
 }

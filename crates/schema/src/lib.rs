@@ -117,4 +117,26 @@ mod tests {
         schema.validate(&value)?;
         Ok(())
     }
+
+    fn assert_tag(schema: Schema, tag: &str) {
+        let json = serde_json::to_string(&schema).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["type"], tag, "wrong tag for {json}");
+
+        let back: Schema = serde_json::from_str(&json).unwrap();
+        assert_eq!(serde_json::to_string(&back).unwrap(), json);
+    }
+
+    #[test]
+    fn every_variant_tagged() {
+        use crate::{array, bool, null, number, object, string};
+
+        assert_tag(string().into(), "string");
+        assert_tag(number().into(), "number");
+        assert_tag(integer().into(), "integer");
+        assert_tag(bool().into(), "bool");
+        assert_tag(null().into(), "null");
+        assert_tag(array().into(), "array");
+        assert_tag(object().into(), "object");
+    }
 }
