@@ -18,6 +18,7 @@ pub enum Error {
     List(ListError),
     Object(ObjectError),
     Group(ErrorGroup),
+    Custom { error: Box<Self>, message: String },
     Rule { name: String, message: String },
 }
 
@@ -37,6 +38,7 @@ impl std::fmt::Display for Error {
             Self::List(err) => write!(f, "{err}"),
             Self::Group(err) => write!(f, "{err}"),
             Self::Object(err) => write!(f, "{err}"),
+            Self::Custom { error: _, message } => write!(f, "{message}"),
         }
     }
 }

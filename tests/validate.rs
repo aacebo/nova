@@ -168,7 +168,7 @@ fn merged_manifest_schemas_accept_either() {
 
 #[test]
 fn schema_round_trips_through_json() {
-    let schema = Schema::Object(object().field("name", string().min(1)));
+    let schema: Schema = object().field("name", string().min(1)).into();
     let json = serde_json::to_string(&schema).unwrap();
     let back: Schema = serde_json::from_str(&json).unwrap();
     assert_eq!(serde_json::to_string(&back).unwrap(), json);
