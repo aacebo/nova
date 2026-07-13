@@ -1,0 +1,27 @@
+name: guard
+on: [run]
+
+vars:
+  good_sku: ABC-123
+  good_qty: 5
+  bad_sku: xx
+  huge_qty: 999
+
+steps:
+  - name: valid_order
+    call: place_order
+    with:
+      sku: good_sku
+      qty: good_qty
+
+  - name: bad_sku
+    call: place_order
+    with:
+      sku: bad_sku
+      qty: good_qty
+
+  - name: qty_out_of_range
+    call: place_order
+    with:
+      sku: good_sku
+      qty: huge_qty

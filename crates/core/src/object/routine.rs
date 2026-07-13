@@ -67,7 +67,6 @@ impl Routine {
 
         if let Err(err) = schema::Validate::validate(validator.as_ref(), &instance) {
             let message = format!("invalid args for `{}`: {}", self.name, err);
-            scope.error(message.clone());
             return Err(Box::new(Error::action(scope.trace_id().to_string(), &self.name, message)));
         }
 

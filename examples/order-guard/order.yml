@@ -1,0 +1,21 @@
+name: place_order
+on: [call]
+
+args:
+  type: object
+  fields:
+    sku:
+      type: string
+      min: 3
+      pattern: "^[A-Z]{3}-[0-9]+$"
+      message: "must look like ABC-123"
+    qty:
+      type: integer
+      min: 1
+      max: 100
+      message: "must be between 1 and 100"
+
+steps:
+  - name: accept
+    run: |
+      {{ info('accepted order ' ~ sku ~ ' x' ~ qty) }}

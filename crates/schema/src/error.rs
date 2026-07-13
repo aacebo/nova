@@ -112,10 +112,8 @@ impl From<ObjectError> for Error {
 impl std::fmt::Display for ObjectError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (k, errs) in &self.0 {
-            writeln!(f, "{k}")?;
-
             for err in errs {
-                writeln!(f, "{err}")?;
+                writeln!(f, "{k}: {err}")?;
             }
         }
 
