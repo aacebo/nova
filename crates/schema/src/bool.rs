@@ -17,10 +17,6 @@ impl BoolSchema {
 }
 
 impl Validate for BoolSchema {
-    fn name(&self) -> &str {
-        "bool"
-    }
-
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let value = value

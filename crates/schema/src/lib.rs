@@ -19,7 +19,6 @@ pub use oneof::*;
 pub use string::*;
 
 pub trait Validate {
-    fn name(&self) -> &str;
     fn validate(&self, value: &reflect::Value) -> Result<(), Error>;
 }
 
@@ -59,10 +58,6 @@ impl<T: Into<AnySchema> + std::fmt::Debug> From<T> for Schema {
 }
 
 impl Validate for Schema {
-    fn name(&self) -> &str {
-        self.inner.name()
-    }
-
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         if let Some(optional) = &self.optional
             && *optional
@@ -151,19 +146,6 @@ impl From<OneOf> for AnySchema {
 }
 
 impl Validate for AnySchema {
-    fn name(&self) -> &str {
-        match self {
-            Self::String(v) => v.name(),
-            Self::Number(v) => v.name(),
-            Self::Integer(v) => v.name(),
-            Self::Bool(v) => v.name(),
-            Self::Null(v) => v.name(),
-            Self::Array(v) => v.name(),
-            Self::Object(v) => v.name(),
-            Self::OneOf { oneof } => oneof.name(),
-        }
-    }
-
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         match self {
             Self::String(schema) => schema.validate(value),

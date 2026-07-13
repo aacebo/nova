@@ -23,10 +23,6 @@ impl OneOf {
 }
 
 impl Validate for OneOf {
-    fn name(&self) -> &str {
-        "oneof"
-    }
-
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         for schema in &self.0 {
             if schema.validate(value).is_ok() {

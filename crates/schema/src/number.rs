@@ -29,10 +29,6 @@ impl NumberSchema {
 }
 
 impl Validate for NumberSchema {
-    fn name(&self) -> &str {
-        "number"
-    }
-
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let float = value
