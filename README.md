@@ -36,6 +36,7 @@ Nova runs *workflows* written as YAML manifests. A workflow is a named routine o
   - [Triggers](#triggers)
   - [Steps](#steps)
   - [Validated inputs](#validated-inputs)
+  - [Environment](#environment)
 - [Templating](#templating)
 - [Recipes](#recipes)
 - [Examples](#examples)
@@ -103,7 +104,7 @@ A manifest is a single YAML file with the following top-level keys.
 | `on`        | Triggers: `run`, `run(<priority>)`, or `call`.                        |
 | `args`      | Schema for validating inputs passed by a caller.                      |
 | `vars`      | Variables available to every step's templates.                        |
-| `env`       | Environment bindings.                                                 |
+| `env`       | Bind process environment variables into the routine's scope.          |
 | `templates` | Inline named templates.                                               |
 | `steps`     | The ordered list of steps to execute.                                 |
 
@@ -170,6 +171,37 @@ steps:
       {{ info('accepted order ' ~ sku ~ ' x' ~ qty) }}
 ```
 
+### Environment
+
+The `env:` block pulls values from the process environment into the routine's scope. Each entry maps a **local variable name** to the **name of an OS environment variable**; when that variable is set at startup, its value is bound as a local you can reference in templates. Unset variables are simply skipped.
+
+```yaml
+name: deploy
+on: [run]
+
+env:
+  token: DEPLOY_TOKEN     # {{ token }}  <- value of $DEPLOY_TOKEN
+  region: AWS_REGION      # {{ region }} <- value of $AWS_REGION
+
+steps:
+  - name: check
+    run: |
+      {% if token %}
+        {{ info('deploying to ' ~ region) }}
+      {% else %}
+        {{ error('DEPLOY_TOKEN is not set') }}
+      {% endif %}
+```
+
+To read a variable inline instead of pre-binding it, use the `env()` helper — it takes an optional `default`:
+
+```yaml
+steps:
+  - name: greet
+    run: |
+      {{ info('hello from ' ~ env('HOSTNAME', default='localhost')) }}
+```
+
 ---
 
 ## Templating
@@ -179,6 +211,7 @@ steps:
 | Helper                             | Purpose                                     |
 |------------------------------------|---------------------------------------------|
 | `info(msg)` `warn(msg)` `error(msg)` | Emit a diagnostic.                        |
+| `env(name, default=…)`              | Read a process environment variable.       |
 | `fs.read(path)` `fs.write(path, s)` | Read / write a file.                       |
 | `json.encode(v)` `json.decode(s)`   | JSON encode / decode.                      |
 | `yaml.encode(v)` `yaml.decode(s)`   | YAML encode / decode.                      |
