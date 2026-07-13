@@ -13,11 +13,8 @@ const HF_TOKEN: &str = "HF_TOKEN";
 
 pub trait Repository: Send + Sync {
     fn exists(&self, path: &Path) -> bool;
-
     fn get(&self, path: &Path) -> Result<Asset>;
-
     fn read(&self, path: &Path) -> Result<AssetData>;
-
     fn resolve(&self, path: &Path) -> Result<PathBuf>;
 }
 
