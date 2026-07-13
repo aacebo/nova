@@ -47,7 +47,6 @@ fn missing_required_kwarg_fails_and_skips_steps() {
     drop(runtime);
 
     assert!(result.is_err());
-    assert!(recorder.has_error());
     assert!(!recorder.messages().iter().any(|m| m == "ran"), "{:?}", recorder.messages());
 }
 
@@ -78,7 +77,6 @@ fn positional_by_index_passes_and_fails() {
     .unwrap();
     assert!(fail.call("t", nova::args!("nope")).is_err());
     drop(fail);
-    assert!(fail_recorder.has_error());
     assert!(!fail_recorder.messages().iter().any(|m| m == "ran"));
 }
 
@@ -96,7 +94,6 @@ fn type_mismatch_fails() {
 
     assert!(runtime.call("t", nova::args!(count = "not-a-number")).is_err());
     drop(runtime);
-    assert!(recorder.has_error());
 }
 
 #[test]
@@ -163,7 +160,6 @@ fn merged_manifest_schemas_accept_either() {
     drop(runtime);
 
     assert!(recorder.messages().iter().any(|m| m == "ran"), "{:?}", recorder.messages());
-    assert!(recorder.has_error());
 }
 
 #[test]

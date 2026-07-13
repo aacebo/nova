@@ -1,0 +1,34 @@
+name: classify
+on: [call]
+
+args:
+  type: object
+  fields:
+    text:
+      type: string
+      min: 1
+      message: "review text is required"
+
+steps:
+  - name: sentiment
+    run: |
+      {% set out = ai.sentiment(text, min_score=0.5) %}
+      {% if out and out[0].label == 'negative' %}
+        {{ warn('#' ~ index ~ ' NEGATIVE (' ~ out[0].score ~ ') — ' ~ text) }}
+      {% else %}
+        {{ info('#' ~ index ~ ' positive — ' ~ text) }}
+      {% endif %}
+
+  - name: entities
+    run: |
+      {% set found = ai.entities.extract(text, min_score=0.9) %}
+      {% if found %}
+        {{ info('#' ~ index ~ ' entities: ' ~ (found | map(attribute='text') | join(', '))) }}
+      {% endif %}
+
+  - name: keywords
+    run: |
+      {% set words = ai.keywords.extract(text) %}
+      {% if words %}
+        {{ info('#' ~ index ~ ' keywords: ' ~ (words | map(attribute='text') | join(', '))) }}
+      {% endif %}

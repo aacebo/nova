@@ -16,7 +16,7 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-nova = { path = "..", features = ["fs", "codec", "http"] }
+nova = { path = "..", features = ["fs", "codec", "http", "ai"] }
 glob = { version = "0.3" }
 clap = { version = "4.6", features = ["derive"] }
 figment = { version = "0.10", features = ["yaml"] }

@@ -1,0 +1,15 @@
+name: triage
+on: [run]
+
+vars:
+  reviews:
+    - "The staff at the Hilton in London were incredibly helpful, loved it."
+    - "Terrible experience with Acme Corp. The booking was a mess and nobody answered."
+    - "Sarah Johnson gave us a wonderful tour of the Louvre in Paris."
+
+steps:
+  - name: fan_out
+    run: |
+      {% for review in reviews %}
+        {{ classify(text=review, index=loop.index) }}
+      {% endfor %}

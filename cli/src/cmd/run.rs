@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use figment::Figment;
 use figment::providers::{Format, Yaml};
+use nova::ai::AI;
 use nova::codec::Codec;
 use nova::fs::FileSystem;
 use nova::http::Http;
@@ -54,7 +55,7 @@ impl Args {
                 sink.lock().unwrap().push(d.clone());
             }));
 
-        builder = builder.fs().json().yaml().http();
+        builder = builder.fs().json().yaml().http().ai();
 
         for manifest in manifests {
             builder = builder.routine(manifest);

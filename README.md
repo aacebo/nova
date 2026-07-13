@@ -216,8 +216,36 @@ steps:
 | `json.encode(v)` `json.decode(s)`   | JSON encode / decode.                      |
 | `yaml.encode(v)` `yaml.decode(s)`   | YAML encode / decode.                      |
 | `http.get(url)`                     | HTTP request — returns `.status`, etc.     |
+| `ai.sentiment(text)`                | Sentiment classification (annotations).    |
+| `ai.entities.extract(text)`         | Named-entity extraction (annotations).     |
+| `ai.keywords.extract(text)`         | Keyword extraction (annotations).          |
+| `ai.pii.extract(text)`              | PII detection (annotations).               |
+| `ai.embeddings(text)`               | Sentence embeddings (artifacts + vectors). |
+| `ai.summarize(text)`                | Abstractive summarization (artifacts).     |
 
 Standard minijinja filters (`| length`), loops with `loop.index`, `{% set %}`, and `{% if %}/{% else %}` all work.
+
+### AI routines
+
+The `ai` module wraps [rust-bert](https://github.com/guillaume-be/rust-bert) NLP pipelines (enabled by the `ai` feature, on by default in the CLI). Each routine accepts a single string **or** a list of strings, plus an optional `min_score` keyword to filter low-confidence results. Models are downloaded on first use and cached per worker thread.
+
+`ai.sentiment`, `ai.entities.extract`, `ai.keywords.extract`, and `ai.pii.extract` return **annotations** (`name`, `label`, `text`, `score`, `spans`); `ai.embeddings` and `ai.summarize` return **artifacts** (`name`, `value`, and, for embeddings, a `vector`).
+
+```yaml
+name: analyze
+on: [run]
+
+vars:
+  review: "The staff were incredibly helpful and the room was spotless."
+
+steps:
+  - name: score
+    run: |
+      {% set out = ai.sentiment(review, min_score=0.5) %}
+      {% if out %}
+        {{ info('sentiment: ' ~ out[0].label ~ ' (' ~ out[0].score ~ ')') }}
+      {% endif %}
+```
 
 ---
 
@@ -281,6 +309,7 @@ The [`examples/`](examples/) directory doubles as a tutorial — each is runnabl
 | **build-pipeline** | A prioritized pipeline: writes/reads a JSON artifact, loops over build stages, asserts via shell exit codes, delegates to a `report` subroutine. | `nova run 'examples/build-pipeline/*.yml'` |
 | **http-healthcheck** | Probes a URL with `http.get`, writes a status file, then a lower-priority `notify` routine reads it back — cross-file ordering by priority. | `nova run 'examples/http-healthcheck/*.yml'` |
 | **batch-report** | Fans out over records with a `{% for %}` loop, calls a `format` subroutine per item, aggregates with shell, round-trips through YAML. | `nova run 'examples/batch-report/*.yml'` |
+| **review-triage** | Runs rust-bert NLP over customer reviews: a `classify` subroutine scores sentiment and extracts entities and keywords for each. Needs the `ai` feature. | `nova run 'examples/review-triage/*.yml'` |
 
 ---
 
@@ -297,7 +326,7 @@ Nova is a Cargo workspace. The root `nova` crate re-exports feature-gated capabi
 | `fs`      | `fs`      | Filesystem module (`fs.read` / `fs.write`).                          |
 | `codec`   | `codec`   | Encoding modules (`json`, `yaml`).                                   |
 | `http`    | `http`    | HTTP module (`http.get`).                                            |
-| `ai`      | `ai`      | AI / embedding types (early, on the backlog).                        |
+| `ai`      | `ai`      | AI module: rust-bert NLP routines (`ai.sentiment`, `ai.embeddings`, …). |
 
 For a deeper walkthrough of the design and a candid review of strengths and rough edges, see [REPORT.md](REPORT.md).
 
@@ -309,4 +338,4 @@ Nova is **pre-release (v0.0.0)** and evolving — APIs, the manifest schema, and
 
 **Backlog**
 
-- AI Module — `my name is {{ ai.complete('my name is') }}`
+- AI text completion — `my name is {{ ai.complete('my name is') }}` (the `ai` module ships NLP routines today; generative completion is still pending).
