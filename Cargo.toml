@@ -27,9 +27,6 @@ nova-schema = { path = "crates/schema", version = "0.0.0" }
 nova-reflect = { path = "crates/reflect", version = "0.0.0" }
 nova-reflect-macros = { path = "crates/reflect/macros", version = "0.0.0" }
 
-[profile.dev]
-incremental = false
-
 [package]
 name = "nova"
 description = "A YAML-driven workflow runtime with an embedded template engine"
@@ -40,6 +37,9 @@ readme.workspace = true
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
+
+[profile.dev]
+incremental = false
 
 [lib]
 doctest = false
