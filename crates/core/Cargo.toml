@@ -19,5 +19,5 @@ ulid = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive", "rc"] }
 minijinja = { version = "2", features = ["serde"] }
 crossbeam = { package = "crossbeam-channel", version = "0.5" }
-jsonschema = { version = "0.47", default-features = false }
-serde_json = "1"
+reflect = { package = "nova-reflect", path = "../reflect", features = ["serde", "minijinja"] }
+schema = { package = "nova-schema", path = "../schema" }

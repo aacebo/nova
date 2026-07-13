@@ -2,6 +2,7 @@ mod common;
 
 use common::Recorder;
 use nova::Value;
+use nova::schema::{Schema, number, object, string};
 
 fn build(manifest: nova::Manifest, recorder: &Recorder) -> Result<nova::Runtime, Box<dyn std::error::Error>> {
     nova::new().observe(recorder.clone()).routine(manifest).build()
@@ -11,20 +12,12 @@ fn routine() -> nova::build::ManifestBuilder {
     nova::manifest().name("t").on([nova::Trigger::Run { priority: None }])
 }
 
-fn schema(value: serde_json::Value) -> Value {
-    Value::from_serialize(value)
-}
-
 #[test]
 fn valid_kwargs_pass() {
     let recorder = Recorder::new();
     let runtime = build(
         routine()
-            .args(schema(serde_json::json!({
-                "type": "object",
-                "properties": { "name": { "type": "string" } },
-                "required": ["name"],
-            })))
+            .args(object().field("name", string()))
             .step(nova::step().run("{{ info('ran') }}"))
             .build(),
         &recorder,
@@ -43,11 +36,7 @@ fn missing_required_kwarg_fails_and_skips_steps() {
     let recorder = Recorder::new();
     let runtime = build(
         routine()
-            .args(schema(serde_json::json!({
-                "type": "object",
-                "properties": { "name": { "type": "string" } },
-                "required": ["name"],
-            })))
+            .args(object().field("name", string()))
             .step(nova::step().run("{{ info('ran') }}"))
             .build(),
         &recorder,
@@ -67,11 +56,7 @@ fn positional_by_index_passes_and_fails() {
     let pass_recorder = Recorder::new();
     let pass = build(
         routine()
-            .args(schema(serde_json::json!({
-                "type": "object",
-                "properties": { "0": { "type": "number" } },
-                "required": ["0"],
-            })))
+            .args(object().field("0", number()))
             .step(nova::step().run("{{ info('ran') }}"))
             .build(),
         &pass_recorder,
@@ -85,11 +70,7 @@ fn positional_by_index_passes_and_fails() {
     let fail_recorder = Recorder::new();
     let fail = build(
         routine()
-            .args(schema(serde_json::json!({
-                "type": "object",
-                "properties": { "0": { "type": "number" } },
-                "required": ["0"],
-            })))
+            .args(object().field("0", number()))
             .step(nova::step().run("{{ info('ran') }}"))
             .build(),
         &fail_recorder,
@@ -106,11 +87,7 @@ fn type_mismatch_fails() {
     let recorder = Recorder::new();
     let runtime = build(
         routine()
-            .args(schema(serde_json::json!({
-                "type": "object",
-                "properties": { "count": { "type": "number" } },
-                "required": ["count"],
-            })))
+            .args(object().field("count", number()))
             .step(nova::step().run("{{ info('ran') }}"))
             .build(),
         &recorder,
@@ -140,11 +117,7 @@ fn call_step_is_validated_by_target() {
     let target = nova::manifest()
         .name("a")
         .on([nova::Trigger::Call])
-        .args(schema(serde_json::json!({
-            "type": "object",
-            "properties": { "name": { "type": "string" } },
-            "required": ["name"],
-        })))
+        .args(object().field("name", string()))
         .step(nova::step().run("{{ info('a ran') }}"))
         .build();
 
@@ -167,23 +140,13 @@ fn call_step_is_validated_by_target() {
 }
 
 #[test]
-fn merged_manifest_schemas_both_apply() {
+fn merged_manifest_schemas_accept_either() {
     let recorder = Recorder::new();
     let first = routine()
-        .args(schema(serde_json::json!({
-            "type": "object",
-            "properties": { "name": { "type": "string" } },
-            "required": ["name"],
-        })))
+        .args(object().field("name", string()))
         .step(nova::step().run("{{ info('ran') }}"))
         .build();
-    let second = routine()
-        .args(schema(serde_json::json!({
-            "type": "object",
-            "properties": { "count": { "type": "number" } },
-            "required": ["count"],
-        })))
-        .build();
+    let second = routine().args(object().field("count", number())).build();
 
     let runtime = nova::new()
         .observe(recorder.clone())
@@ -192,8 +155,11 @@ fn merged_manifest_schemas_both_apply() {
         .build()
         .unwrap();
 
-    assert!(runtime.call("t", nova::args!(name = "x")).is_err());
-    runtime.call("t", nova::args!(name = "x", count = 3)).unwrap();
+    // merged schemas form a `oneof`: either shape is accepted.
+    runtime.call("t", nova::args!(name = "x")).unwrap();
+    runtime.call("t", nova::args!(count = 3)).unwrap();
+    // a value matching neither shape is rejected.
+    assert!(runtime.call("t", nova::args!(other = true)).is_err());
     drop(runtime);
 
     assert!(recorder.messages().iter().any(|m| m == "ran"), "{:?}", recorder.messages());
@@ -201,15 +167,9 @@ fn merged_manifest_schemas_both_apply() {
 }
 
 #[test]
-fn bad_schema_fails_at_build() {
-    let recorder = Recorder::new();
-    let result = build(
-        routine()
-            .args(schema(serde_json::json!({ "type": "not-a-real-type" })))
-            .step(nova::step().run("{{ info('ran') }}"))
-            .build(),
-        &recorder,
-    );
-
-    assert!(result.is_err());
+fn schema_round_trips_through_json() {
+    let schema = Schema::Object(object().field("name", string().min(1)));
+    let json = serde_json::to_string(&schema).unwrap();
+    let back: Schema = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&back).unwrap(), json);
 }

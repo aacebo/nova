@@ -23,6 +23,34 @@ impl ToValue for minijinja::Value {
                 }
             }
             ValueKind::String => Value::Str(crate::Str(std::borrow::Cow::Owned(self.to_string()))),
+            ValueKind::Map => {
+                let ty = crate::MapType::new(crate::Type::Any, crate::Type::Any, crate::Type::Any);
+                let mut map = crate::Map::new(&ty);
+
+                if let Ok(keys) = self.try_iter() {
+                    for key in keys {
+                        let value = self.get_item(&key).unwrap_or_default();
+                        map.insert(key.to_value().into_owned(), value.to_value().into_owned());
+                    }
+                }
+
+                Value::Map(map)
+            }
+            ValueKind::Seq | ValueKind::Iterable => {
+                let ty = crate::MapType::new(crate::Type::Any, crate::Type::Any, crate::Type::Any);
+                let mut map = crate::Map::new(&ty);
+
+                if let Ok(items) = self.try_iter() {
+                    for (i, item) in items.enumerate() {
+                        map.insert(
+                            Value::Number(crate::Number::Int(crate::Int::U64(i as u64))),
+                            item.to_value().into_owned(),
+                        );
+                    }
+                }
+
+                Value::Map(map)
+            }
             _ => Value::Null,
         }
     }
@@ -231,5 +259,43 @@ mod test {
             minijinja::value::Object::repr(&obj),
             minijinja::value::ObjectRepr::Map
         ));
+    }
+
+    #[test]
+    fn to_value_converts_nested_object() {
+        use crate::ToValue;
+
+        let value = minijinja::Value::from_serialize(minijinja::context! {
+            name => "alex",
+            address => minijinja::context! { city => "nyc", zip => 10001 },
+        });
+
+        let converted = value.to_value();
+        assert!(converted.is_map());
+
+        let map = converted.as_map().unwrap();
+        let name = map.get(&Value::Str(crate::Str("name".into()))).unwrap();
+        assert_eq!(name, &Value::Str(crate::Str("alex".into())));
+
+        let address = map.get(&Value::Str(crate::Str("address".into()))).unwrap();
+        assert!(address.is_map());
+        let address_map = address.as_map().unwrap();
+        let city = address_map.get(&Value::Str(crate::Str("city".into()))).unwrap();
+        assert_eq!(city, &Value::Str(crate::Str("nyc".into())));
+    }
+
+    #[test]
+    fn to_value_converts_sequence() {
+        use crate::ToValue;
+
+        let value = minijinja::Value::from_serialize(vec!["a", "b", "c"]);
+        let converted = value.to_value();
+
+        assert!(converted.is_map());
+        assert_eq!(converted.len(), 3);
+
+        let map = converted.as_map().unwrap();
+        let first = map.get(&Value::Number(Number::Int(crate::Int::U64(0)))).unwrap();
+        assert_eq!(first, &Value::Str(crate::Str("a".into())));
     }
 }

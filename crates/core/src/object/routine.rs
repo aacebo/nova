@@ -9,7 +9,7 @@ pub struct Routine {
     name: String,
     scope: Scope,
     steps: Vec<Step>,
-    validator: Option<Arc<jsonschema::Validator>>,
+    validator: Option<Arc<schema::Schema>>,
 }
 
 impl Routine {
@@ -17,7 +17,7 @@ impl Routine {
         name: impl Into<String>,
         scope: Scope,
         steps: impl IntoIterator<Item = impl Into<Step>>,
-        validator: Option<Arc<jsonschema::Validator>>,
+        validator: Option<Arc<schema::Schema>>,
     ) -> Self {
         Self {
             name: name.into(),
@@ -50,29 +50,28 @@ impl Routine {
     }
 
     fn validate(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+        use reflect::ToValue;
+
         let Some(validator) = &self.validator else {
             return Ok(());
         };
 
-        let mut instance = serde_json::Map::new();
+        let ty = reflect::MapType::new(reflect::Type::Any, reflect::Type::Any, reflect::Type::Any);
+        let mut instance = reflect::Map::new(&ty);
 
         for (key, value) in args {
-            instance.insert(key.to_string(), serde_json::to_value(&value)?);
+            instance.insert(key.to_value().into_owned(), value.to_value().into_owned());
         }
 
-        let instance = serde_json::Value::Object(instance);
-        let errors: Vec<String> = validator
-            .iter_errors(&instance)
-            .map(|err| format!("{} ({})", err, err.instance_path()))
-            .collect();
+        let instance = reflect::Value::Map(instance);
 
-        if errors.is_empty() {
-            return Ok(());
+        if let Err(err) = schema::Validate::validate(validator.as_ref(), &instance) {
+            let message = format!("invalid args for `{}`: {}", self.name, err);
+            scope.error(message.clone());
+            return Err(Box::new(Error::action(scope.trace_id().to_string(), &self.name, message)));
         }
 
-        let message = format!("invalid args for `{}`: {}", self.name, errors.join("; "));
-        scope.error(message.clone());
-        Err(Box::new(Error::action(scope.trace_id().to_string(), &self.name, message)))
+        Ok(())
     }
 }
 

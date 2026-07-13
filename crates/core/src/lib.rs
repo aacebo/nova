@@ -14,7 +14,8 @@ pub use event::{Event, Observer};
 pub use manifest::*;
 pub use minijinja::context;
 pub use object::*;
-pub use serde_json::json;
+pub use reflect;
+pub use schema;
 pub use state::*;
 
 pub type Value = minijinja::Value;
@@ -235,14 +236,7 @@ impl Builder {
                 }
             }
 
-            let validator = match &manifest.args {
-                Some(schema) => {
-                    let schema = serde_json::to_value(schema)?;
-                    Some(std::sync::Arc::new(jsonschema::validator_for(&schema)?))
-                }
-                None => None,
-            };
-
+            let validator = manifest.args.clone().map(std::sync::Arc::new);
             root.set(name.clone(), Routine::new(name, scope, manifest.steps, validator));
         }
 
