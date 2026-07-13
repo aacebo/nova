@@ -1,25 +1,25 @@
 mod aggregation;
+mod checkpoint;
 mod config;
-mod model;
-mod pipeline;
+mod extract;
+mod local;
+mod pii;
+mod remote;
 
-use std::sync::OnceLock;
+use std::sync::{Arc, LazyLock};
 
+pub use checkpoint::TokenClassificationCheckpoint;
 pub use config::Config;
-pub use model::TokenClassificationModel;
-pub use pipeline::TokenClassification;
+pub use extract::Extract;
 
+use crate::pipelines::cache::Cache;
+use crate::pipelines::{Key, Model};
 use crate::resources::Result;
 
-static PIPELINE: OnceLock<TokenClassification> = OnceLock::new();
+static PIPELINES: LazyLock<Cache<dyn Extract>> = LazyLock::new(Cache::new);
 
-/// NER and PII run the same checkpoint, so they share one pipeline rather than loading
-/// BERT-large twice.
-pub fn get() -> Result<&'static TokenClassification> {
-    if let Some(pipeline) = PIPELINE.get() {
-        return Ok(pipeline);
-    }
-
-    let pipeline = Config::default().build()?;
-    Ok(PIPELINE.get_or_init(|| pipeline))
+pub fn get(model: &Model, api_key: &Option<String>) -> Result<Arc<dyn Extract>> {
+    PIPELINES.get_or_build(Key::new(model, api_key), || {
+        Config::default().model(model.clone()).api_key(api_key.clone()).build()
+    })
 }

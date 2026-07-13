@@ -6,39 +6,6 @@ use super::config::Config;
 use super::embeddings::LearnedPositionalEmbedding;
 
 #[derive(Debug, Clone)]
-pub struct EncoderLayer {
-    self_attn: Attention,
-    self_attn_layer_norm: LayerNorm,
-    activation_fn: candle_nn::Activation,
-    fc1: Linear,
-    fc2: Linear,
-    final_layer_norm: LayerNorm,
-}
-
-impl EncoderLayer {
-    pub fn new(cfg: &Config, vb: VarBuilder) -> Result<Self> {
-        Ok(Self {
-            self_attn: Attention::new(cfg, false, vb.pp("self_attn"))?,
-            self_attn_layer_norm: layer_norm(cfg.d_model, 1e-5, vb.pp("self_attn_layer_norm"))?,
-            activation_fn: cfg.activation_function,
-            fc1: linear(cfg.d_model, cfg.encoder_ffn_dim, vb.pp("fc1"))?,
-            fc2: linear(cfg.encoder_ffn_dim, cfg.d_model, vb.pp("fc2"))?,
-            final_layer_norm: layer_norm(cfg.d_model, 1e-5, vb.pp("final_layer_norm"))?,
-        })
-    }
-
-    fn forward(&mut self, xs: &Tensor) -> Result<Tensor> {
-        let residual = xs;
-        let xs = (self.self_attn.forward(xs, None, None)? + residual)?.apply(&self.self_attn_layer_norm)?;
-
-        let residual = &xs;
-        let xs = xs.apply(&self.fc1)?.apply(&self.activation_fn)?.apply(&self.fc2)?;
-
-        (xs + residual)?.apply(&self.final_layer_norm)
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct Encoder {
     embed_tokens: Embedding,
     embed_positions: LearnedPositionalEmbedding,
@@ -81,5 +48,37 @@ impl Encoder {
         }
 
         Ok(xs)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EncoderLayer {
+    self_attn: Attention,
+    self_attn_layer_norm: LayerNorm,
+    activation_fn: candle_nn::Activation,
+    fc1: Linear,
+    fc2: Linear,
+    final_layer_norm: LayerNorm,
+}
+
+impl EncoderLayer {
+    pub fn new(cfg: &Config, vb: VarBuilder) -> Result<Self> {
+        Ok(Self {
+            self_attn: Attention::new(cfg, false, vb.pp("self_attn"))?,
+            self_attn_layer_norm: layer_norm(cfg.d_model, 1e-5, vb.pp("self_attn_layer_norm"))?,
+            activation_fn: cfg.activation_function,
+            fc1: linear(cfg.d_model, cfg.encoder_ffn_dim, vb.pp("fc1"))?,
+            fc2: linear(cfg.encoder_ffn_dim, cfg.d_model, vb.pp("fc2"))?,
+            final_layer_norm: layer_norm(cfg.d_model, 1e-5, vb.pp("final_layer_norm"))?,
+        })
+    }
+
+    pub fn forward(&mut self, xs: &Tensor) -> Result<Tensor> {
+        let residual = xs;
+        let xs = (self.self_attn.forward(xs, None, None)? + residual)?.apply(&self.self_attn_layer_norm)?;
+        let residual = &xs;
+        let xs = xs.apply(&self.fc1)?.apply(&self.activation_fn)?.apply(&self.fc2)?;
+
+        (xs + residual)?.apply(&self.final_layer_norm)
     }
 }

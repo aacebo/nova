@@ -3,6 +3,7 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::bert;
 
 use super::config::Config;
+use crate::models::Forward;
 use crate::resources::{Error, Result};
 
 pub struct Bert {
@@ -19,7 +20,15 @@ impl Bert {
     /// `mask` is the keep-mask (1 = real token); `BertModel` widens it internally.
     pub fn forward(&self, ids: &Tensor, mask: &Tensor) -> Result<Tensor> {
         let types = ids.zeros_like().map_err(Error::inference)?;
-
         self.inner.forward(ids, &types, Some(mask)).map_err(Error::inference)
+    }
+}
+
+impl Forward for Bert {
+    type Input = (Tensor, Tensor);
+    type Output = Tensor;
+
+    fn forward(&self, (ids, mask): Self::Input) -> Result<Self::Output> {
+        self.forward(&ids, &mask)
     }
 }

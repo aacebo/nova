@@ -3,6 +3,7 @@ use candle_nn::{Linear, Module, VarBuilder, ops};
 
 use super::config::Config;
 use super::model::Bert;
+use crate::models::Forward;
 use crate::resources::{Error, Result};
 
 pub struct TokenClassifier {
@@ -35,5 +36,14 @@ impl TokenClassifier {
             .forward(&hidden)
             .and_then(|logits| ops::softmax(&logits, 2))
             .map_err(Error::inference)
+    }
+}
+
+impl Forward for TokenClassifier {
+    type Input = (Tensor, Tensor);
+    type Output = Tensor;
+
+    fn forward(&self, (ids, mask): Self::Input) -> Result<Self::Output> {
+        self.forward(&ids, &mask)
     }
 }

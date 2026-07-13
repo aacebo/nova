@@ -45,7 +45,6 @@ impl Attention {
     pub fn forward(&mut self, xs: &Tensor, kv_states: Option<&Tensor>, attn_mask: Option<&Tensor>) -> Result<Tensor> {
         let (b_sz, tgt_len, _) = xs.dims3()?;
         let query_states = (xs.apply(&self.q_proj)? * self.scaling)?;
-
         let (key_states, value_states) = match kv_states {
             Some(kv_states) => match &self.cross_cache {
                 Some((key, value)) => (key.clone(), value.clone()),
@@ -82,7 +81,6 @@ impl Attention {
         let query_states = self.shape(&query_states, b_sz)?.reshape(proj_shape)?;
         let key_states = key_states.reshape(proj_shape)?;
         let value_states = value_states.reshape(proj_shape)?;
-
         let attn_weights = query_states.matmul(&key_states.transpose(1, 2)?)?;
         let attn_weights = match attn_mask {
             None => attn_weights,

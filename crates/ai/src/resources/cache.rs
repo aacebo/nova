@@ -1,18 +1,15 @@
 use std::path::PathBuf;
 
-const ENV: &str = "NOVA_CACHE";
-const DIR: &str = ".cache";
-
 /// Where downloaded model weights live: `$NOVA_CACHE`, else a `.cache/` directory at the root of
 /// the enclosing repository, else `hf-hub`'s own default (`$HF_HOME`, else `~/.cache/huggingface`).
 ///
 /// The fallback matters: a published `nova-ai` may run with no repository above it at all.
 pub fn dir() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os(ENV) {
+    if let Some(path) = std::env::var_os("NOVA_CACHE") {
         return Some(PathBuf::from(path));
     }
 
-    root().map(|root| root.join(DIR))
+    root().map(|root| root.join(".cache"))
 }
 
 /// `.git` marks the repository root. Falling back to the *outermost* `Cargo.toml` finds the

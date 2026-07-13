@@ -3,19 +3,21 @@ use tokenizers::Tokenizer;
 
 use super::aggregation::{self, Word};
 use super::config::Config;
+use super::extract::Extract;
+use super::pii;
 use crate::models::bert;
-use crate::resources::{Error, Repo, Result};
-use crate::types::{Entity, Token};
+use crate::resources::{Error, Result};
+use crate::types::Entity;
 
-pub struct TokenClassification {
+pub struct Local {
     classifier: bert::TokenClassifier,
     tokenizer: Tokenizer,
     device: Device,
 }
 
-impl TokenClassification {
-    pub(super) fn new(config: Config) -> Result<Self> {
-        let repo = Repo::open(config.model, config.device, config.dtype)?;
+impl Local {
+    pub fn new(config: Config) -> Result<Self> {
+        let repo = config.model.loader(config.device.clone(), config.dtype)?;
         let model: bert::Config = repo.config()?;
         let device = repo.device().clone();
 
@@ -26,21 +28,15 @@ impl TokenClassification {
         })
     }
 
-    pub fn predict<S: AsRef<str>>(&self, text: &[S]) -> Result<Vec<Vec<Token>>> {
+    fn ner(&self, text: &[&str]) -> Result<Vec<Vec<Entity>>> {
         text.iter()
-            .map(|text| {
-                let text = text.as_ref();
-                Ok(aggregation::tokens(self.words(text)?, text))
-            })
+            .map(|text| Ok(aggregation::entities(self.words(text)?, text)))
             .collect()
     }
 
-    pub fn predict_entities<S: AsRef<str>>(&self, text: &[S]) -> Result<Vec<Vec<Entity>>> {
+    fn identifiers(&self, text: &[&str], min_score: f64) -> Result<Vec<Vec<Entity>>> {
         text.iter()
-            .map(|text| {
-                let text = text.as_ref();
-                Ok(aggregation::entities(self.words(text)?, text))
-            })
+            .map(|text| Ok(pii::entities(self.words(text)?, text, min_score)))
             .collect()
     }
 
@@ -64,5 +60,15 @@ impl TokenClassification {
             .map_err(Error::inference)?;
 
         aggregation::words(&probs, &encoding, self.classifier.labels())
+    }
+}
+
+impl Extract for Local {
+    fn entities(&self, text: &[&str]) -> Result<Vec<Vec<Entity>>> {
+        self.ner(text)
+    }
+
+    fn pii(&self, text: &[&str], min_score: f64) -> Result<Vec<Vec<Entity>>> {
+        self.identifiers(text, min_score)
     }
 }

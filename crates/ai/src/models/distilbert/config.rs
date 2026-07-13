@@ -1,5 +1,6 @@
 use candle_transformers::models::distilbert;
 
+use crate::models::Architecture;
 use crate::resources::{Error, Result};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -14,7 +15,7 @@ pub struct Config {
     pub initializer_range: f64,
     pub pad_token_id: usize,
     #[serde(default)]
-    pub model_type: Option<String>,
+    pub model_type: Architecture,
 }
 
 impl Config {
@@ -57,8 +58,6 @@ impl Config {
         self
     }
 
-    /// candle's `distilbert::Config` has private fields and no constructor, so serde is the
-    /// only way to build one.
     pub fn to_candle(&self) -> Result<distilbert::Config> {
         let json = serde_json::to_value(self).map_err(Error::load)?;
         serde_json::from_value(json).map_err(Error::load)

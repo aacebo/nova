@@ -1,13 +1,15 @@
 use candle_core::{DType, Device};
 
-use super::pipeline::Keywords;
-use crate::pipelines::sentence_embeddings::SentenceEmbeddingsModel;
-use crate::resources::{self, ModelResource, Result};
-
-const TOP_N: usize = 5;
+use super::extract::Keywords;
+use super::{local, remote};
+use crate::clients::openai::OpenAI;
+use crate::pipelines::Model;
+use crate::pipelines::sentence_embeddings::SentenceEmbeddingsCheckpoint;
+use crate::resources::{Provider, Result};
 
 pub struct Config {
-    pub model: ModelResource,
+    pub model: Model,
+    pub api_key: Option<String>,
     pub device: Device,
     pub dtype: DType,
     pub top_n: usize,
@@ -16,17 +18,23 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            model: SentenceEmbeddingsModel::AllMiniLmL6V2.resource(),
-            device: resources::default_device(),
-            dtype: resources::default_dtype(),
-            top_n: TOP_N,
+            model: SentenceEmbeddingsCheckpoint::AllMiniLmL6V2.model(),
+            api_key: None,
+            device: Device::Cpu,
+            dtype: DType::F32,
+            top_n: 5,
         }
     }
 }
 
 impl Config {
-    pub fn model(mut self, model: impl Into<ModelResource>) -> Self {
-        self.model = model.into();
+    pub fn model(mut self, model: Model) -> Self {
+        self.model = model;
+        self
+    }
+
+    pub fn api_key(mut self, api_key: Option<String>) -> Self {
+        self.api_key = api_key;
         self
     }
 
@@ -45,7 +53,15 @@ impl Config {
         self
     }
 
-    pub fn build(self) -> Result<Keywords> {
-        Keywords::new(self)
+    pub fn build(self) -> Result<std::sync::Arc<dyn Keywords>> {
+        match &self.model {
+            Model::Remote { provider, id, base_url } => match provider {
+                Provider::OpenAI => {
+                    let client = OpenAI::new(id.clone(), base_url.clone(), self.api_key.clone());
+                    Ok(std::sync::Arc::new(remote::Remote::new(client, self.top_n)))
+                }
+            },
+            _ => Ok(std::sync::Arc::new(local::Local::new(self)?)),
+        }
     }
 }

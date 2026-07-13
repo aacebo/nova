@@ -1,3 +1,5 @@
+#![cfg(feature = "schema")]
+
 mod common;
 
 use common::Recorder;

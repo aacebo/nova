@@ -1,11 +1,15 @@
 use candle_core::{DType, Device};
 
-use super::model::TokenClassificationModel;
-use super::pipeline::TokenClassification;
-use crate::resources::{self, ModelResource, Result};
+use super::checkpoint::TokenClassificationCheckpoint;
+use super::extract::Extract;
+use super::{local, remote};
+use crate::clients::openai::OpenAI;
+use crate::pipelines::Model;
+use crate::resources::{Provider, Result};
 
 pub struct Config {
-    pub model: ModelResource,
+    pub model: Model,
+    pub api_key: Option<String>,
     pub device: Device,
     pub dtype: DType,
 }
@@ -13,16 +17,22 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            model: TokenClassificationModel::BertLargeConll03.resource(),
-            device: resources::default_device(),
-            dtype: resources::default_dtype(),
+            model: TokenClassificationCheckpoint::BertLargeConll03.model(),
+            api_key: None,
+            device: Device::Cpu,
+            dtype: DType::F32,
         }
     }
 }
 
 impl Config {
-    pub fn model(mut self, model: impl Into<ModelResource>) -> Self {
-        self.model = model.into();
+    pub fn model(mut self, model: Model) -> Self {
+        self.model = model;
+        self
+    }
+
+    pub fn api_key(mut self, api_key: Option<String>) -> Self {
+        self.api_key = api_key;
         self
     }
 
@@ -36,7 +46,15 @@ impl Config {
         self
     }
 
-    pub fn build(self) -> Result<TokenClassification> {
-        TokenClassification::new(self)
+    pub fn build(self) -> Result<std::sync::Arc<dyn Extract>> {
+        match &self.model {
+            Model::Remote { provider, id, base_url } => match provider {
+                Provider::OpenAI => {
+                    let client = OpenAI::new(id.clone(), base_url.clone(), self.api_key.clone());
+                    Ok(std::sync::Arc::new(remote::Remote::new(client)))
+                }
+            },
+            _ => Ok(std::sync::Arc::new(local::Local::new(self)?)),
+        }
     }
 }

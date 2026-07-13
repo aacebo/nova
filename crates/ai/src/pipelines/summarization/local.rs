@@ -4,11 +4,12 @@ use candle_core::{Device, Tensor};
 use tokenizers::Tokenizer;
 
 use super::config::Config;
+use super::summarize::Summarize;
 use crate::models::bart::{self, Bart};
 use crate::pipelines::generation;
-use crate::resources::{Error, Repo, Result};
+use crate::resources::{Error, Result};
 
-pub struct Summarization {
+pub struct Local {
     model: Mutex<Bart>,
     generation: generation::Config,
     tokenizer: Tokenizer,
@@ -16,9 +17,9 @@ pub struct Summarization {
     device: Device,
 }
 
-impl Summarization {
-    pub(super) fn new(config: Config) -> Result<Self> {
-        let repo = Repo::open(config.model, config.device, config.dtype)?;
+impl Local {
+    pub fn new(config: Config) -> Result<Self> {
+        let repo = config.model.loader(config.device.clone(), config.dtype)?;
         let model: bart::Config = repo.config()?;
         let device = repo.device().clone();
 
@@ -37,8 +38,8 @@ impl Summarization {
         })
     }
 
-    pub fn summarize<S: AsRef<str>>(&self, text: &[S]) -> Result<Vec<String>> {
-        text.iter().map(|text| self.summarize_one(text.as_ref())).collect()
+    fn all(&self, text: &[&str]) -> Result<Vec<String>> {
+        text.iter().map(|text| self.summarize_one(text)).collect()
     }
 
     fn summarize_one(&self, text: &str) -> Result<String> {
@@ -61,5 +62,11 @@ impl Summarization {
             .decode(&tokens, true)
             .map(|summary| summary.trim().to_string())
             .map_err(Error::tokenize)
+    }
+}
+
+impl Summarize for Local {
+    fn summarize(&self, text: &[&str]) -> Result<Vec<String>> {
+        self.all(text)
     }
 }

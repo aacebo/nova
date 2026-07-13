@@ -1,21 +1,22 @@
 use candle_core::Device;
 use tokenizers::Tokenizer;
 
+use super::classify::Classify;
 use super::config::Config;
 use crate::models::distilbert;
 use crate::pipelines::common::Batch;
-use crate::resources::{Error, Repo, Result};
+use crate::resources::{Error, Result};
 use crate::types::{Polarity, Sentiment as Output};
 
-pub struct Sentiment {
+pub struct Local {
     classifier: distilbert::SequenceClassifier,
     tokenizer: Tokenizer,
     device: Device,
 }
 
-impl Sentiment {
-    pub(super) fn new(config: Config) -> Result<Self> {
-        let repo = Repo::open(config.model, config.device, config.dtype)?;
+impl Local {
+    pub fn new(config: Config) -> Result<Self> {
+        let repo = config.model.loader(config.device.clone(), config.dtype)?;
         let model: distilbert::Config = repo.config()?;
         let device = repo.device().clone();
 
@@ -26,13 +27,12 @@ impl Sentiment {
         })
     }
 
-    pub fn predict<S: AsRef<str>>(&self, text: &[S]) -> Result<Vec<Output>> {
+    fn predict(&self, text: &[&str]) -> Result<Vec<Output>> {
         if text.is_empty() {
             return Ok(Vec::new());
         }
 
-        let text: Vec<&str> = text.iter().map(AsRef::as_ref).collect();
-        let encodings = self.tokenizer.encode_batch(text, true).map_err(Error::tokenize)?;
+        let encodings = self.tokenizer.encode_batch(text.to_vec(), true).map_err(Error::tokenize)?;
         let batch = Batch::new(encodings, &self.device)?;
 
         let probs = self.classifier.forward(&batch.ids, &batch.padding()?)?;
@@ -56,5 +56,11 @@ impl Sentiment {
                 }
             })
             .collect())
+    }
+}
+
+impl Classify for Local {
+    fn classify(&self, text: &[&str]) -> Result<Vec<Output>> {
+        self.predict(text)
     }
 }

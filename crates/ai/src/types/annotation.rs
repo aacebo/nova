@@ -13,18 +13,13 @@ pub struct Annotation {
 
 impl Reflect for Annotation {
     fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
-        let key = key.as_str()?;
-
-        if key == "name" {
-            Some((&self.name).into())
-        } else if key == "label" {
-            Some((&self.label).into())
-        } else if key == "text" {
-            Some((&self.text).into())
-        } else if key == "score" {
-            Some(self.score.into())
-        } else {
-            None
+        match key.as_str()? {
+            "name" => Some((&self.name).into()),
+            "label" => Some((&self.label).into()),
+            "text" => Some((&self.text).into()),
+            "score" => Some(self.score.into()),
+            "spans" => Some(Value::from_serialize(&self.spans)),
+            _ => None,
         }
     }
 }

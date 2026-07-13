@@ -1,23 +1,24 @@
 mod candidates;
 mod config;
-mod pipeline;
+mod extract;
+mod local;
+mod remote;
 mod scorer;
 mod stopwords;
 
-use std::sync::OnceLock;
+use std::sync::{Arc, LazyLock};
 
 pub use config::Config;
-pub use pipeline::Keywords;
+pub use extract::Keywords;
 
+use crate::pipelines::cache::Cache;
+use crate::pipelines::{Key, Model};
 use crate::resources::Result;
 
-static PIPELINE: OnceLock<Keywords> = OnceLock::new();
+static PIPELINES: LazyLock<Cache<dyn Keywords>> = LazyLock::new(Cache::new);
 
-pub fn get() -> Result<&'static Keywords> {
-    if let Some(pipeline) = PIPELINE.get() {
-        return Ok(pipeline);
-    }
-
-    let pipeline = Config::default().build()?;
-    Ok(PIPELINE.get_or_init(|| pipeline))
+pub fn get(model: &Model, api_key: &Option<String>) -> Result<Arc<dyn Keywords>> {
+    PIPELINES.get_or_build(Key::new(model, api_key), || {
+        Config::default().model(model.clone()).api_key(api_key.clone()).build()
+    })
 }

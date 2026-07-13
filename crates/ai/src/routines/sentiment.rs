@@ -1,25 +1,30 @@
-use crate::pipelines::sentiment;
-use crate::routines::Input;
-use crate::types::Polarity;
+use crate::pipelines::sentiment::{self, SentimentCheckpoint};
+use crate::routines::args;
 use crate::{Annotation, Offset};
 
-pub fn sentiment(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let input = Input::from_args(args)?;
-    let out = sentiment::get()?.predict(&input.text)?;
+pub fn sentiment(args_: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+    let text = args::text(args_)?;
+    let min_score = args::min_score(args_)?;
+    let model = args::model(args_, SentimentCheckpoint::DistilBertSst2.model())?;
+    let api_key = args::api_key(args_)?;
+    let out = sentiment::get(&model, &api_key)?.classify(&args::borrow(&text))?;
+
     let mut annotations: Vec<Annotation> = Vec::new();
 
-    for (i, sentiment) in out.into_iter().filter(|v| v.score as f32 >= input.min_score).enumerate() {
-        let polarity = match sentiment.polarity {
-            Polarity::Negative => "negative",
-            Polarity::Positive => "positive",
-        };
+    for (index, sentiment) in out.into_iter().enumerate() {
+        if sentiment.score < min_score {
+            continue;
+        }
+
+        let source = text.get(index).map(String::as_str).unwrap_or_default();
+        let label = sentiment.polarity.as_str();
 
         annotations.push(Annotation {
             name: String::from("sentiment"),
-            label: polarity.to_string(),
-            text: polarity.to_string(),
+            label: label.to_string(),
+            text: label.to_string(),
             score: sentiment.score,
-            spans: vec![Offset::new(0, input.text[i].len() as u32)],
+            spans: vec![Offset::new(0, source.chars().count() as u32)],
         });
     }
 

@@ -1,22 +1,23 @@
+mod checkpoint;
+mod classify;
 mod config;
-mod model;
-mod pipeline;
+mod local;
+mod remote;
 
-use std::sync::OnceLock;
+use std::sync::{Arc, LazyLock};
 
+pub use checkpoint::SentimentCheckpoint;
+pub use classify::Classify;
 pub use config::Config;
-pub use model::SentimentModel;
-pub use pipeline::Sentiment;
 
+use crate::pipelines::cache::Cache;
+use crate::pipelines::{Key, Model};
 use crate::resources::Result;
 
-static PIPELINE: OnceLock<Sentiment> = OnceLock::new();
+static PIPELINES: LazyLock<Cache<dyn Classify>> = LazyLock::new(Cache::new);
 
-pub fn get() -> Result<&'static Sentiment> {
-    if let Some(pipeline) = PIPELINE.get() {
-        return Ok(pipeline);
-    }
-
-    let pipeline = Config::default().build()?;
-    Ok(PIPELINE.get_or_init(|| pipeline))
+pub fn get(model: &Model, api_key: &Option<String>) -> Result<Arc<dyn Classify>> {
+    PIPELINES.get_or_build(Key::new(model, api_key), || {
+        Config::default().model(model.clone()).api_key(api_key.clone()).build()
+    })
 }

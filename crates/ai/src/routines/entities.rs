@@ -1,17 +1,21 @@
-use crate::pipelines::token_classification;
-use crate::routines::Input;
+use crate::pipelines::token_classification::{self, TokenClassificationCheckpoint};
+use crate::routines::args;
 use crate::{Annotation, Offset};
 
 pub fn entity_extraction(
-    args: &nova_core::Args,
+    args_: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let input = Input::from_args(args)?;
-    let out = token_classification::get()?.predict_entities(&input.text)?;
+    let text = args::text(args_)?;
+    let min_score = args::min_score(args_)?;
+    let model = args::model(args_, TokenClassificationCheckpoint::BertLargeConll03.model())?;
+    let api_key = args::api_key(args_)?;
+    let out = token_classification::get(&model, &api_key)?.entities(&args::borrow(&text))?;
+
     let mut annotations: Vec<Annotation> = Vec::new();
 
     for entities in out {
-        for entity in entities.into_iter().filter(|e| e.score as f32 >= input.min_score) {
+        for entity in entities.into_iter().filter(|e| e.score >= min_score) {
             annotations.push(Annotation {
                 name: String::from("entity"),
                 label: match entity.label.as_str() {

@@ -3,6 +3,7 @@ use candle_nn::VarBuilder;
 
 use super::config::Config;
 use super::model::Bert;
+use crate::models::Forward;
 use crate::resources::{Error, Result};
 
 pub struct Embedder {
@@ -19,7 +20,6 @@ impl Embedder {
     /// Sentence vectors: mean-pool the token states over the mask, then L2 normalize.
     pub fn forward(&self, ids: &Tensor, mask: &Tensor) -> Result<Tensor> {
         let hidden = self.bert.forward(ids, mask)?;
-
         normalize(&pool(&hidden, mask)?)
     }
 }
@@ -32,7 +32,6 @@ fn pool(hidden: &Tensor, mask: &Tensor) -> Result<Tensor> {
 
     let summed = hidden.broadcast_mul(&mask).and_then(|v| v.sum(1)).map_err(Error::inference)?;
     let counts = mask.sum(1).map_err(Error::inference)?;
-
     summed.broadcast_div(&counts).map_err(Error::inference)
 }
 
@@ -44,4 +43,13 @@ fn normalize(v: &Tensor) -> Result<Tensor> {
         .map_err(Error::inference)?;
 
     v.broadcast_div(&norm).map_err(Error::inference)
+}
+
+impl Forward for Embedder {
+    type Input = (Tensor, Tensor);
+    type Output = Tensor;
+
+    fn forward(&self, (ids, mask): Self::Input) -> Result<Self::Output> {
+        self.forward(&ids, &mask)
+    }
 }

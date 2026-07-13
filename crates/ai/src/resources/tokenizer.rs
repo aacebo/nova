@@ -17,7 +17,6 @@ pub fn from_vocab(path: impl AsRef<Path>, lowercase: bool) -> Result<Tokenizer> 
     let wordpiece = WordPiece::from_file(&path.as_ref().to_string_lossy())
         .build()
         .map_err(Error::tokenize)?;
-
     let cls = wordpiece
         .token_to_id("[CLS]")
         .ok_or_else(|| Error::Tokenize("vocab is missing [CLS]".to_string()))?;

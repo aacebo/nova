@@ -214,3 +214,54 @@ fn keyword_extraction_finds_salient_terms() {
         "expected a salient keyword in {found:?}"
     );
 }
+
+#[test]
+#[ignore]
+fn pii_extraction_finds_entities() {
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .step(nova::step().run(
+                "{% set found = ai.pii.extract('Contact Sarah Connor at Cyberdyne Systems in Los Angeles', min_score=0.5) %}\
+                 {{ info(found | map(attribute='text') | join('|')) }}",
+            ))
+            .build(),
+    );
+
+    assert!(!recorder.has_error(), "{:?}", recorder.messages());
+
+    let found = recorder.messages().join(" ");
+    assert!(found.contains("Sarah"), "expected a person in {found:?}");
+    assert!(found.contains("Cyberdyne"), "expected an org in {found:?}");
+}
+
+/// `Resource::Path` was matched but never constructed before the onyx refactor, so loading weights
+/// from a local directory was unreachable. This proves it now works.
+#[test]
+#[ignore]
+fn embeddings_load_from_a_local_directory() {
+    let snapshot = std::fs::read_dir(".cache")
+        .expect(".cache must exist; run the hub-backed tests first")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.to_string_lossy().contains("all-MiniLM-L6-v2"))
+        .map(|path| path.join("snapshots"))
+        .and_then(|path| std::fs::read_dir(path).ok()?.filter_map(Result::ok).next())
+        .map(|entry| entry.path())
+        .expect("a cached MiniLM-L6 snapshot");
+
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .step(nova::step().run(format!(
+                "{{% set out = ai.embeddings('hello there', model='{}') %}}{{{{ info(out[0].vector | length) }}}}",
+                snapshot.display()
+            )))
+            .build(),
+    );
+
+    assert!(!recorder.has_error(), "{:?}", recorder.messages());
+    assert!(recorder.messages().iter().any(|m| m == "384"), "{:?}", recorder.messages());
+}

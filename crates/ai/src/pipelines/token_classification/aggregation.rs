@@ -1,7 +1,7 @@
 use tokenizers::Encoding;
 
 use crate::resources::{Error, Result};
-use crate::types::{Entity, Offset, Token};
+use crate::types::{Entity, Offset};
 
 /// A whole word: sub-word pieces already merged, carrying BYTE offsets into the source text.
 pub struct Word {
@@ -54,18 +54,6 @@ pub fn words(probs: &[Vec<f32>], encoding: &Encoding, labels: &[String]) -> Resu
     }
 
     Ok(words)
-}
-
-pub fn tokens(words: Vec<Word>, text: &str) -> Vec<Token> {
-    words
-        .into_iter()
-        .map(|word| Token {
-            text: text[word.start..word.end].to_string(),
-            score: word.score,
-            label: word.label,
-            offset: Some(Offset::new(char_offset(text, word.start), char_offset(text, word.end))),
-        })
-        .collect()
 }
 
 /// CoNLL-03 is IOB1: entities may start with `I-`, and `B-` only splits adjacent same-type

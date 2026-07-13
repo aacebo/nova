@@ -2,19 +2,20 @@ use candle_core::Device;
 use tokenizers::Tokenizer;
 
 use super::config::Config;
+use super::embed::Embed;
 use crate::models::bert;
 use crate::pipelines::common::Batch;
-use crate::resources::{Error, Repo, Result};
+use crate::resources::{Error, Result};
 
-pub struct SentenceEmbeddings {
+pub struct Local {
     embedder: bert::Embedder,
     tokenizer: Tokenizer,
     device: Device,
 }
 
-impl SentenceEmbeddings {
-    pub(super) fn new(config: Config) -> Result<Self> {
-        let repo = Repo::open(config.model, config.device, config.dtype)?;
+impl Local {
+    pub fn new(config: Config) -> Result<Self> {
+        let repo = config.model.loader(config.device.clone(), config.dtype)?;
         let model: bert::Config = repo.config()?;
         let device = repo.device().clone();
 
@@ -25,18 +26,23 @@ impl SentenceEmbeddings {
         })
     }
 
-    pub fn encode<S: AsRef<str>>(&self, text: &[S]) -> Result<Vec<Vec<f32>>> {
+    pub fn encode(&self, text: &[&str]) -> Result<Vec<Vec<f32>>> {
         if text.is_empty() {
             return Ok(Vec::new());
         }
 
-        let text: Vec<&str> = text.iter().map(AsRef::as_ref).collect();
-        let encodings = self.tokenizer.encode_batch(text, true).map_err(Error::tokenize)?;
+        let encodings = self.tokenizer.encode_batch(text.to_vec(), true).map_err(Error::tokenize)?;
         let batch = Batch::new(encodings, &self.device)?;
 
         self.embedder
             .forward(&batch.ids, &batch.mask)?
             .to_vec2::<f32>()
             .map_err(Error::inference)
+    }
+}
+
+impl Embed for Local {
+    fn embed(&self, text: &[&str]) -> Result<Vec<Vec<f32>>> {
+        self.encode(text)
     }
 }

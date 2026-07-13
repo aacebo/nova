@@ -3,6 +3,7 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::distilbert;
 
 use super::config::Config;
+use crate::models::Forward;
 use crate::resources::{Error, Result};
 
 pub struct DistilBert {
@@ -16,8 +17,16 @@ impl DistilBert {
         })
     }
 
-    /// `padding` is truthy where a position must be IGNORED -- the inverse of Bert's keep-mask.
     pub fn forward(&self, ids: &Tensor, padding: &Tensor) -> Result<Tensor> {
         self.inner.forward(ids, padding).map_err(Error::inference)
+    }
+}
+
+impl Forward for DistilBert {
+    type Input = (Tensor, Tensor);
+    type Output = Tensor;
+
+    fn forward(&self, (ids, padding): Self::Input) -> Result<Self::Output> {
+        self.forward(&ids, &padding)
     }
 }

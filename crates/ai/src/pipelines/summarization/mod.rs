@@ -1,22 +1,23 @@
+mod checkpoint;
 mod config;
-mod model;
-mod pipeline;
+mod local;
+mod remote;
+mod summarize;
 
-use std::sync::OnceLock;
+use std::sync::{Arc, LazyLock};
 
+pub use checkpoint::SummarizationCheckpoint;
 pub use config::Config;
-pub use model::SummarizationModel;
-pub use pipeline::Summarization;
+pub use summarize::Summarize;
 
+use crate::pipelines::cache::Cache;
+use crate::pipelines::{Key, Model};
 use crate::resources::Result;
 
-static PIPELINE: OnceLock<Summarization> = OnceLock::new();
+static PIPELINES: LazyLock<Cache<dyn Summarize>> = LazyLock::new(Cache::new);
 
-pub fn get() -> Result<&'static Summarization> {
-    if let Some(pipeline) = PIPELINE.get() {
-        return Ok(pipeline);
-    }
-
-    let pipeline = Config::default().build()?;
-    Ok(PIPELINE.get_or_init(|| pipeline))
+pub fn get(model: &Model, api_key: &Option<String>) -> Result<Arc<dyn Summarize>> {
+    PIPELINES.get_or_build(Key::new(model, api_key), || {
+        Config::default().model(model.clone()).api_key(api_key.clone()).build()
+    })
 }

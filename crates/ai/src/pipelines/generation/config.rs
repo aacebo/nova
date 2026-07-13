@@ -8,7 +8,6 @@ pub struct Config {
     pub min_length: usize,
     pub length_penalty: f64,
     pub no_repeat_ngram_size: usize,
-
     pub eos_token_id: u32,
     pub decoder_start_token_id: u32,
     pub forced_bos_token_id: Option<u32>,

@@ -10,14 +10,12 @@ pub struct Config {
     pub decoder_ffn_dim: usize,
     pub activation_function: candle_nn::Activation,
     pub max_position_embeddings: usize,
-    #[serde(default)]
-    pub scale_embedding: bool,
-
     pub eos_token_id: u32,
     pub decoder_start_token_id: u32,
     pub forced_bos_token_id: Option<u32>,
     pub forced_eos_token_id: Option<u32>,
-
+    #[serde(default)]
+    pub scale_embedding: bool,
     #[serde(default = "default_beams")]
     pub num_beams: usize,
     #[serde(default = "default_max_length")]

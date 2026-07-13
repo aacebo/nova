@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use candle_transformers::models::bert;
 
+use crate::models::Architecture;
 use crate::resources::{Error, Result};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -21,7 +22,7 @@ pub struct Config {
     #[serde(default)]
     pub classifier_dropout: Option<f64>,
     #[serde(default)]
-    pub model_type: Option<String>,
+    pub model_type: Architecture,
     #[serde(default)]
     pub id2label: HashMap<String, String>,
 }
@@ -44,7 +45,7 @@ impl From<&Config> for bert::Config {
             position_embedding_type: bert::PositionEmbeddingType::Absolute,
             use_cache: false,
             classifier_dropout: config.classifier_dropout,
-            model_type: config.model_type.clone(),
+            model_type: Some(config.model_type.to_string()),
         }
     }
 }

@@ -1,23 +1,22 @@
 use super::config::Config;
+use super::extract::Keywords;
 use super::{candidates, scorer};
-use crate::pipelines::sentence_embeddings::{self, SentenceEmbeddings};
+use crate::pipelines::sentence_embeddings::{self, Embed};
 use crate::resources::Result;
 use crate::types::Keyword;
 
 /// KeyBERT: embed the document, embed each candidate word, rank candidates by cosine
 /// similarity to the document. Any sentence embedder will do.
-pub struct Keywords {
-    embeddings: SentenceEmbeddings,
+pub struct Local {
+    embeddings: std::sync::Arc<dyn Embed>,
     top_n: usize,
 }
 
-impl Keywords {
-    pub(super) fn new(config: Config) -> Result<Self> {
-        let embeddings = sentence_embeddings::Config::default()
-            .model(config.model)
-            .device(config.device)
-            .dtype(config.dtype)
-            .build()?;
+impl Local {
+    pub fn new(config: Config) -> Result<Self> {
+        // Through the shared cache: `ai.embeddings` and `ai.keywords.extract` on the same model
+        // then hold one copy of the weights, not two.
+        let embeddings = sentence_embeddings::get(&config.model, &config.api_key)?;
 
         Ok(Self {
             embeddings,
@@ -25,8 +24,8 @@ impl Keywords {
         })
     }
 
-    pub fn predict<S: AsRef<str>>(&self, text: &[S]) -> Result<Vec<Vec<Keyword>>> {
-        text.iter().map(|text| self.predict_one(text.as_ref())).collect()
+    fn all(&self, text: &[&str]) -> Result<Vec<Vec<Keyword>>> {
+        text.iter().map(|text| self.predict_one(text)).collect()
     }
 
     fn predict_one(&self, text: &str) -> Result<Vec<Keyword>> {
@@ -40,11 +39,17 @@ impl Keywords {
         batch.push(text);
         batch.extend(candidates.iter().map(|candidate| candidate.text.as_str()));
 
-        let vectors = self.embeddings.encode(&batch)?;
+        let vectors = self.embeddings.embed(&batch)?;
         let Some((document, vectors)) = vectors.split_first() else {
             return Ok(Vec::new());
         };
 
         Ok(scorer::rank(candidates, document, vectors, self.top_n))
+    }
+}
+
+impl Keywords for Local {
+    fn keywords(&self, text: &[&str]) -> Result<Vec<Vec<Keyword>>> {
+        self.all(text)
     }
 }

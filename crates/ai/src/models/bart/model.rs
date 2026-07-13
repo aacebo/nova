@@ -16,7 +16,6 @@ pub struct Bart {
 impl Bart {
     pub fn new(cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let vb_m = vb.pp("model");
-
         let embed_tokens = embedding(cfg.vocab_size, cfg.d_model, vb_m.pp("decoder").pp("embed_tokens"))?;
 
         Ok(Self {
@@ -37,7 +36,6 @@ impl Bart {
             .flat_map(|i| (0..seq_len).map(move |j| if j > i { f32::NEG_INFINITY } else { 0f32 }))
             .collect();
         let mask = Tensor::from_vec(mask, (seq_len, seq_len), xs.device())?.to_dtype(DType::F32)?;
-
         let logits = self
             .decoder
             .forward(xs, Some(encoder_xs), past_kv_len, &mask)?

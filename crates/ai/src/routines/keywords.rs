@@ -1,29 +1,28 @@
 use crate::pipelines::keywords;
-use crate::routines::Input;
+use crate::pipelines::sentence_embeddings::SentenceEmbeddingsCheckpoint;
+use crate::routines::args;
 use crate::{Annotation, Offset};
 
 pub fn keyword_extraction(
-    args: &nova_core::Args,
+    args_: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let input = Input::from_args(args)?;
-    let out = keywords::get()?.predict(&input.text)?;
+    let text = args::text(args_)?;
+    let min_score = args::min_score(args_)? as f32;
+    let model = args::model(args_, SentenceEmbeddingsCheckpoint::AllMiniLmL6V2.model())?;
+    let api_key = args::api_key(args_)?;
+    let out = keywords::get(&model, &api_key)?.keywords(&args::borrow(&text))?;
+
     let mut annotations: Vec<Annotation> = Vec::new();
 
-    for (index, keywords) in out.into_iter().enumerate() {
-        let text = input.text.get(index).map(String::as_str).unwrap_or_default();
-
-        for keyword in keywords.into_iter().filter(|v| v.score >= input.min_score) {
+    for keywords in out {
+        for keyword in keywords.into_iter().filter(|k| k.score >= min_score) {
             annotations.push(Annotation {
                 name: String::from("keyword"),
                 label: keyword.text.clone(),
                 text: keyword.text,
                 score: keyword.score as f64,
-                spans: keyword
-                    .offsets
-                    .iter()
-                    .map(|offset| span_from_byte_offsets(text, offset.begin, offset.end))
-                    .collect(),
+                spans: keyword.offsets.iter().map(|o| Offset::new(o.begin, o.end)).collect(),
             });
         }
     }
@@ -31,14 +30,4 @@ pub fn keyword_extraction(
     Ok(nova_core::Value::from(
         annotations.into_iter().map(nova_core::Value::from_object).collect::<Vec<_>>(),
     ))
-}
-
-fn span_from_byte_offsets(text: &str, start: u32, end: u32) -> Offset {
-    Offset::new(byte_offset_to_char_offset(text, start), byte_offset_to_char_offset(text, end))
-}
-
-fn byte_offset_to_char_offset(text: &str, byte_offset: u32) -> u32 {
-    let byte_offset = (byte_offset as usize).min(text.len());
-
-    text.char_indices().take_while(|(index, _)| *index < byte_offset).count() as u32
 }
