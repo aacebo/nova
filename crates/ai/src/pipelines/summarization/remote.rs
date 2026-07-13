@@ -1,5 +1,5 @@
-use super::summarize::Summarize;
 use crate::clients::openai::OpenAI;
+use crate::pipelines::Summarize;
 use crate::resources::Result;
 
 const PROMPT: &str = "Summarize the text the user gives you. Respond with JSON matching the schema: \

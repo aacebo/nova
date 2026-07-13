@@ -1,6 +1,5 @@
-use super::extract::Extract;
 use crate::clients::openai::OpenAI;
-use crate::pipelines::anchor;
+use crate::pipelines::{Extract, anchor};
 use crate::resources::Result;
 use crate::types::Entity;
 

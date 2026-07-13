@@ -1,5 +1,5 @@
-use super::classify::Classify;
 use crate::clients::openai::OpenAI;
+use crate::pipelines::Classify;
 use crate::resources::Result;
 use crate::types::{Polarity, Sentiment};
 

@@ -1,4 +1,4 @@
-use crate::pipelines::Model;
+use crate::models::ModelRef;
 use crate::resources::ModelId;
 
 /// Checkpoints known to work with this pipeline. `Resource` remains available for anything not
@@ -11,8 +11,8 @@ pub enum TokenClassificationCheckpoint {
 }
 
 impl TokenClassificationCheckpoint {
-    pub fn model(self) -> Model {
-        Model::hub(self.id())
+    pub fn model(self) -> ModelRef {
+        ModelRef::hub(self.id())
     }
 
     pub fn id(self) -> ModelId {
@@ -25,7 +25,7 @@ impl TokenClassificationCheckpoint {
     }
 }
 
-impl From<TokenClassificationCheckpoint> for Model {
+impl From<TokenClassificationCheckpoint> for ModelRef {
     fn from(checkpoint: TokenClassificationCheckpoint) -> Self {
         checkpoint.model()
     }

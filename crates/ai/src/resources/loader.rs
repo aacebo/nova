@@ -6,8 +6,7 @@ use candle_nn::VarBuilder;
 use tokenizers::Tokenizer;
 
 use super::error::{Error, Result};
-use super::repository::Repository;
-use super::tokenizer;
+use super::{Repository, tokenizer};
 
 pub struct Loader {
     repo: Arc<dyn Repository>,
@@ -50,7 +49,7 @@ impl Loader {
         serde_json::from_slice(&bytes).map_err(Error::load)
     }
 
-    /// Model-specific: SST-2 is uncased, CoNLL-03 is cased. Lowercasing a cased model wrecks it.
+    /// ModelRef-specific: SST-2 is uncased, CoNLL-03 is cased. Lowercasing a cased model wrecks it.
     fn lowercase(&self) -> Result<bool> {
         #[derive(serde::Deserialize)]
         struct Config {

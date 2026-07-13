@@ -1,6 +1,6 @@
 use nova_core::Args;
 
-use crate::pipelines::Model;
+use crate::models::ModelRef;
 use crate::resources::{ModelId, Provider, Uri};
 
 type Error = Box<dyn std::error::Error>;
@@ -42,7 +42,7 @@ pub fn api_key(args: &Args) -> Result<Option<String>, Error> {
 
 /// `provider=` selects a hosted API. Otherwise `model=` is parsed by shape: a path or url is a
 /// local weight source, anything else is a hub id.
-pub fn model(args: &Args, default: Model) -> Result<Model, Error> {
+pub fn model(args: &Args, default: ModelRef) -> Result<ModelRef, Error> {
     let provider = string(args, "provider")?;
     let model = string(args, "model")?;
 
@@ -52,8 +52,8 @@ pub fn model(args: &Args, default: Model) -> Result<Model, Error> {
         };
 
         return Ok(match is_uri(&model) {
-            true => Model::local(model.parse::<Uri>()?),
-            false => Model::hub(model.parse::<ModelId>()?),
+            true => ModelRef::local(model.parse::<Uri>()?),
+            false => ModelRef::hub(model.parse::<ModelId>()?),
         });
     };
 
@@ -62,7 +62,7 @@ pub fn model(args: &Args, default: Model) -> Result<Model, Error> {
         .ok_or_else(|| nova_core::Error::message("model is required when provider is set"))?
         .parse()?;
 
-    Ok(Model::remote(provider, id).base_url(string(args, "base_url")?))
+    Ok(ModelRef::remote(provider, id).base_url(string(args, "base_url")?))
 }
 
 /// `facebook/bart-large-cnn` and `models/bart` are the same shape, so an explicit scheme or a

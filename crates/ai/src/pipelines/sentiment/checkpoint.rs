@@ -1,4 +1,4 @@
-use crate::pipelines::Model;
+use crate::models::ModelRef;
 use crate::resources::ModelId;
 
 /// Checkpoints known to work with this pipeline. `Resource` remains available for anything not
@@ -10,8 +10,8 @@ pub enum SentimentCheckpoint {
 }
 
 impl SentimentCheckpoint {
-    pub fn model(self) -> Model {
-        Model::hub(self.id())
+    pub fn model(self) -> ModelRef {
+        ModelRef::hub(self.id())
     }
 
     pub fn id(self) -> ModelId {
@@ -23,7 +23,7 @@ impl SentimentCheckpoint {
     }
 }
 
-impl From<SentimentCheckpoint> for Model {
+impl From<SentimentCheckpoint> for ModelRef {
     fn from(checkpoint: SentimentCheckpoint) -> Self {
         checkpoint.model()
     }

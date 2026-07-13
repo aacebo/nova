@@ -3,8 +3,7 @@ use tokenizers::Tokenizer;
 
 use super::aggregation::{self, Word};
 use super::config::Config;
-use super::extract::Extract;
-use super::pii;
+use super::{Extract, pii};
 use crate::models::bert;
 use crate::resources::{Error, Result};
 use crate::types::Entity;

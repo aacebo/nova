@@ -4,9 +4,8 @@ use candle_core::{Device, Tensor};
 use tokenizers::Tokenizer;
 
 use super::config::Config;
-use super::summarize::Summarize;
 use crate::models::bart::{self, Bart};
-use crate::pipelines::generation;
+use crate::pipelines::{Summarize, generation};
 use crate::resources::{Error, Result};
 
 pub struct Local {

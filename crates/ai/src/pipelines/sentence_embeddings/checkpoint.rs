@@ -1,4 +1,4 @@
-use crate::pipelines::Model;
+use crate::models::ModelRef;
 use crate::resources::ModelId;
 
 /// Checkpoints known to work with this pipeline. `Resource` remains available for anything not
@@ -14,8 +14,8 @@ pub enum SentenceEmbeddingsCheckpoint {
 }
 
 impl SentenceEmbeddingsCheckpoint {
-    pub fn model(self) -> Model {
-        Model::hub(self.id())
+    pub fn model(self) -> ModelRef {
+        ModelRef::hub(self.id())
     }
 
     pub fn id(self) -> ModelId {
@@ -31,7 +31,7 @@ impl SentenceEmbeddingsCheckpoint {
     }
 }
 
-impl From<SentenceEmbeddingsCheckpoint> for Model {
+impl From<SentenceEmbeddingsCheckpoint> for ModelRef {
     fn from(checkpoint: SentenceEmbeddingsCheckpoint) -> Self {
         checkpoint.model()
     }

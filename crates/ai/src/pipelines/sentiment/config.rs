@@ -1,14 +1,13 @@
 use candle_core::{DType, Device};
 
 use super::checkpoint::SentimentCheckpoint;
-use super::classify::Classify;
-use super::{local, remote};
+use super::{Classify, local, remote};
 use crate::clients::openai::OpenAI;
-use crate::pipelines::Model;
+use crate::models::ModelRef;
 use crate::resources::{Provider, Result};
 
 pub struct Config {
-    pub model: Model,
+    pub model: ModelRef,
     pub api_key: Option<String>,
     pub device: Device,
     pub dtype: DType,
@@ -26,7 +25,7 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn model(mut self, model: Model) -> Self {
+    pub fn model(mut self, model: ModelRef) -> Self {
         self.model = model;
         self
     }
@@ -48,7 +47,7 @@ impl Config {
 
     pub fn build(self) -> Result<std::sync::Arc<dyn Classify>> {
         match &self.model {
-            Model::Remote { provider, id, base_url } => match provider {
+            ModelRef::Remote { provider, id, base_url } => match provider {
                 Provider::OpenAI => {
                     let client = OpenAI::new(id.clone(), base_url.clone(), self.api_key.clone());
                     Ok(std::sync::Arc::new(remote::Remote::new(client)))

@@ -1,5 +1,5 @@
-use super::embed::Embed;
 use crate::clients::openai::OpenAI;
+use crate::pipelines::Embed;
 use crate::resources::Result;
 
 pub struct Remote {

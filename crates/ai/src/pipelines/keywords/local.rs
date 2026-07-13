@@ -1,7 +1,6 @@
 use super::config::Config;
-use super::extract::Keywords;
-use super::{candidates, scorer};
-use crate::pipelines::sentence_embeddings::{self, Embed};
+use super::{Keywords, candidates, scorer};
+use crate::pipelines::{Embed, sentence_embeddings};
 use crate::resources::Result;
 use crate::types::Keyword;
 

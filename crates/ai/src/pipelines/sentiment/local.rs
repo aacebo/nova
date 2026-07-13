@@ -1,9 +1,9 @@
 use candle_core::Device;
 use tokenizers::Tokenizer;
 
-use super::classify::Classify;
 use super::config::Config;
 use crate::models::distilbert;
+use crate::pipelines::Classify;
 use crate::pipelines::common::Batch;
 use crate::resources::{Error, Result};
 use crate::types::{Polarity, Sentiment as Output};

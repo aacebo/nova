@@ -1,6 +1,5 @@
-use super::extract::Keywords;
 use crate::clients::openai::OpenAI;
-use crate::pipelines::anchor;
+use crate::pipelines::{Keywords, anchor};
 use crate::resources::Result;
 use crate::types::Keyword;
 
