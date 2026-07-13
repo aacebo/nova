@@ -1,17 +1,17 @@
-use rust_bert::pipelines::sentiment::SentimentPolarity;
-
-use crate::routines::{Input, models};
-use crate::{Annotation, Span};
+use crate::pipelines::sentiment;
+use crate::routines::Input;
+use crate::types::Polarity;
+use crate::{Annotation, Offset};
 
 pub fn sentiment(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     let input = Input::from_args(args)?;
-    let out = models::with_sentiment(|model| model.predict(input.text.iter().map(String::as_str).collect::<Vec<_>>()))?;
+    let out = sentiment::get()?.predict(&input.text)?;
     let mut annotations: Vec<Annotation> = Vec::new();
 
     for (i, sentiment) in out.into_iter().filter(|v| v.score as f32 >= input.min_score).enumerate() {
         let polarity = match sentiment.polarity {
-            SentimentPolarity::Negative => "negative",
-            SentimentPolarity::Positive => "positive",
+            Polarity::Negative => "negative",
+            Polarity::Positive => "positive",
         };
 
         annotations.push(Annotation {
@@ -19,9 +19,11 @@ pub fn sentiment(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<no
             label: polarity.to_string(),
             text: polarity.to_string(),
             score: sentiment.score,
-            spans: vec![Span::new(0, input.text[i].len() as u32)],
+            spans: vec![Offset::new(0, input.text[i].len() as u32)],
         });
     }
 
-    Ok(nova_core::Value::from_serialize(&annotations))
+    Ok(nova_core::Value::from(
+        annotations.into_iter().map(nova_core::Value::from_object).collect::<Vec<_>>(),
+    ))
 }

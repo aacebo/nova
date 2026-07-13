@@ -2,7 +2,6 @@ mod embeddings;
 mod entities;
 mod input;
 mod keywords;
-mod models;
 mod pii;
 mod sentiment;
 mod summarization;

@@ -1,11 +1,11 @@
-use rust_bert::pipelines::token_classification::Token;
-
-use crate::routines::{Input, models};
-use crate::{Annotation, Span};
+use crate::pipelines::token_classification;
+use crate::routines::Input;
+use crate::types::Token;
+use crate::{Annotation, Offset};
 
 pub fn pii_extraction(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     let input = Input::from_args(args)?;
-    let out = models::with_pii(|model| model.predict(&input.text, true, false))?;
+    let out = token_classification::get()?.predict(&input.text)?;
     let mut annotations: Vec<Annotation> = Vec::new();
 
     for sequence in out {
@@ -18,7 +18,9 @@ pub fn pii_extraction(args: &nova_core::Args, _scope: &nova_core::Scope) -> Resu
         annotations.extend(entities.finish());
     }
 
-    Ok(nova_core::Value::from_serialize(&annotations))
+    Ok(nova_core::Value::from(
+        annotations.into_iter().map(nova_core::Value::from_object).collect::<Vec<_>>(),
+    ))
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -139,7 +141,7 @@ struct PiiEntity {
 impl PiiEntity {
     fn can_merge(&self, other: &Self) -> bool {
         self.annotation.label.eq_ignore_ascii_case(&other.annotation.label)
-            && self.annotation.spans.first().map(|span| span.end) == other.annotation.spans.first().map(|span| span.start)
+            && self.annotation.spans.first().map(|span| span.end) == other.annotation.spans.first().map(|span| span.begin)
     }
 
     fn merge(&mut self, other: Self) {
@@ -207,7 +209,7 @@ impl PiiEntityBuilder {
                 label: self.label,
                 text: self.words.join(" "),
                 score: self.score_sum / self.token_count as f64,
-                spans: vec![Span::new(self.start, self.end)],
+                spans: vec![Offset::new(self.start, self.end)],
             },
             token_count: self.token_count,
         }

@@ -9,47 +9,47 @@ pub struct Artifact {
 
 impl Reflect for Artifact {
     fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
-        let key = key.as_str()?;
-
-        if key == "name" {
-            Some((&self.name).into())
-        } else if key == "value" {
-            Some(match &self.value {
-                ArtifactContent::Text(v) => v.into(),
-                ArtifactContent::File(v) => v.display().to_string().into(),
-            })
-        } else {
-            None
+        match key.as_str()? {
+            "name" => Some((&self.name).into()),
+            "value" => Some(self.value.to_string().into()),
+            "vector" => self.vector.as_ref().map(Value::from_serialize),
+            _ => None,
         }
+    }
+}
+
+impl std::fmt::Display for Artifact {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.name, self.value)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ArtifactContent {
-    Text(String),
-    File(std::path::PathBuf),
+    Text { text: String },
+    File { path: std::path::PathBuf },
 }
 
 impl ArtifactContent {
     pub fn text(value: impl Into<String>) -> Self {
-        Self::Text(value.into())
+        Self::Text { text: value.into() }
     }
 
     pub fn file(path: std::path::PathBuf) -> Self {
-        Self::File(path)
+        Self::File { path }
     }
 
     pub fn as_text(&self) -> Option<&str> {
         match self {
-            Self::Text(v) => Some(v),
+            Self::Text { text } => Some(text),
             _ => None,
         }
     }
 
     pub fn as_file(&self) -> Option<&std::path::PathBuf> {
         match self {
-            Self::File(v) => Some(v),
+            Self::File { path } => Some(path),
             _ => None,
         }
     }
@@ -58,8 +58,8 @@ impl ArtifactContent {
 impl std::fmt::Display for ArtifactContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Text(v) => write!(f, "{v}"),
-            Self::File(v) => write!(f, "{}", v.display()),
+            Self::Text { text } => write!(f, "{text}"),
+            Self::File { path } => write!(f, "{}", path.display()),
         }
     }
 }

@@ -1,12 +1,13 @@
-use crate::routines::{Input, models};
-use crate::{Annotation, Span};
+use crate::pipelines::token_classification;
+use crate::routines::Input;
+use crate::{Annotation, Offset};
 
 pub fn entity_extraction(
     args: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     let input = Input::from_args(args)?;
-    let out = models::with_ner(|model| model.predict_full_entities(&input.text))?;
+    let out = token_classification::get()?.predict_entities(&input.text)?;
     let mut annotations: Vec<Annotation> = Vec::new();
 
     for entities in out {
@@ -21,10 +22,12 @@ pub fn entity_extraction(
                 },
                 text: entity.word,
                 score: entity.score,
-                spans: vec![Span::new(entity.offset.begin, entity.offset.end)],
+                spans: vec![Offset::new(entity.offset.begin, entity.offset.end)],
             });
         }
     }
 
-    Ok(nova_core::Value::from_serialize(&annotations))
+    Ok(nova_core::Value::from(
+        annotations.into_iter().map(nova_core::Value::from_object).collect::<Vec<_>>(),
+    ))
 }

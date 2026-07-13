@@ -1,14 +1,14 @@
-mod annotation;
-mod artifact;
+pub mod models;
+pub mod pipelines;
+pub mod resources;
+
 mod routines;
-mod span;
+mod types;
 
 use std::sync::Arc;
 
-pub use annotation::*;
-pub use artifact::*;
 pub use routines::*;
-pub use span::*;
+pub use types::*;
 
 pub trait AI {
     fn ai(self) -> Self;

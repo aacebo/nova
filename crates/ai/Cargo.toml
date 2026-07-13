@@ -19,7 +19,9 @@ workspace = true
 nova-core = { workspace = true }
 
 serde = { version = "1", features = ["derive", "rc"] }
-ort = { version = "1.16.3", features = ["download-binaries"] }
-tch = { version = "0.17" }
-console = { version = "0.16" }
-rust-bert = { version = "0.23", features = ["onnx", "remote"] }
+serde_json = { version = "1" }
+candle-core = { version = "0.11" }
+candle-nn = { version = "0.11" }
+candle-transformers = { version = "0.11" }
+tokenizers = { version = "0.22" }
+hf-hub = { version = "0.5" }

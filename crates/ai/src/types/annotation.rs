@@ -1,6 +1,6 @@
 use nova_core::{Reflect, Value};
 
-use crate::Span;
+use super::Offset;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Annotation {
@@ -8,7 +8,7 @@ pub struct Annotation {
     pub label: String,
     pub text: String,
     pub score: f64,
-    pub spans: Vec<Span>,
+    pub spans: Vec<Offset>,
 }
 
 impl Reflect for Annotation {
@@ -26,5 +26,11 @@ impl Reflect for Annotation {
         } else {
             None
         }
+    }
+}
+
+impl std::fmt::Display for Annotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({}): {}", self.name, self.label, self.text)
     }
 }

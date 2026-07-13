@@ -1,0 +1,47 @@
+use candle_core::{DType, Tensor};
+use candle_nn::VarBuilder;
+
+use super::config::Config;
+use super::model::Bert;
+use crate::resources::{Error, Result};
+
+pub struct Embedder {
+    bert: Bert,
+}
+
+impl Embedder {
+    pub fn new(vars: VarBuilder, config: &Config) -> Result<Self> {
+        Ok(Self {
+            bert: Bert::new(vars, config)?,
+        })
+    }
+
+    /// Sentence vectors: mean-pool the token states over the mask, then L2 normalize.
+    pub fn forward(&self, ids: &Tensor, mask: &Tensor) -> Result<Tensor> {
+        let hidden = self.bert.forward(ids, mask)?;
+
+        normalize(&pool(&hidden, mask)?)
+    }
+}
+
+fn pool(hidden: &Tensor, mask: &Tensor) -> Result<Tensor> {
+    let mask = mask
+        .to_dtype(DType::F32)
+        .and_then(|mask| mask.unsqueeze(2))
+        .map_err(Error::inference)?;
+
+    let summed = hidden.broadcast_mul(&mask).and_then(|v| v.sum(1)).map_err(Error::inference)?;
+    let counts = mask.sum(1).map_err(Error::inference)?;
+
+    summed.broadcast_div(&counts).map_err(Error::inference)
+}
+
+fn normalize(v: &Tensor) -> Result<Tensor> {
+    let norm = v
+        .sqr()
+        .and_then(|v| v.sum_keepdim(1))
+        .and_then(|v| v.sqrt())
+        .map_err(Error::inference)?;
+
+    v.broadcast_div(&norm).map_err(Error::inference)
+}

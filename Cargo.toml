@@ -41,6 +41,10 @@ repository.workspace = true
 [profile.dev]
 incremental = false
 
+# candle is unusable unoptimized: a BART summarization takes ~370s at opt-level 0 vs ~7s here.
+[profile.dev.package."*"]
+opt-level = 3
+
 [lib]
 doctest = false
 
@@ -57,9 +61,6 @@ macros = ["dep:nova-macros", "nova-reflect/macros"]
 schema = ["dep:nova-schema"]
 reflect = ["dep:nova-reflect", "nova-reflect/serde", "nova-reflect/minijinja"]
 json = ["nova-reflect/json"]
-
-[patch.crates-io]
-ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
 
 [dependencies]
 nova-core = { workspace = true }
