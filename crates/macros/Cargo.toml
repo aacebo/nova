@@ -1,5 +1,6 @@
 [package]
 name = "nova-macros"
+description = "Procedural macros for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

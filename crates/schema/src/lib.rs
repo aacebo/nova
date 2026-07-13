@@ -19,7 +19,7 @@ pub use oneof::*;
 pub use string::*;
 
 pub trait Validate {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error>;
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error>;
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -58,7 +58,7 @@ impl<T: Into<AnySchema> + std::fmt::Debug> From<T> for Schema {
 }
 
 impl Validate for Schema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         if let Some(optional) = &self.optional
             && *optional
             && (value.is_null() || value.is_undefined())
@@ -146,7 +146,7 @@ impl From<OneOf> for AnySchema {
 }
 
 impl Validate for AnySchema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         match self {
             Self::String(schema) => schema.validate(value),
             Self::Number(schema) => schema.validate(value),
@@ -162,7 +162,7 @@ impl Validate for AnySchema {
 
 #[cfg(test)]
 mod tests {
-    use reflect::ToValue;
+    use nova_reflect::ToValue;
 
     use crate::{AnySchema, Error, Validate, integer, object, string};
 
@@ -171,7 +171,7 @@ mod tests {
         let schema = AnySchema::Object(object().field("name", string().min(1)));
         let json = serde_json::to_string(&schema).unwrap();
         let schema: AnySchema = serde_json::from_str(&json).unwrap();
-        let map = reflect::btree_map! {
+        let map = nova_reflect::btree_map! {
             "name".to_string() => "nova".to_string()
         };
 
@@ -213,7 +213,7 @@ mod tests {
     }
 
     mod optional {
-        use reflect::ToValue;
+        use nova_reflect::ToValue;
 
         use crate::{Schema, Validate, string};
 
@@ -221,14 +221,14 @@ mod tests {
         fn skips_null() {
             let schema: Schema = string().into();
             let schema = schema.optional();
-            assert!(schema.validate(&reflect::Value::Null).is_ok());
+            assert!(schema.validate(&nova_reflect::Value::Null).is_ok());
         }
 
         #[test]
         fn skips_undefined() {
             let schema: Schema = string().into();
             let schema = schema.optional();
-            assert!(schema.validate(&reflect::Value::Undefined).is_ok());
+            assert!(schema.validate(&nova_reflect::Value::Undefined).is_ok());
         }
 
         #[test]
@@ -242,18 +242,18 @@ mod tests {
         fn required_rejects_null() {
             let schema: Schema = string().into();
             let schema = schema.required();
-            assert!(schema.validate(&reflect::Value::Null).is_err());
+            assert!(schema.validate(&nova_reflect::Value::Null).is_err());
         }
 
         #[test]
         fn default_rejects_null() {
             let schema: Schema = string().into();
-            assert!(schema.validate(&reflect::Value::Null).is_err());
+            assert!(schema.validate(&nova_reflect::Value::Null).is_err());
         }
     }
 
     mod message {
-        use reflect::ToValue;
+        use nova_reflect::ToValue;
 
         use crate::{Error, Schema, Validate, string};
 
@@ -290,7 +290,7 @@ mod tests {
     }
 
     mod object_field {
-        use reflect::{ToValue, btree_map};
+        use nova_reflect::{ToValue, btree_map};
 
         use crate::{Schema, Validate, object, string};
 
@@ -311,7 +311,7 @@ mod tests {
     }
 
     mod serde {
-        use reflect::ToValue;
+        use nova_reflect::ToValue;
 
         use crate::{Error, Schema, Validate, string};
 
@@ -321,7 +321,7 @@ mod tests {
             let schema = schema.optional();
             let json = serde_json::to_string(&schema).unwrap();
             let back: Schema = serde_json::from_str(&json).unwrap();
-            assert!(back.validate(&reflect::Value::Null).is_ok());
+            assert!(back.validate(&nova_reflect::Value::Null).is_ok());
         }
 
         #[test]

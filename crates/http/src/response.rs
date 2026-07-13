@@ -8,7 +8,7 @@ pub struct Response {
 }
 
 impl TryFrom<reqwest::blocking::Response> for Response {
-    type Error = nova::Error;
+    type Error = nova_core::Error;
 
     fn try_from(value: reqwest::blocking::Response) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -18,19 +18,19 @@ impl TryFrom<reqwest::blocking::Response> for Response {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
                 .collect(),
-            data: value.bytes().map_err(|e| nova::Error::message(e.to_string()))?.to_vec(),
+            data: value.bytes().map_err(|e| nova_core::Error::message(e.to_string()))?.to_vec(),
         })
     }
 }
 
-impl nova::Reflect for Response {
-    fn get_value(self: &std::sync::Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+impl nova_core::Reflect for Response {
+    fn get_value(self: &std::sync::Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
         let key = key.as_str()?;
 
         match key {
             "status" => Some(self.status.into()),
             "headers" => Some(self.headers.clone().into()),
-            "data" => Some(nova::Value::from_bytes(self.data.clone())),
+            "data" => Some(nova_core::Value::from_bytes(self.data.clone())),
             "text" => Some(String::from_utf8_lossy(&self.data).into_owned().into()),
             _ => None,
         }

@@ -1,7 +1,7 @@
 use crate::routines::{Input, models};
 use crate::{Artifact, ArtifactContent};
 
-pub fn summarization(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
+pub fn summarization(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     let input = Input::from_args(args)?;
     let mut artifacts: Vec<Artifact> = Vec::new();
     let text = input
@@ -12,7 +12,7 @@ pub fn summarization(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Va
         .collect::<Vec<_>>();
 
     if text.is_empty() {
-        return Ok(nova::Value::from_serialize(&artifacts));
+        return Ok(nova_core::Value::from_serialize(&artifacts));
     }
 
     let out = models::with_summarization(|model| model.summarize(&text))??;
@@ -29,5 +29,5 @@ pub fn summarization(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Va
         });
     }
 
-    Ok(nova::Value::from_serialize(&artifacts))
+    Ok(nova_core::Value::from_serialize(&artifacts))
 }

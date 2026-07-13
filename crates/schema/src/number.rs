@@ -29,7 +29,7 @@ impl NumberSchema {
 }
 
 impl Validate for NumberSchema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let float = value
             .to_f64()
@@ -60,7 +60,7 @@ impl Validate for NumberSchema {
 
 #[cfg(test)]
 mod tests {
-    use reflect::ToValue;
+    use nova_reflect::ToValue;
 
     use crate::{Error, Validate, number};
 

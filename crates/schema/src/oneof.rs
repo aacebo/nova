@@ -23,7 +23,7 @@ impl OneOf {
 }
 
 impl Validate for OneOf {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         for schema in &self.0 {
             if schema.validate(value).is_ok() {
                 return Ok(());
@@ -36,7 +36,7 @@ impl Validate for OneOf {
 
 #[cfg(test)]
 mod tests {
-    use reflect::ToValue;
+    use nova_reflect::ToValue;
 
     use crate::{Error, Validate, bool, string};
 

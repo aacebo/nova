@@ -1,5 +1,6 @@
 [package]
 name = "nova-ai"
+description = "AI routines (embeddings, entities, keywords, PII, sentiment, summarization) for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,7 +16,8 @@ doctest = false
 workspace = true
 
 [dependencies]
-nova = { path = "../core", package = "nova-core" }
+nova-core = { workspace = true }
+
 serde = { version = "1", features = ["derive", "rc"] }
 ort = { version = "1.16.3", features = ["download-binaries"] }
 tch = { version = "0.17" }

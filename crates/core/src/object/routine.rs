@@ -9,7 +9,7 @@ pub struct Routine {
     name: String,
     scope: Scope,
     steps: Vec<Step>,
-    validator: Option<Arc<schema::Schema>>,
+    validator: Option<Arc<nova_schema::Schema>>,
 }
 
 impl Routine {
@@ -17,7 +17,7 @@ impl Routine {
         name: impl Into<String>,
         scope: Scope,
         steps: impl IntoIterator<Item = impl Into<Step>>,
-        validator: Option<Arc<schema::Schema>>,
+        validator: Option<Arc<nova_schema::Schema>>,
     ) -> Self {
         Self {
             name: name.into(),
@@ -50,22 +50,22 @@ impl Routine {
     }
 
     fn validate(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
-        use reflect::ToValue;
+        use nova_reflect::ToValue;
 
         let Some(validator) = &self.validator else {
             return Ok(());
         };
 
-        let ty = reflect::MapType::new(reflect::Type::Any, reflect::Type::Any, reflect::Type::Any);
-        let mut instance = reflect::Map::new(&ty);
+        let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
+        let mut instance = nova_reflect::Map::new(&ty);
 
         for (key, value) in args {
             instance.insert(key.to_value().into_owned(), value.to_value().into_owned());
         }
 
-        let instance = reflect::Value::Map(instance);
+        let instance = nova_reflect::Value::Map(instance);
 
-        if let Err(err) = schema::Validate::validate(validator.as_ref(), &instance) {
+        if let Err(err) = nova_schema::Validate::validate(validator.as_ref(), &instance) {
             let message = format!("invalid args for `{}`: {}", self.name, err);
             return Err(Box::new(Error::action(scope.trace_id().to_string(), &self.name, message)));
         }

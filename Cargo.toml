@@ -16,11 +16,23 @@ repository = "https://www.github.com/aacebo/nova"
 result_large_err = "allow"
 type_complexity = "allow"
 
+[workspace.dependencies]
+nova-core = { path = "crates/core", version = "0.0.0" }
+nova-ai = { path = "crates/ai", version = "0.0.0" }
+nova-fs = { path = "crates/fs", version = "0.0.0" }
+nova-codec = { path = "crates/codec", version = "0.0.0" }
+nova-http = { path = "crates/http", version = "0.0.0" }
+nova-macros = { path = "crates/macros", version = "0.0.0" }
+nova-schema = { path = "crates/schema", version = "0.0.0" }
+nova-reflect = { path = "crates/reflect", version = "0.0.0" }
+nova-reflect-macros = { path = "crates/reflect/macros", version = "0.0.0" }
+
 [profile.dev]
 incremental = false
 
 [package]
 name = "nova"
+description = "A YAML-driven workflow runtime with an embedded template engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -50,14 +62,14 @@ json = ["nova-reflect/json"]
 ort = { git = "https://github.com/pykeio/ort.git", tag = "v1.16.3" }
 
 [dependencies]
-nova-core = { path = "crates/core" }
-nova-ai = { path = "crates/ai", optional = true }
-nova-fs = { path = "crates/fs", optional = true }
-nova-codec = { path = "crates/codec", optional = true }
-nova-http = { path = "crates/http", optional = true }
-nova-macros = { path = "crates/macros", optional = true }
-nova-schema = { path = "crates/schema", optional = true }
-nova-reflect = { path = "crates/reflect", optional = true }
+nova-core = { workspace = true }
+nova-ai = { workspace = true, optional = true }
+nova-fs = { workspace = true, optional = true }
+nova-codec = { workspace = true, optional = true }
+nova-http = { workspace = true, optional = true }
+nova-macros = { workspace = true, optional = true }
+nova-schema = { workspace = true, optional = true }
+nova-reflect = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = "3"

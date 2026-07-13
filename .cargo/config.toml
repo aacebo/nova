@@ -10,3 +10,6 @@ retry = 3
 
 [alias]
 lint = "clippy --workspace --all-features -- -D warnings"
+patch = "release patch --workspace --no-push"
+minor = "release minor --workspace --no-push"
+major = "release major --workspace --no-push"

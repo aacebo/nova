@@ -1,5 +1,6 @@
 [package]
 name = "nova-schema"
+description = "Schema definition and validation for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,7 +13,8 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-reflect = { package = "nova-reflect", path = "../reflect", features = ["serde"] }
+nova-reflect = { workspace = true, features = ["serde"] }
+
 serde = { version = "1", features = ["derive", "rc"] }
 regex = { version = "1" }
 

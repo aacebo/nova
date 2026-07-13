@@ -14,24 +14,33 @@ pub trait AI {
     fn ai(self) -> Self;
 }
 
-impl AI for nova::Builder {
+impl AI for nova_core::Builder {
     fn ai(self) -> Self {
-        self.var("ai", nova::Value::from_object(Ai))
+        self.var("ai", nova_core::Value::from_object(Ai))
     }
 }
 
 #[derive(Debug)]
 pub struct Ai;
 
-impl nova::Reflect for Ai {
-    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+impl nova_core::Reflect for Ai {
+    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
         match key.as_str()? {
-            "embeddings" => Some(nova::Value::from_object(nova::Function::func("ai.embeddings", embeddings))),
-            "entities" => Some(nova::Value::from_object(Entities)),
-            "keywords" => Some(nova::Value::from_object(Keywords)),
-            "pii" => Some(nova::Value::from_object(Pii)),
-            "sentiment" => Some(nova::Value::from_object(nova::Function::func("ai.sentiment", sentiment))),
-            "summarize" => Some(nova::Value::from_object(nova::Function::func("ai.summarize", summarization))),
+            "embeddings" => Some(nova_core::Value::from_object(nova_core::Function::func(
+                "ai.embeddings",
+                embeddings,
+            ))),
+            "entities" => Some(nova_core::Value::from_object(Entities)),
+            "keywords" => Some(nova_core::Value::from_object(Keywords)),
+            "pii" => Some(nova_core::Value::from_object(Pii)),
+            "sentiment" => Some(nova_core::Value::from_object(nova_core::Function::func(
+                "ai.sentiment",
+                sentiment,
+            ))),
+            "summarize" => Some(nova_core::Value::from_object(nova_core::Function::func(
+                "ai.summarize",
+                summarization,
+            ))),
             _ => None,
         }
     }
@@ -40,10 +49,10 @@ impl nova::Reflect for Ai {
 #[derive(Debug)]
 pub struct Entities;
 
-impl nova::Reflect for Entities {
-    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+impl nova_core::Reflect for Entities {
+    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
         match key.as_str()? {
-            "extract" => Some(nova::Value::from_object(nova::Function::func(
+            "extract" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.entities.extract",
                 entity_extraction,
             ))),
@@ -55,10 +64,10 @@ impl nova::Reflect for Entities {
 #[derive(Debug)]
 pub struct Keywords;
 
-impl nova::Reflect for Keywords {
-    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+impl nova_core::Reflect for Keywords {
+    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
         match key.as_str()? {
-            "extract" => Some(nova::Value::from_object(nova::Function::func(
+            "extract" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.keywords.extract",
                 keyword_extraction,
             ))),
@@ -70,10 +79,10 @@ impl nova::Reflect for Keywords {
 #[derive(Debug)]
 pub struct Pii;
 
-impl nova::Reflect for Pii {
-    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+impl nova_core::Reflect for Pii {
+    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
         match key.as_str()? {
-            "extract" => Some(nova::Value::from_object(nova::Function::func(
+            "extract" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.pii.extract",
                 pii_extraction,
             ))),

@@ -20,7 +20,7 @@ pub struct Manifest {
     pub on: Vec<Trigger>,
 
     #[serde(default)]
-    pub args: Option<schema::Schema>,
+    pub args: Option<nova_schema::Schema>,
 
     #[serde(default)]
     pub vars: BTreeMap<String, Value>,
@@ -39,7 +39,7 @@ impl Manifest {
     pub fn merge(&mut self, other: Self) -> &mut Self {
         self.on.extend(other.on);
         self.args = match (self.args.take(), other.args) {
-            (Some(base), Some(next)) => Some(schema::oneof!(base, next).into()),
+            (Some(base), Some(next)) => Some(nova_schema::oneof!(base, next).into()),
             (base, next) => base.or(next),
         };
         self.vars.extend(other.vars);
@@ -82,7 +82,7 @@ pub mod build {
     pub struct ManifestBuilder {
         name: Option<String>,
         on: Vec<Trigger>,
-        args: Option<schema::Schema>,
+        args: Option<nova_schema::Schema>,
         vars: BTreeMap<String, Value>,
         env: BTreeMap<String, String>,
         templates: BTreeMap<String, String>,
@@ -104,7 +104,7 @@ pub mod build {
             self
         }
 
-        pub fn args(mut self, schema: impl Into<schema::Schema>) -> Self {
+        pub fn args(mut self, schema: impl Into<nova_schema::Schema>) -> Self {
             self.args = Some(schema.into());
             self
         }

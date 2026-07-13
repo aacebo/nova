@@ -1,5 +1,6 @@
 [package]
 name = "nova-codec"
+description = "JSON and YAML encoding routines for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,6 +13,6 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-nova = { path = "../core", package = "nova-core" }
+nova-core = { workspace = true }
 serde_json = "1"
 serde_norway = "0.9"

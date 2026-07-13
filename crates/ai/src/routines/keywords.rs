@@ -1,7 +1,10 @@
 use crate::routines::{Input, models};
 use crate::{Annotation, Span};
 
-pub fn keyword_extraction(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
+pub fn keyword_extraction(
+    args: &nova_core::Args,
+    _scope: &nova_core::Scope,
+) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     let input = Input::from_args(args)?;
     let out = models::with_keywords(|model| model.predict(&input.text))??;
     let mut annotations: Vec<Annotation> = Vec::new();
@@ -24,7 +27,7 @@ pub fn keyword_extraction(args: &nova::Args, _scope: &nova::Scope) -> Result<nov
         }
     }
 
-    Ok(nova::Value::from_serialize(&annotations))
+    Ok(nova_core::Value::from_serialize(&annotations))
 }
 
 fn span_from_byte_offsets(text: &str, start: u32, end: u32) -> Span {

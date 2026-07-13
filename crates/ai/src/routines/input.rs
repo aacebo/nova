@@ -1,4 +1,4 @@
-use nova::{Args, Value};
+use nova_core::{Args, Value};
 
 pub struct Input {
     pub text: Vec<String>,
@@ -10,7 +10,7 @@ impl Input {
         let text = Self::text(&args.at(0))?;
         let min_score = match args.key("min_score") {
             v if v.is_undefined() || v.is_none() => 0.0,
-            v => f64::try_from(v).map_err(|_| nova::Error::message("min_score must be a number"))? as f32,
+            v => f64::try_from(v).map_err(|_| nova_core::Error::message("min_score must be a number"))? as f32,
         };
 
         Ok(Self { text, min_score })
@@ -28,7 +28,7 @@ impl Input {
         for item in value.try_iter()? {
             let item = item
                 .as_str()
-                .ok_or(nova::Error::message("text must be a string or list of strings"))?;
+                .ok_or(nova_core::Error::message("text must be a string or list of strings"))?;
             out.push(item.to_string());
         }
 

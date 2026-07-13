@@ -8,46 +8,46 @@ pub trait Http {
     fn http(self) -> Self;
 }
 
-impl Http for nova::Builder {
+impl Http for nova_core::Builder {
     fn http(self) -> Self {
-        self.var("http", nova::Value::from_object(Client))
+        self.var("http", nova_core::Value::from_object(Client))
     }
 }
 
 #[derive(Debug)]
 pub struct Client;
 
-impl nova::Reflect for Client {
-    fn get_value(self: &Arc<Self>, key: &nova::Value) -> Option<nova::Value> {
+impl nova_core::Reflect for Client {
+    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
         match key.as_str()? {
-            "get" => Some(nova::Value::from_object(nova::Function::func("http.get", get))),
-            "post" => Some(nova::Value::from_object(nova::Function::func("http.post", post))),
-            "put" => Some(nova::Value::from_object(nova::Function::func("http.put", put))),
-            "patch" => Some(nova::Value::from_object(nova::Function::func("http.patch", patch))),
+            "get" => Some(nova_core::Value::from_object(nova_core::Function::func("http.get", get))),
+            "post" => Some(nova_core::Value::from_object(nova_core::Function::func("http.post", post))),
+            "put" => Some(nova_core::Value::from_object(nova_core::Function::func("http.put", put))),
+            "patch" => Some(nova_core::Value::from_object(nova_core::Function::func("http.patch", patch))),
             _ => None,
         }
     }
 }
 
-pub fn get(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
+pub fn get(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     send(reqwest::Method::GET, args)
 }
 
-pub fn post(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
+pub fn post(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     send(reqwest::Method::POST, args)
 }
 
-pub fn put(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
+pub fn put(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     send(reqwest::Method::PUT, args)
 }
 
-pub fn patch(args: &nova::Args, _scope: &nova::Scope) -> Result<nova::Value, Box<dyn std::error::Error>> {
+pub fn patch(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     send(reqwest::Method::PATCH, args)
 }
 
-fn send(method: reqwest::Method, args: &nova::Args) -> Result<nova::Value, Box<dyn std::error::Error>> {
+fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
     let uri = args.at(0);
-    let uri = uri.as_str().ok_or(nova::Error::message("uri must be a string"))?;
+    let uri = uri.as_str().ok_or(nova_core::Error::message("uri must be a string"))?;
     let body = args.at(1);
     let mut req = reqwest::blocking::Client::new().request(method, uri);
 
@@ -55,8 +55,12 @@ fn send(method: reqwest::Method, args: &nova::Args) -> Result<nova::Value, Box<d
     if !headers.is_undefined() && !headers.is_none() {
         for key in headers.try_iter()? {
             let value = headers.get_item(&key)?;
-            let key = key.as_str().ok_or(nova::Error::message("header name must be a string"))?;
-            let value = value.as_str().ok_or(nova::Error::message("header value must be a string"))?;
+            let key = key
+                .as_str()
+                .ok_or(nova_core::Error::message("header name must be a string"))?;
+            let value = value
+                .as_str()
+                .ok_or(nova_core::Error::message("header value must be a string"))?;
             req = req.header(key, value);
         }
     }
@@ -70,5 +74,5 @@ fn send(method: reqwest::Method, args: &nova::Args) -> Result<nova::Value, Box<d
     };
 
     let res = req.send()?;
-    Ok(nova::Value::from_dyn_object(Arc::new(Response::try_from(res)?)))
+    Ok(nova_core::Value::from_dyn_object(Arc::new(Response::try_from(res)?)))
 }

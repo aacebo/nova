@@ -29,7 +29,7 @@ impl ArraySchema {
 }
 
 impl Validate for ArraySchema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let sequence = value
             .as_dynamic()
@@ -70,7 +70,7 @@ impl Validate for ArraySchema {
 
 #[cfg(test)]
 mod tests {
-    use reflect::ToValue;
+    use nova_reflect::ToValue;
 
     use crate::{Error, Validate, array, number};
 

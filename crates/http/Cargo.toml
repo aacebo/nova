@@ -1,5 +1,6 @@
 [package]
 name = "nova-http"
+description = "HTTP routines for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,5 +13,5 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-nova = { path = "../core", package = "nova-core" }
+nova-core = { workspace = true }
 reqwest = { version = "0.13", features = ["json", "blocking"] }

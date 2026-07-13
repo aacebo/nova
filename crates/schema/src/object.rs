@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use reflect::ToValue;
+use nova_reflect::ToValue;
 
 use crate::{Error, Schema, Validate, error};
 
@@ -21,7 +21,7 @@ impl ObjectSchema {
 }
 
 impl Validate for ObjectSchema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         let map = value
             .as_map()
             .ok_or(("type", format!("expected object, received {}", value.to_type())))?;
@@ -29,7 +29,7 @@ impl Validate for ObjectSchema {
 
         for (name, schema) in &self.fields {
             let key = name.clone();
-            let field = map.get(&key.to_value()).cloned().unwrap_or(reflect::Value::Undefined);
+            let field = map.get(&key.to_value()).cloned().unwrap_or(nova_reflect::Value::Undefined);
 
             if let Err(err) = schema.validate(&field) {
                 errors = errors.field(name, err);
@@ -43,7 +43,7 @@ impl Validate for ObjectSchema {
 
 #[cfg(test)]
 mod tests {
-    use reflect::{ToValue, btree_map};
+    use nova_reflect::{ToValue, btree_map};
 
     use crate::{Error, Validate, object, string};
 

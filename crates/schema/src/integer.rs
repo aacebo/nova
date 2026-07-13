@@ -29,7 +29,7 @@ impl IntegerSchema {
 }
 
 impl Validate for IntegerSchema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let number = value
             .as_number()
@@ -62,7 +62,7 @@ impl Validate for IntegerSchema {
 
 #[cfg(test)]
 mod tests {
-    use reflect::ToValue;
+    use nova_reflect::ToValue;
 
     use crate::{Error, Validate, integer};
 

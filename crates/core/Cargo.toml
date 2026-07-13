@@ -1,5 +1,6 @@
 [package]
 name = "nova-core"
+description = "Core runtime, manifest, and object model for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,9 +16,10 @@ doctest = false
 workspace = true
 
 [dependencies]
+nova-schema = { workspace = true }
+nova-reflect = { workspace = true, features = ["serde", "minijinja"] }
+
 ulid = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive", "rc"] }
 minijinja = { version = "2", features = ["serde"] }
 crossbeam = { package = "crossbeam-channel", version = "0.5" }
-reflect = { package = "nova-reflect", path = "../reflect", features = ["serde", "minijinja"] }
-schema = { package = "nova-schema", path = "../schema" }

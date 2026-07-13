@@ -36,7 +36,7 @@ impl StringSchema {
 }
 
 impl Validate for StringSchema {
-    fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
+    fn validate(&self, value: &nova_reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let value = value
             .as_str()
@@ -104,7 +104,7 @@ mod pattern {
 
 #[cfg(test)]
 mod tests {
-    use reflect::ToValue;
+    use nova_reflect::ToValue;
 
     use crate::{Error, Validate, string};
 
