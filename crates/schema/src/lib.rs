@@ -5,6 +5,7 @@ mod integer;
 mod null;
 mod number;
 mod object;
+mod oneof;
 mod string;
 
 pub use array::*;
@@ -14,9 +15,11 @@ pub use integer::*;
 pub use null::*;
 pub use number::*;
 pub use object::*;
+pub use oneof::*;
 pub use string::*;
 
 pub trait Validate {
+    fn name(&self) -> &str;
     fn validate(&self, value: &reflect::Value) -> Result<(), Error>;
 }
 
@@ -30,6 +33,10 @@ pub enum Schema {
     Null(NullSchema),
     Array(ArraySchema),
     Object(ObjectSchema),
+    #[serde(untagged)]
+    OneOf {
+        oneof: OneOf,
+    },
 }
 
 impl From<StringSchema> for Schema {
@@ -74,7 +81,26 @@ impl From<ObjectSchema> for Schema {
     }
 }
 
+impl From<OneOf> for Schema {
+    fn from(value: OneOf) -> Self {
+        Self::OneOf { oneof: value }
+    }
+}
+
 impl Validate for Schema {
+    fn name(&self) -> &str {
+        match self {
+            Self::String(v) => v.name(),
+            Self::Number(v) => v.name(),
+            Self::Integer(v) => v.name(),
+            Self::Bool(v) => v.name(),
+            Self::Null(v) => v.name(),
+            Self::Array(v) => v.name(),
+            Self::Object(v) => v.name(),
+            Self::OneOf { oneof } => oneof.name(),
+        }
+    }
+
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         match self {
             Self::String(schema) => schema.validate(value),
@@ -84,6 +110,7 @@ impl Validate for Schema {
             Self::Null(schema) => schema.validate(value),
             Self::Array(schema) => schema.validate(value),
             Self::Object(schema) => schema.validate(value),
+            Self::OneOf { oneof } => oneof.validate(value),
         }
     }
 }

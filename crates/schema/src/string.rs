@@ -36,6 +36,10 @@ impl StringSchema {
 }
 
 impl Validate for StringSchema {
+    fn name(&self) -> &str {
+        "string"
+    }
+
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let value = value

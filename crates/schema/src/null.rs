@@ -8,6 +8,10 @@ pub fn null() -> NullSchema {
 pub struct NullSchema;
 
 impl Validate for NullSchema {
+    fn name(&self) -> &str {
+        "null"
+    }
+
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         if !value.is_null() && !value.is_undefined() {
             return Err(("type", format!("expected null, received {}", value.to_type())).into());

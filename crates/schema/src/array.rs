@@ -29,6 +29,10 @@ impl ArraySchema {
 }
 
 impl Validate for ArraySchema {
+    fn name(&self) -> &str {
+        "array"
+    }
+
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let sequence = value

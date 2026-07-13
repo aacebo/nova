@@ -21,6 +21,10 @@ impl ObjectSchema {
 }
 
 impl Validate for ObjectSchema {
+    fn name(&self) -> &str {
+        "object"
+    }
+
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let map = value
             .as_map()

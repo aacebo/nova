@@ -29,6 +29,10 @@ impl IntegerSchema {
 }
 
 impl Validate for IntegerSchema {
+    fn name(&self) -> &str {
+        "integer"
+    }
+
     fn validate(&self, value: &reflect::Value) -> Result<(), Error> {
         let mut errors = error::group();
         let number = value
