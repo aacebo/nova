@@ -6,10 +6,10 @@ use std::sync::{Arc, Mutex};
 use common::Recorder;
 use nova::event::object::{CallEvent, UpdateEvent};
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Args, Event, Object, Scope, Value, args, event};
+use nova::{Args, Binding, Event, Pointer, Scope, Value, args, event};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
-type FuncResult = Result<Value, Box<dyn std::error::Error>>;
+type FuncResult = Result<Pointer, Box<dyn std::error::Error>>;
 
 #[test]
 fn listener_delivers_calls_updates_and_errors() {
@@ -21,7 +21,7 @@ fn listener_delivers_calls_updates_and_errors() {
         .func("subtotal", |args: &Args, _scope: &Scope| -> FuncResult {
             let qty = u64::try_from(args.key("qty")).unwrap_or(0);
             let unit = u64::try_from(args.key("unit")).unwrap_or(0);
-            Ok(Value::from(qty * unit))
+            Ok(Value::from(qty * unit).into())
         })
         .action("fulfill", |args: &Args, scope: &Scope| -> ActionResult {
             let total = nova::call!("subtotal", **args as u64);
@@ -33,7 +33,7 @@ fn listener_delivers_calls_updates_and_errors() {
             Ok(())
         })
         .action("process", |args: &Args, scope: &Scope| -> ActionResult {
-            if nova::call!("in_stock", **args).is_true() {
+            if nova::call!("in_stock", **args).is_truthy() {
                 nova::call!("fulfill", **args);
             } else {
                 nova::call!("reject", **args);
@@ -168,7 +168,7 @@ fn runtime_without_observers_runs_and_drops_cleanly() {
             nova::set!("count", 1);
             scope.set(
                 "fn",
-                Object::func("noop", |_args: &Args, _: &Scope| -> FuncResult { Ok(Value::from(())) }),
+                Binding::func("noop", |_args: &Args, _: &Scope| -> FuncResult { Ok(Value::Null.into()) }),
             );
             nova::call!("fn");
             Ok(())

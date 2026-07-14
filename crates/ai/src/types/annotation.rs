@@ -1,4 +1,4 @@
-use nova_core::{Reflect, Value};
+use nova_core::{Dynamic, Reflect, ToType, ToValue, Type, Value};
 
 use super::Offset;
 
@@ -11,16 +11,28 @@ pub struct Annotation {
     pub spans: Vec<Offset>,
 }
 
+impl ToType for Annotation {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
+
 impl Reflect for Annotation {
-    fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
-        match key.as_str()? {
-            "name" => Some((&self.name).into()),
-            "label" => Some((&self.label).into()),
-            "text" => Some((&self.text).into()),
-            "score" => Some(self.score.into()),
-            "spans" => Some(Value::from_serialize(&self.spans)),
-            _ => None,
+    fn field(&self, name: &str) -> Value<'_> {
+        match name {
+            "name" => Value::from(self.name.clone()),
+            "label" => Value::from(self.label.clone()),
+            "text" => Value::from(self.text.clone()),
+            "score" => Value::from(self.score),
+            "spans" => self.spans.to_value(),
+            _ => Value::Undefined,
         }
+    }
+}
+
+impl ToValue for Annotation {
+    fn to_value(&self) -> Value<'_> {
+        Value::Dynamic(Dynamic::from_object(self))
     }
 }
 

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 pub use step::*;
 pub use trigger::*;
 
-use crate::{Runtime, Value};
+use crate::{Pointer, Runtime};
 
 pub fn manifest() -> build::ManifestBuilder {
     build::ManifestBuilder::new()
@@ -26,7 +26,7 @@ pub struct Manifest {
     pub args: Option<nova_schema::Schema>,
 
     #[serde(default)]
-    pub vars: BTreeMap<String, Value>,
+    pub vars: BTreeMap<String, Pointer>,
 
     #[serde(default)]
     pub env: BTreeMap<String, String>,
@@ -88,7 +88,7 @@ pub mod build {
         on: Vec<Trigger>,
         include: Vec<String>,
         args: Option<nova_schema::Schema>,
-        vars: BTreeMap<String, Value>,
+        vars: BTreeMap<String, Pointer>,
         env: BTreeMap<String, String>,
         templates: BTreeMap<String, String>,
         steps: Vec<Step>,
@@ -119,12 +119,12 @@ pub mod build {
             self
         }
 
-        pub fn var(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
+        pub fn var(mut self, name: impl Into<String>, value: impl Into<Pointer>) -> Self {
             self.vars.insert(name.into(), value.into());
             self
         }
 
-        pub fn vars(mut self, value: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>) -> Self {
+        pub fn vars(mut self, value: impl IntoIterator<Item = (impl Into<String>, impl Into<Pointer>)>) -> Self {
             self.vars.extend(value.into_iter().map(|(k, v)| (k.into(), v.into())));
             self
         }

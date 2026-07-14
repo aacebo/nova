@@ -1,24 +1,19 @@
-mod args;
+mod bind;
 mod builtin;
 mod diagnostic;
 mod error;
 pub mod event;
 mod manifest;
-mod object;
 mod state;
 
-pub use args::*;
+pub use bind::*;
 pub use diagnostic::*;
 pub use error::*;
 pub use event::{Event, Observer};
 pub use manifest::*;
-pub use minijinja::context;
-pub use object::*;
+pub use nova_reflect::{Dynamic, Object as Reflect, ToType, ToValue, Type, Value};
+pub use nova_template::{Args, Context, Engine, FromArgs, KArgs, Minijinja, Namespace, Pointer, is_truthy};
 pub use state::*;
-
-pub type Value = minijinja::Value;
-pub type Environment<'a> = minijinja::Environment<'a>;
-pub use minijinja::value::{Kwargs, Object as Reflect};
 
 pub trait Action: Send + Sync {
     fn invoke(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>>;
@@ -29,7 +24,7 @@ pub trait Predicate: Send + Sync {
 }
 
 pub trait Call: Send + Sync {
-    fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>>;
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<Pointer, Box<dyn std::error::Error>>;
 }
 
 impl<F> Action for F
@@ -52,9 +47,9 @@ where
 
 impl<F> Call for F
 where
-    F: Fn(&Args, &Scope) -> Result<Value, Box<dyn std::error::Error>> + Send + Sync,
+    F: Fn(&Args, &Scope) -> Result<Pointer, Box<dyn std::error::Error>> + Send + Sync,
 {
-    fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
+    fn invoke(&self, args: &Args, scope: &Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
         self(args, scope)
     }
 }
@@ -70,10 +65,6 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn env(&self) -> &Environment<'static> {
-        self.scope.env()
-    }
-
     pub fn scope(&self) -> &Scope {
         &self.scope
     }
@@ -84,10 +75,10 @@ impl Runtime {
     }
 
     pub fn eval(&self, name: &str, args: Args) -> Result<bool, Box<dyn std::error::Error>> {
-        Ok(self.scope.call(name, args)?.is_true())
+        Ok(is_truthy(&self.scope.call(name, args)?.value()))
     }
 
-    pub fn func(&self, name: &str, args: Args) -> Result<Value, Box<dyn std::error::Error>> {
+    pub fn func(&self, name: &str, args: Args) -> Result<Pointer, Box<dyn std::error::Error>> {
         self.scope.call(name, args)
     }
 
@@ -143,14 +134,14 @@ impl Builder {
         self
     }
 
-    pub fn var(self, name: impl Into<String>, value: impl Into<Value>) -> Self {
+    pub fn var(self, name: impl Into<String>, value: impl Into<Pointer>) -> Self {
         let name = name.into();
         let value = value.into();
-        self.scope.set(name.clone(), Object::value(value));
+        self.scope.set(name.clone(), Binding::value(value));
         self
     }
 
-    pub fn vars(mut self, values: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>) -> Self {
+    pub fn vars(mut self, values: impl IntoIterator<Item = (impl Into<String>, impl Into<Pointer>)>) -> Self {
         for (name, value) in values {
             self = self.var(name, value);
         }
@@ -160,19 +151,19 @@ impl Builder {
 
     pub fn action(self, name: impl Into<String>, action: impl Action + 'static) -> Self {
         let name = name.into();
-        self.scope.set(name.clone(), Object::action(name, action));
+        self.scope.set(name.clone(), Binding::action(name, action));
         self
     }
 
     pub fn predicate(self, name: impl Into<String>, predicate: impl Predicate + 'static) -> Self {
         let name = name.into();
-        self.scope.set(name.clone(), Object::predicate(name, predicate));
+        self.scope.set(name.clone(), Binding::predicate(name, predicate));
         self
     }
 
     pub fn func(self, name: impl Into<String>, func: impl Call + 'static) -> Self {
         let name = name.into();
-        self.scope.set(name.clone(), Object::func(name, func));
+        self.scope.set(name.clone(), Binding::func(name, func));
         self
     }
 
@@ -195,13 +186,13 @@ impl Builder {
     }
 
     pub fn build(self) -> Result<Runtime, Box<dyn std::error::Error>> {
-        let mut env = Environment::new();
+        let mut env = Minijinja::new();
 
         for (name, source) in self.templates {
-            env.add_template_owned(name, source)?;
+            env.add_template(&name, &source)?;
         }
 
-        let root = self.scope.with_env(env);
+        let root = self.scope.with_engine(env);
         let mut merged: std::collections::BTreeMap<String, Manifest> = std::collections::BTreeMap::new();
 
         for manifest in self.manifests {
@@ -216,21 +207,21 @@ impl Builder {
         }
 
         for (name, manifest) in merged {
-            let mut cenv = Environment::new();
+            let mut cenv = Minijinja::new();
 
             for (tmpl, source) in &manifest.templates {
-                cenv.add_template_owned(tmpl.clone(), source.clone())?;
+                cenv.add_template(tmpl, source)?;
             }
 
-            let scope = root.fork(&name, Vec::new(), KArgs::new()).with_env(cenv);
+            let scope = root.fork(&name, Vec::new(), KArgs::new()).with_engine(cenv);
 
             for (key, value) in &manifest.vars {
-                scope.set_local(key.clone(), Object::value(value.clone()));
+                scope.set_local(key.clone(), Binding::value(value.clone()));
             }
 
             for (key, var) in &manifest.env {
                 if let Ok(value) = std::env::var(var) {
-                    scope.set_local(key.clone(), Object::value(value.into()));
+                    scope.set_local(key.clone(), Binding::value(Pointer::new(Value::from(value))));
                 }
             }
 

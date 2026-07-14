@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    Action, Arena, Args, Diagnostic, Entry, Environment, Event, KArgs, Object, Reflect, Slot, SlotMut, Traced, Value, event,
+    Action, Arena, Args, Binding, Diagnostic, Engine, Entry, Event, KArgs, Minijinja, Pointer, Slot, SlotMut, ToType, ToValue,
+    Traced, Type, Value, event,
 };
 
 #[derive(Clone)]
@@ -12,10 +13,10 @@ struct _Scope {
     trace_id: ulid::Ulid,
     name: String,
     parent: Option<Scope>,
-    env: Arc<Environment<'static>>,
+    engine: Arc<dyn Engine>,
     symbols: Mutex<HashMap<String, ulid::Ulid>>,
     arena: Arc<Mutex<Arena>>,
-    args: Vec<Value>,
+    args: Vec<Pointer>,
     kargs: KArgs,
     events: crossbeam::Sender<Event>,
 }
@@ -28,7 +29,7 @@ impl Scope {
             trace_id: ulid::Ulid::new(),
             name: name.into(),
             parent: None,
-            env: Default::default(),
+            engine: Arc::new(Minijinja::new()),
             symbols: Default::default(),
             arena,
             args: Default::default(),
@@ -37,9 +38,9 @@ impl Scope {
         }))
     }
 
-    pub(crate) fn with_env(self, env: Environment<'static>) -> Self {
-        let mut inner = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("with_env on a shared scope"));
-        inner.env = Arc::new(env);
+    pub(crate) fn with_engine(self, engine: impl Engine + 'static) -> Self {
+        let mut inner = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("with_engine on a shared scope"));
+        inner.engine = Arc::new(engine);
         Self(Arc::new(inner))
     }
 
@@ -51,11 +52,11 @@ impl Scope {
         &self.0.name
     }
 
-    pub fn env(&self) -> &Environment<'static> {
-        &self.0.env
+    pub fn engine(&self) -> &Arc<dyn Engine> {
+        &self.0.engine
     }
 
-    pub fn args(&self) -> &[Value] {
+    pub fn args(&self) -> &[Pointer] {
         &self.0.args
     }
 
@@ -84,12 +85,12 @@ impl Scope {
         self.len() == 0
     }
 
-    pub fn fork(&self, name: impl Into<String>, args: impl IntoIterator<Item = Value>, kargs: impl Into<KArgs>) -> Self {
+    pub fn fork(&self, name: impl Into<String>, args: impl IntoIterator<Item = Pointer>, kargs: impl Into<KArgs>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: self.0.trace_id,
             name: name.into(),
             parent: Some(self.clone()),
-            env: self.0.env.clone(),
+            engine: self.0.engine.clone(),
             symbols: Default::default(),
             arena: self.0.arena.clone(),
             args: args.into_iter().collect(),
@@ -143,7 +144,7 @@ impl Scope {
         }
     }
 
-    pub fn set(&self, key: impl Into<String>, object: impl Into<Object>) -> &Self {
+    pub fn set(&self, key: impl Into<String>, object: impl Into<Binding>) -> &Self {
         let key = key.into();
         let id = self.0.symbols.lock().unwrap().get(&key).copied();
 
@@ -172,7 +173,7 @@ impl Scope {
         self
     }
 
-    pub fn set_local(&self, key: impl Into<String>, object: impl Into<Object>) -> &Self {
+    pub fn set_local(&self, key: impl Into<String>, object: impl Into<Binding>) -> &Self {
         let key = key.into();
         let existing = self.0.symbols.lock().unwrap().get(&key).copied();
         let object = object.into();
@@ -212,7 +213,7 @@ impl Scope {
         self
     }
 
-    pub fn call(&self, name: impl AsRef<str>, args: Args) -> Result<Value, Box<dyn std::error::Error>> {
+    pub fn call(&self, name: impl AsRef<str>, args: Args) -> Result<Pointer, Box<dyn std::error::Error>> {
         let name = name.as_ref();
 
         if let Some(slot) = self.get(name)
@@ -225,7 +226,7 @@ impl Scope {
             ));
 
             routine.invoke(&args, self)?;
-            return Ok(Value::from(()));
+            return Ok(Pointer::new(Value::Null));
         }
 
         let func = self.get_func(name)?;
@@ -237,22 +238,24 @@ impl Scope {
             child.kargs().clone().into_inner(),
         ));
 
-        let child_args = Args::new(child.args(), child.kargs().clone());
+        let child_args = Args::new(child.args().to_vec(), child.kargs().clone());
         func.invoke(&child_args, &child)
     }
 
-    pub fn eval(&self, src: &str) -> Result<Value, Box<dyn std::error::Error>> {
-        let expr = self.env().compile_expression(src)?;
-        Ok(expr.eval(Value::from_object(self.clone()))?)
+    fn as_context(&self) -> Arc<dyn crate::Context> {
+        Arc::new(self.clone())
+    }
+
+    pub fn eval(&self, src: &str) -> Result<Pointer, Box<dyn std::error::Error>> {
+        Ok(self.0.engine.eval(src, &self.as_context())?)
     }
 
     pub fn render(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let tmpl = self.env().get_template(name)?;
-        Ok(tmpl.render(Value::from_object(self.clone()))?)
+        Ok(self.0.engine.render(name, &self.as_context())?)
     }
 
     pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(self.env().render_str(source, Value::from_object(self.clone()))?)
+        Ok(self.0.engine.render_str(source, &self.as_context())?)
     }
 
     pub fn dispatch(&self, source: impl Into<event::Source>) {
@@ -274,18 +277,20 @@ impl std::fmt::Debug for Scope {
     }
 }
 
-impl Reflect for Scope {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        let name = key.as_str()?;
+impl ToType for Scope {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
 
-        if name == Self::KEY {
-            return Some(Value::from_object(Self::clone(self)));
-        }
+impl ToValue for Scope {
+    fn to_value(&self) -> Value<'_> {
+        Value::Undefined
+    }
+}
 
-        if name == "args" {
-            return Some(Value::from_iter(self.args().iter().cloned()));
-        }
-
+impl crate::Context for Scope {
+    fn resolve(&self, name: &str) -> Option<Pointer> {
         if let Some(value) = self.kargs().get(name) {
             return Some(value.clone());
         }
@@ -293,9 +298,25 @@ impl Reflect for Scope {
         let slot = self.get(name)?;
 
         match &*slot {
-            Object::Value(value) => Some(value.clone()),
-            Object::Func(func) => Some(Value::from_object(func.clone())),
-            Object::Routine(rt) => Some(Value::from_object(rt.clone())),
+            Binding::Value(value) => Some(value.clone()),
+            Binding::Func(func) => Some(Pointer::callable(func.clone())),
+            Binding::Routine(rt) => Some(Pointer::callable_namespace(rt.clone())),
         }
+    }
+
+    fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.0.symbols.lock().unwrap().keys().cloned().collect();
+
+        if let Some(parent) = &self.0.parent {
+            names.extend(crate::Context::names(parent));
+        }
+
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    fn as_caller(&self) -> Pointer {
+        Pointer::new(self.clone())
     }
 }

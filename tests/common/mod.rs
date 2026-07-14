@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Diagnostic, Event, Observer, Severity, Value};
+use nova::{Diagnostic, Event, Observer, Pointer, Severity};
 
 #[derive(Clone, Default)]
 pub struct Recorder(Arc<Inner>);
@@ -11,7 +11,7 @@ pub struct Recorder(Arc<Inner>);
 #[derive(Default)]
 struct Inner {
     calls: Mutex<Vec<String>>,
-    updates: Mutex<Vec<(String, Value, Value)>>,
+    updates: Mutex<Vec<(String, Pointer, Pointer)>>,
     errors: Mutex<Vec<String>>,
     diagnostics: Mutex<Vec<Diagnostic>>,
     events: Mutex<usize>,
@@ -28,7 +28,7 @@ impl Recorder {
         self.0.calls.lock().unwrap().clone()
     }
 
-    pub fn updates(&self) -> Vec<(String, Value, Value)> {
+    pub fn updates(&self) -> Vec<(String, Pointer, Pointer)> {
         self.0.updates.lock().unwrap().clone()
     }
 
@@ -100,4 +100,8 @@ impl Recorder {
             Source::Step(StepEvent::End(e)) => self.0.step_ends.lock().unwrap().push(e.clone()),
         }
     }
+}
+
+pub fn to_pointer<T: nova::ToValue>(value: T) -> Pointer {
+    Pointer::new(value.to_value().into_owned())
 }

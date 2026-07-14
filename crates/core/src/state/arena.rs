@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{Entry, Object};
+use crate::{Binding, Entry};
 
 #[derive(Default, Clone)]
 pub struct Arena(HashMap<ulid::Ulid, Entry>);
@@ -26,7 +26,7 @@ impl Arena {
         self.0.get(id).cloned()
     }
 
-    pub fn set(&mut self, id: &ulid::Ulid, object: Object) -> &mut Self {
+    pub fn set(&mut self, id: &ulid::Ulid, object: Binding) -> &mut Self {
         match self.0.get(id) {
             Some(entry) => {
                 *entry.value.write().unwrap() = object;

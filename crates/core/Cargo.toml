@@ -17,9 +17,9 @@ workspace = true
 
 [dependencies]
 nova-schema = { workspace = true }
-nova-reflect = { workspace = true, features = ["serde", "minijinja"] }
+nova-reflect = { workspace = true, features = ["serde"] }
+nova-template = { workspace = true }
 
 ulid = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive", "rc"] }
-minijinja = { version = "2", features = ["serde"] }
 crossbeam = { package = "crossbeam-channel", version = "0.5" }

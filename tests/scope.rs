@@ -26,7 +26,7 @@ fn scope_bindings_lifecycle_through_macros() {
 
             {
                 let mut slot = get_mut!("x").expect("x should be set");
-                *slot.as_value_mut().unwrap() = Value::from(9);
+                *slot.as_value_mut().unwrap() = Value::from(9).into();
             }
             assert_eq!(get!("x").unwrap().clone(), Value::from(9));
 
@@ -124,7 +124,7 @@ fn typed_get_filters_by_object_variant() {
 
             {
                 let mut slot = get_mut!("x" as Value).expect("x is a Var");
-                *slot.as_value_mut().unwrap() = Value::from(9);
+                *slot.as_value_mut().unwrap() = Value::from(9).into();
             }
 
             assert_eq!(get!("x" as Value).unwrap().clone(), Value::from(9));

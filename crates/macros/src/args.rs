@@ -13,10 +13,10 @@ pub enum Arg {
 impl Arg {
     pub fn stmt(&self) -> TokenStream {
         match self {
-            Self::Positional(expr) => zyn! { __args.push(::nova::Value::from({{ expr }})); },
+            Self::Positional(expr) => zyn! { __args.push(::nova::Pointer::from({{ expr }})); },
             Self::Named(key, expr) => {
                 let key = LitStr::new(&key.to_string(), key.span());
-                zyn! { __kargs.set({{ key }}, {{ expr }}); }
+                zyn! { __kargs.set({{ key }}, ::nova::Pointer::from({{ expr }})); }
             }
             Self::SplatArgs(expr) => zyn! { __args = ({{ expr }}).to_vec(); },
             Self::SplatKargs(expr) => zyn! {
@@ -60,8 +60,12 @@ impl Args {
             .args
             .iter()
             .filter_map(|arg| match arg {
-                Arg::Positional(expr) => Some(zyn! { __args.push(::nova::Value::from({{ expr }})); }),
-                Arg::SplatArgs(expr) => Some(zyn! { __args.extend(({{ expr }}).iter().cloned()); }),
+                Arg::Positional(expr) => Some(zyn! {
+                    __args.push(::nova::Pointer::from({{ expr }}));
+                }),
+                Arg::SplatArgs(expr) => Some(zyn! {
+                    __args.extend(({{ expr }}).iter().map(::nova::Pointer::from));
+                }),
                 _ => None,
             })
             .collect();
@@ -72,39 +76,27 @@ impl Args {
             .filter_map(|arg| match arg {
                 Arg::Named(key, expr) => {
                     let key = LitStr::new(&key.to_string(), key.span());
-                    Some(zyn! { __kwargs.push(({{ key }}, ::nova::Value::from({{ expr }}))); })
+                    Some(zyn! {
+                        __kwargs.set({{ key }}, ::nova::Pointer::from({{ expr }}));
+                    })
                 }
                 Arg::SplatKargs(expr) => Some(zyn! {
                     for (__k, __v) in ({{ expr }}).iter() {
-                        __kwargs.push((__k.as_str(), __v.clone()));
+                        __kwargs.set(__k.as_str(), __v.clone());
                     }
                 }),
                 _ => None,
             })
             .collect();
 
-        let has_named = self
-            .args
-            .iter()
-            .any(|arg| matches!(arg, Arg::Named(..) | Arg::SplatKargs(..)));
-
-        let push_kwargs = if has_named {
-            zyn! {
-                __args.push(::nova::Value::from(::nova::Kwargs::from_iter(__kwargs)));
-            }
-        } else {
-            TokenStream::new()
-        };
-
         zyn! {
-            ::nova::Args::try_from(&{
-                let mut __args: ::std::vec::Vec<::nova::Value> = ::std::vec::Vec::new();
-                let mut __kwargs: ::std::vec::Vec<(&str, ::nova::Value)> = ::std::vec::Vec::new();
+            {
+                let mut __args: ::std::vec::Vec<::nova::Pointer> = ::std::vec::Vec::new();
+                let mut __kwargs = ::nova::KArgs::new();
                 @for (stmt in positional.iter()) { {{ stmt }} }
                 @for (stmt in named.iter()) { {{ stmt }} }
-                {{ push_kwargs }}
-                __args
-            }[..]).expect("args! builds a well-formed argument slice")
+                ::nova::Args::new(__args, __kwargs)
+            }
         }
     }
 }

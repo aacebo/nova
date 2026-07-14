@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use nova_core::{Dynamic, Reflect, ToType, ToValue, Type, Value};
+
 #[derive(Debug, Clone)]
 pub struct Response {
     pub status: u16,
@@ -23,16 +25,25 @@ impl TryFrom<reqwest::blocking::Response> for Response {
     }
 }
 
-impl nova_core::Reflect for Response {
-    fn get_value(self: &std::sync::Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
-        let key = key.as_str()?;
+impl ToType for Response {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
 
-        match key {
-            "status" => Some(self.status.into()),
-            "headers" => Some(self.headers.clone().into()),
-            "data" => Some(nova_core::Value::from_bytes(self.data.clone())),
-            "text" => Some(String::from_utf8_lossy(&self.data).into_owned().into()),
-            _ => None,
+impl Reflect for Response {
+    fn field(&self, name: &str) -> Value<'_> {
+        match name {
+            "status" => Value::from(self.status),
+            "headers" => self.headers.to_value(),
+            "text" | "data" => Value::from(String::from_utf8_lossy(&self.data).into_owned()),
+            _ => Value::Undefined,
         }
+    }
+}
+
+impl ToValue for Response {
+    fn to_value(&self) -> Value<'_> {
+        Value::Dynamic(Dynamic::from_object(self))
     }
 }

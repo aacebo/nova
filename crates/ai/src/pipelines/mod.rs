@@ -46,7 +46,7 @@ impl ModelArgs {
 impl FromArgs for ModelArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &Args<'_>) -> RoutineResult<Self> {
+    fn from_args(args: &Args) -> RoutineResult<Self> {
         Ok(Self {
             provider: string(args, "provider")?,
             model: string(args, "model")?,
@@ -64,7 +64,7 @@ pub struct TextArgs {
 impl FromArgs for TextArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &Args<'_>) -> RoutineResult<Self> {
+    fn from_args(args: &Args) -> RoutineResult<Self> {
         Ok(Self {
             text: text(args)?,
             model: ModelArgs::from_args(args)?,
@@ -83,7 +83,7 @@ pub struct ScoredArgs {
 impl FromArgs for ScoredArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &Args<'_>) -> RoutineResult<Self> {
+    fn from_args(args: &Args) -> RoutineResult<Self> {
         Ok(Self {
             text: text(args)?,
             min_score: min_score(args)?,
@@ -99,14 +99,19 @@ pub fn borrow(text: &[String]) -> Vec<&str> {
 
 fn text(args: &Args) -> RoutineResult<Vec<String>> {
     let value = args.at(0);
+    let value = value.value();
 
     if let Some(text) = value.as_str() {
         return Ok(vec![text.to_string()]);
     }
 
+    let map = value
+        .as_map()
+        .ok_or(nova_core::Error::message("text must be a string or list of strings"))?;
+
     let mut out = Vec::new();
 
-    for item in value.try_iter()? {
+    for (_, item) in map.iter() {
         let item = item
             .as_str()
             .ok_or(nova_core::Error::message("text must be a string or list of strings"))?;
@@ -118,10 +123,16 @@ fn text(args: &Args) -> RoutineResult<Vec<String>> {
 }
 
 fn min_score(args: &Args) -> RoutineResult<f64> {
-    match args.key("min_score") {
-        v if v.is_undefined() || v.is_none() => Ok(0.0),
-        v => f64::try_from(v).map_err(|_| nova_core::Error::message("min_score must be a number").into()),
+    let value = args.key("min_score");
+    let value = value.value();
+
+    if value.is_null() || value.is_undefined() {
+        return Ok(0.0);
     }
+
+    value
+        .to_f64()
+        .ok_or_else(|| nova_core::Error::message("min_score must be a number").into())
 }
 
 fn is_uri(model: &str) -> bool {
@@ -131,13 +142,17 @@ fn is_uri(model: &str) -> bool {
 }
 
 fn string(args: &Args, key: &str) -> RoutineResult<Option<String>> {
-    match args.key(key) {
-        v if v.is_undefined() || v.is_none() => Ok(None),
-        v => v
-            .as_str()
-            .map(|value| Some(value.to_string()))
-            .ok_or_else(|| nova_core::Error::message(format!("{key} must be a string")).into()),
+    let value = args.key(key);
+    let value = value.value();
+
+    if value.is_null() || value.is_undefined() {
+        return Ok(None);
     }
+
+    value
+        .as_str()
+        .map(|value| Some(value.to_string()))
+        .ok_or_else(|| nova_core::Error::message(format!("{key} must be a string")).into())
 }
 
 /// Default models, one per capability. A model that cannot serve the routine you called is an

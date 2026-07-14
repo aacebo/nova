@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use nova_core::FromArgs;
+use nova_core::{FromArgs, Function, Namespace, Pointer, ToType, ToValue, Type, Value};
 
 pub trait Codec {
     fn json(self) -> Self;
@@ -9,60 +7,80 @@ pub trait Codec {
 
 impl Codec for nova_core::Builder {
     fn json(self) -> Self {
-        self.var("json", nova_core::Value::from_object(Json))
+        self.var("json", Pointer::namespace(Json))
     }
 
     fn yaml(self) -> Self {
-        self.var("yaml", nova_core::Value::from_object(Yaml))
+        self.var("yaml", Pointer::namespace(Yaml))
     }
 }
 
 #[derive(Debug)]
 pub struct Json;
 
-impl nova_core::Reflect for Json {
-    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
-        match key.as_str()? {
-            "encode" => Some(nova_core::Value::from_object(nova_core::Function::func(
-                "json.encode",
-                json_encode,
-            ))),
-            "decode" => Some(nova_core::Value::from_object(nova_core::Function::func(
-                "json.decode",
-                json_decode,
-            ))),
+impl ToType for Json {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
+
+impl ToValue for Json {
+    fn to_value(&self) -> Value<'_> {
+        Value::Undefined
+    }
+}
+
+impl Namespace for Json {
+    fn member(&self, name: &str) -> Option<Pointer> {
+        match name {
+            "encode" => Some(Pointer::callable(Function::func("json.encode", json_encode))),
+            "decode" => Some(Pointer::callable(Function::func("json.decode", json_decode))),
             _ => None,
         }
+    }
+
+    fn members(&self) -> Vec<String> {
+        vec!["encode".to_string(), "decode".to_string()]
     }
 }
 
 #[derive(Debug)]
 pub struct Yaml;
 
-impl nova_core::Reflect for Yaml {
-    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
-        match key.as_str()? {
-            "encode" => Some(nova_core::Value::from_object(nova_core::Function::func(
-                "yaml.encode",
-                yaml_encode,
-            ))),
-            "decode" => Some(nova_core::Value::from_object(nova_core::Function::func(
-                "yaml.decode",
-                yaml_decode,
-            ))),
+impl ToType for Yaml {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
+
+impl ToValue for Yaml {
+    fn to_value(&self) -> Value<'_> {
+        Value::Undefined
+    }
+}
+
+impl Namespace for Yaml {
+    fn member(&self, name: &str) -> Option<Pointer> {
+        match name {
+            "encode" => Some(Pointer::callable(Function::func("yaml.encode", yaml_encode))),
+            "decode" => Some(Pointer::callable(Function::func("yaml.decode", yaml_decode))),
             _ => None,
         }
+    }
+
+    fn members(&self) -> Vec<String> {
+        vec!["encode".to_string(), "decode".to_string()]
     }
 }
 
 pub struct EncodeArgs {
-    pub value: nova_core::Value,
+    pub value: Pointer,
 }
 
 impl FromArgs for EncodeArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
+    fn from_args(args: &nova_core::Args) -> Result<Self, Self::Error> {
         Ok(Self { value: args.at(0) })
     }
 }
@@ -74,32 +92,32 @@ pub struct DecodeArgs {
 impl FromArgs for DecodeArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
-        let value = args.at(0);
-        let source = value.as_str().ok_or(nova_core::Error::message("value must be a string"))?;
+    fn from_args(args: &nova_core::Args) -> Result<Self, Self::Error> {
+        let source = args
+            .at(0)
+            .value()
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or(nova_core::Error::message("value must be a string"))?;
 
-        Ok(Self {
-            source: source.to_string(),
-        })
+        Ok(Self { source })
     }
 }
 
-pub fn json_encode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    Ok(serde_json::to_string(&EncodeArgs::from_args(args)?.value)?.into())
+pub fn json_encode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+    let encoded = serde_json::to_string(&EncodeArgs::from_args(args)?.value)?;
+    Ok(Pointer::new(Value::from(encoded)))
 }
 
-pub fn json_decode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    Ok(serde_json::from_str::<nova_core::Value>(
-        &DecodeArgs::from_args(args)?.source,
-    )?)
+pub fn json_decode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_str::<Pointer>(&DecodeArgs::from_args(args)?.source)?)
 }
 
-pub fn yaml_encode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    Ok(serde_norway::to_string(&EncodeArgs::from_args(args)?.value)?.into())
+pub fn yaml_encode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+    let encoded = serde_norway::to_string(&EncodeArgs::from_args(args)?.value)?;
+    Ok(Pointer::new(Value::from(encoded)))
 }
 
-pub fn yaml_decode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    Ok(serde_norway::from_str::<nova_core::Value>(
-        &DecodeArgs::from_args(args)?.source,
-    )?)
+pub fn yaml_decode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+    Ok(serde_norway::from_str::<Pointer>(&DecodeArgs::from_args(args)?.source)?)
 }

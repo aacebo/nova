@@ -1,16 +1,16 @@
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use crate::Object;
+use crate::Binding;
 
 #[derive(Clone)]
 pub struct Entry {
-    pub value: Arc<RwLock<Object>>,
+    pub value: Arc<RwLock<Binding>>,
     pub created_at: Instant,
 }
 
 impl Entry {
-    pub(super) fn new(object: Object) -> Self {
+    pub(super) fn new(object: Binding) -> Self {
         Self {
             value: Arc::new(RwLock::new(object)),
             created_at: Instant::now(),

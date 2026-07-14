@@ -61,7 +61,7 @@ http = ["dep:nova-http"]
 macros = ["dep:nova-macros", "nova-reflect/macros"]
 schema = ["dep:nova-schema"]
 template = ["dep:nova-template"]
-reflect = ["dep:nova-reflect", "nova-reflect/serde", "nova-reflect/minijinja"]
+reflect = ["dep:nova-reflect", "nova-reflect/serde"]
 json = ["nova-reflect/json"]
 
 [dependencies]

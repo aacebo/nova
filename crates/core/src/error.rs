@@ -32,14 +32,14 @@ impl From<ActionError> for Error {
     }
 }
 
-impl From<Error> for minijinja::Error {
+impl From<Error> for nova_template::Error {
     fn from(value: Error) -> Self {
-        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, value.to_string())
+        nova_template::Error::message(value.to_string())
     }
 }
 
-impl From<minijinja::Error> for Error {
-    fn from(value: minijinja::Error) -> Self {
+impl From<nova_template::Error> for Error {
+    fn from(value: nova_template::Error) -> Self {
         Self::other(value)
     }
 }

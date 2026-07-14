@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{Action, Args, KArgs, Scope, Value};
+use crate::{Action, Args, KArgs, Pointer, Scope};
 
 pub fn step() -> build::StepBuilder {
     build::StepBuilder::new()
@@ -35,26 +35,26 @@ impl std::ops::DerefMut for Step {
 impl Action for Step {
     fn invoke(&self, _args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(cond) = &self.cond
-            && !scope.eval(cond).map(|v| v.is_true()).unwrap_or(false)
+            && !scope.eval(cond).map(|v| crate::is_truthy(&v.value())).unwrap_or(false)
         {
             return Ok(());
         }
 
         match &self.body {
             StepBody::Call { call, args, with } => {
-                let resolve = |value: &Value| match value.as_str() {
+                let resolve = |value: &Pointer| match value.value().as_str() {
                     Some(source) => scope.eval(source).unwrap_or_else(|_| value.clone()),
                     None => value.clone(),
                 };
 
-                let positional: Vec<Value> = args.iter().map(&resolve).collect();
+                let positional: Vec<Pointer> = args.iter().map(&resolve).collect();
                 let mut kargs = KArgs::new();
 
                 for (key, value) in with {
                     kargs.set(key.clone(), resolve(value));
                 }
 
-                if let Err(err) = scope.call(call, Args::new(&positional, kargs)) {
+                if let Err(err) = scope.call(call, Args::new(positional, kargs)) {
                     scope.error(err.to_string());
                 }
             }
@@ -102,10 +102,10 @@ pub enum StepBody {
         call: String,
 
         #[serde(default)]
-        args: Vec<Value>,
+        args: Vec<Pointer>,
 
         #[serde(default)]
-        with: BTreeMap<String, Value>,
+        with: BTreeMap<String, Pointer>,
     },
     Run {
         run: String,
@@ -154,8 +154,8 @@ pub mod build {
         pub fn call(
             mut self,
             name: impl Into<String>,
-            args: impl IntoIterator<Item = impl Into<Value>>,
-            with: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>,
+            args: impl IntoIterator<Item = impl Into<Pointer>>,
+            with: impl IntoIterator<Item = (impl Into<String>, impl Into<Pointer>)>,
         ) -> Self {
             self.body = Some(StepBody::Call {
                 call: name.into(),

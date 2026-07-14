@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use minijinja::value::Kwargs;
-
-use crate::{Action, Args, Call, KArgs, Predicate, Reflect, Scope, Value};
+use crate::{Action, Args, Call, Pointer, Predicate, Scope, ToType, ToValue, Type, Value};
 
 #[derive(Clone)]
 pub struct Function {
@@ -42,7 +40,7 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &Args, scope: &Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
         self.callback.invoke(args, scope)
     }
 }
@@ -53,20 +51,31 @@ impl std::fmt::Debug for Function {
     }
 }
 
-impl Reflect for Function {
-    fn call(self: &Arc<Self>, state: &minijinja::State<'_, '_>, args: &[Value]) -> Result<Value, minijinja::Error> {
-        let (positional, kwargs): (&[Value], Kwargs) = minijinja::value::from_args(args)?;
-        let kargs = KArgs::from_kwargs(kwargs)?;
-        let scope = state
-            .lookup(Scope::KEY)
-            .and_then(|v| v.downcast_object::<Scope>())
-            .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
+impl ToType for Function {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
 
-        let child = scope.fork(&self.name, positional.to_vec(), kargs);
-        let args = Args::new(child.args(), child.kargs().clone());
+impl ToValue for Function {
+    fn to_value(&self) -> Value<'_> {
+        Value::Undefined
+    }
+}
+
+impl nova_template::Call for Function {
+    fn call(&self, args: &Args) -> Result<Pointer, nova_template::Error> {
+        let scope = args
+            .caller()
+            .and_then(|c| c.downcast::<Scope>())
+            .ok_or_else(|| nova_template::Error::message("no scope bound to template render"))?;
+
+        let child = scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
+        let child_args = Args::new(child.args().to_vec(), child.kargs().clone());
+
         self.callback
-            .invoke(&args, &child)
-            .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))
+            .invoke(&child_args, &child)
+            .map_err(|err| nova_template::Error::message(err.to_string()))
     }
 }
 
@@ -90,13 +99,13 @@ impl Callback {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, args: &Args, scope: &Scope) -> Result<Value, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &Args, scope: &Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
                 action.invoke(args, scope)?;
-                Ok(Value::from(()))
+                Ok(Pointer::new(Value::Null))
             }
-            Self::Predicate(predicate) => Ok(Value::from(predicate.invoke(args, scope)?)),
+            Self::Predicate(predicate) => Ok(Pointer::new(Value::Bool(predicate.invoke(args, scope)?))),
             Self::Func(func) => func.invoke(args, scope),
         }
     }

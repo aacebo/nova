@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use minijinja::value::Kwargs;
-
-use crate::{Action, Args, Error, KArgs, Object, Reflect, Scope, Step, Value, event};
+use crate::{Action, Args, Binding, Error, Pointer, Scope, Step, ToType, ToValue, Type, Value, event};
 
 #[derive(Clone)]
 pub struct Routine {
@@ -39,19 +37,17 @@ impl Routine {
         &self.steps
     }
 
-    pub fn get(&self, key: &str) -> Option<Value> {
+    pub fn get(&self, key: &str) -> Option<Pointer> {
         let slot = self.scope.get(key)?;
 
         match &*slot {
-            Object::Value(value) => Some(value.clone()),
-            Object::Func(func) => Some(Value::from_object(func.clone())),
-            Object::Routine(rt) => Some(Value::from_object(rt.clone())),
+            Binding::Value(value) => Some(value.clone()),
+            Binding::Func(func) => Some(Pointer::callable(func.clone())),
+            Binding::Routine(rt) => Some(Pointer::callable_namespace(rt.clone())),
         }
     }
 
     fn validate(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
-        use nova_reflect::ToValue;
-
         let Some(validator) = &self.validator else {
             return Ok(());
         };
@@ -59,8 +55,8 @@ impl Routine {
         let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
         let mut instance = nova_reflect::Map::new(&ty);
 
-        for (key, value) in args {
-            instance.insert(key.to_value().into_owned(), value.to_value().into_owned());
+        for (key, value) in args.iter() {
+            instance.insert(key.into_owned(), value.into_owned());
         }
 
         let instance = nova_reflect::Value::Map(instance);
@@ -80,24 +76,39 @@ impl std::fmt::Debug for Routine {
     }
 }
 
-impl Reflect for Routine {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(key.as_str()?)
+impl ToType for Routine {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
+
+impl ToValue for Routine {
+    fn to_value(&self) -> Value<'_> {
+        Value::Undefined
+    }
+}
+
+impl nova_template::Namespace for Routine {
+    fn member(&self, name: &str) -> Option<Pointer> {
+        self.get(name)
     }
 
-    fn call(self: &Arc<Self>, state: &minijinja::State<'_, '_>, args: &[Value]) -> Result<Value, minijinja::Error> {
-        let (positional, kwargs): (&[Value], Kwargs) = minijinja::value::from_args(args)?;
-        let kargs = KArgs::from_kwargs(kwargs)?;
-        let caller = state
-            .lookup(Scope::KEY)
-            .and_then(|v| v.downcast_object::<Scope>())
-            .ok_or_else(|| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "no scope bound to template render"))?;
+    fn members(&self) -> Vec<String> {
+        nova_template::Context::names(&self.scope)
+    }
+}
 
-        let args = Args::new(positional, kargs);
-        self.invoke(&args, &caller)
-            .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))?;
+impl nova_template::Call for Routine {
+    fn call(&self, args: &Args) -> Result<Pointer, nova_template::Error> {
+        let caller = args
+            .caller()
+            .and_then(|c| c.downcast::<Scope>())
+            .ok_or_else(|| nova_template::Error::message("no scope bound to template render"))?;
 
-        Ok(Value::from(()))
+        self.invoke(args, caller)
+            .map_err(|err| nova_template::Error::message(err.to_string()))?;
+
+        Ok(Pointer::new(Value::Null))
     }
 }
 
@@ -115,7 +126,7 @@ impl Action for Routine {
             let skipped = step
                 .cond
                 .as_ref()
-                .map(|cond| !child.eval(cond).map(|v| v.is_true()).unwrap_or(false))
+                .map(|cond| !child.eval(cond).map(|v| crate::is_truthy(&v.value())).unwrap_or(false))
                 .unwrap_or(false);
 
             if skipped {
@@ -131,7 +142,7 @@ impl Action for Routine {
             }
 
             let started = std::time::Instant::now();
-            let step_args = Args::new(child.args(), child.kargs().clone());
+            let step_args = Args::new(child.args().to_vec(), child.kargs().clone());
             let result = step.invoke(&step_args, &child);
             let elapsed = started.elapsed();
             let status = if result.is_err() {

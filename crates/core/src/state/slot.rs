@@ -1,10 +1,10 @@
 use std::time::Instant;
 
-use crate::{Entry, Object};
+use crate::{Binding, Entry};
 
 pub struct Slot {
     entry: Entry,
-    object: Object,
+    object: Binding,
 }
 
 impl Slot {
@@ -19,7 +19,7 @@ impl Slot {
 }
 
 impl std::ops::Deref for Slot {
-    type Target = Object;
+    type Target = Binding;
 
     fn deref(&self) -> &Self::Target {
         &self.object
@@ -28,7 +28,7 @@ impl std::ops::Deref for Slot {
 
 pub struct SlotMut {
     entry: Entry,
-    object: Object,
+    object: Binding,
 }
 
 impl SlotMut {
@@ -43,7 +43,7 @@ impl SlotMut {
 }
 
 impl std::ops::Deref for SlotMut {
-    type Target = Object;
+    type Target = Binding;
 
     fn deref(&self) -> &Self::Target {
         &self.object

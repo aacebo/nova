@@ -17,6 +17,7 @@ workspace = true
 
 [dependencies]
 nova-core = { workspace = true }
+nova-reflect = { workspace = true, features = ["serde"] }
 
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1" }

@@ -2391,6 +2391,7 @@ dependencies = [
  "candle-transformers",
  "hf-hub",
  "nova-core",
+ "nova-reflect",
  "reqwest 0.13.4",
  "serde",
  "serde_json",
@@ -2423,9 +2424,9 @@ name = "nova-core"
 version = "0.0.0"
 dependencies = [
  "crossbeam-channel",
- "minijinja",
  "nova-reflect",
  "nova-schema",
+ "nova-template",
  "serde",
  "ulid",
 ]
@@ -2458,7 +2459,6 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "dhat",
- "minijinja",
  "nova-reflect-macros",
  "serde",
  "serde_json",
@@ -2487,6 +2487,12 @@ dependencies = [
 [[package]]
 name = "nova-template"
 version = "0.0.0"
+dependencies = [
+ "minijinja",
+ "nova-reflect",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "num-complex"

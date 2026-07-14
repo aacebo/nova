@@ -38,18 +38,6 @@ impl PartialEq<String> for TypeId {
     }
 }
 
-impl Ord for TypeId {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl PartialOrd for TypeId {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-
 impl AsRef<TypeId> for TypeId {
     fn as_ref(&self) -> &TypeId {
         self

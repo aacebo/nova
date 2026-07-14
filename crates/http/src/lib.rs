@@ -1,8 +1,6 @@
 mod response;
 
-use std::sync::Arc;
-
-use nova_core::FromArgs;
+use nova_core::{FromArgs, Function, Namespace, Pointer, ToType, ToValue, Type, Value};
 pub use response::*;
 
 pub trait Http {
@@ -11,38 +9,54 @@ pub trait Http {
 
 impl Http for nova_core::Builder {
     fn http(self) -> Self {
-        self.var("http", nova_core::Value::from_object(Client))
+        self.var("http", Pointer::namespace(Client))
     }
 }
 
 #[derive(Debug)]
 pub struct Client;
 
-impl nova_core::Reflect for Client {
-    fn get_value(self: &Arc<Self>, key: &nova_core::Value) -> Option<nova_core::Value> {
-        match key.as_str()? {
-            "get" => Some(nova_core::Value::from_object(nova_core::Function::func("http.get", get))),
-            "post" => Some(nova_core::Value::from_object(nova_core::Function::func("http.post", post))),
-            "put" => Some(nova_core::Value::from_object(nova_core::Function::func("http.put", put))),
-            "patch" => Some(nova_core::Value::from_object(nova_core::Function::func("http.patch", patch))),
-            _ => None,
-        }
+impl ToType for Client {
+    fn to_type(&self) -> Type {
+        Type::Any
     }
 }
 
-pub fn get(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+impl ToValue for Client {
+    fn to_value(&self) -> Value<'_> {
+        Value::Undefined
+    }
+}
+
+impl Namespace for Client {
+    fn member(&self, name: &str) -> Option<Pointer> {
+        match name {
+            "get" => Some(Pointer::callable(Function::func("http.get", get))),
+            "post" => Some(Pointer::callable(Function::func("http.post", post))),
+            "put" => Some(Pointer::callable(Function::func("http.put", put))),
+            "patch" => Some(Pointer::callable(Function::func("http.patch", patch))),
+            _ => None,
+        }
+    }
+
+    fn members(&self) -> Vec<String> {
+        ["get", "post", "put", "patch"].iter().map(|s| s.to_string()).collect()
+    }
+}
+
+pub fn get(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::GET, args)
 }
 
-pub fn post(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+pub fn post(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::POST, args)
 }
 
-pub fn put(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+pub fn put(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::PUT, args)
 }
 
-pub fn patch(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+pub fn patch(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::PATCH, args)
 }
 
@@ -60,22 +74,22 @@ pub struct RequestArgs {
 impl FromArgs for RequestArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
-        let uri = args.at(0);
-        let uri = uri.as_str().ok_or(nova_core::Error::message("uri must be a string"))?;
-        let value = args.at(1);
-        let body = if let Some(text) = value.as_str() {
-            Some(Body::Text(text.to_string()))
-        } else {
-            value.as_bytes().map(|bytes| Body::Bytes(bytes.to_vec()))
-        };
+    fn from_args(args: &nova_core::Args) -> Result<Self, Self::Error> {
+        let uri = args
+            .at(0)
+            .value()
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or(nova_core::Error::message("uri must be a string"))?;
+
+        let body = args.at(1).value().as_str().map(|s| Body::Text(s.to_string()));
 
         let mut headers = Vec::new();
-        let value = args.key("headers");
 
-        if !value.is_undefined() && !value.is_none() {
-            for key in value.try_iter()? {
-                let header = value.get_item(&key)?;
+        let headers_value = args.key("headers");
+
+        if let Some(map) = headers_value.value().as_map() {
+            for (key, header) in map.iter() {
                 let key = key
                     .as_str()
                     .ok_or(nova_core::Error::message("header name must be a string"))?;
@@ -87,15 +101,11 @@ impl FromArgs for RequestArgs {
             }
         }
 
-        Ok(Self {
-            uri: uri.to_string(),
-            body,
-            headers,
-        })
+        Ok(Self { uri, body, headers })
     }
 }
 
-fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<Pointer, Box<dyn std::error::Error>> {
     let args = RequestArgs::from_args(args)?;
     let mut req = reqwest::blocking::Client::new().request(method, args.uri);
 
@@ -110,5 +120,5 @@ fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<nova_core::Va
     };
 
     let res = req.send()?;
-    Ok(nova_core::Value::from_dyn_object(Arc::new(Response::try_from(res)?)))
+    Ok(Pointer::new(Response::try_from(res)?))
 }

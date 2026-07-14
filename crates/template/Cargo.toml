@@ -1,5 +1,6 @@
 [package]
 name = "nova-template"
+description = "Template engine abstraction for the Nova workflow runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +9,16 @@ documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
+[lib]
+doctest = false
+
 [lints]
 workspace = true
 
 [dependencies]
+nova-reflect = { workspace = true, features = ["serde"] }
+minijinja = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"] }
+
+[dev-dependencies]
+serde_json = { version = "1" }

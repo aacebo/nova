@@ -1,4 +1,4 @@
-use nova_core::{Reflect, Value};
+use nova_core::{Dynamic, Reflect, ToType, ToValue, Type, Value};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Artifact {
@@ -7,14 +7,29 @@ pub struct Artifact {
     pub vector: Option<Vec<f32>>,
 }
 
+impl ToType for Artifact {
+    fn to_type(&self) -> Type {
+        Type::Any
+    }
+}
+
 impl Reflect for Artifact {
-    fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
-        match key.as_str()? {
-            "name" => Some((&self.name).into()),
-            "value" => Some(self.value.to_string().into()),
-            "vector" => self.vector.as_ref().map(Value::from_serialize),
-            _ => None,
+    fn field(&self, name: &str) -> Value<'_> {
+        match name {
+            "name" => Value::from(self.name.clone()),
+            "value" => Value::from(self.value.to_string()),
+            "vector" => match &self.vector {
+                Some(v) => v.to_value(),
+                None => Value::Null,
+            },
+            _ => Value::Undefined,
         }
+    }
+}
+
+impl ToValue for Artifact {
+    fn to_value(&self) -> Value<'_> {
+        Value::Dynamic(Dynamic::from_object(self))
     }
 }
 

@@ -4,16 +4,16 @@ mod routine;
 pub use function::*;
 pub use routine::*;
 
-use crate::{Action, Call, Predicate, Value};
+use crate::{Action, Call, Pointer, Predicate};
 
 #[derive(Debug, Clone)]
-pub enum Object {
+pub enum Binding {
     Func(Function),
     Routine(Routine),
-    Value(Value),
+    Value(Pointer),
 }
 
-impl Object {
+impl Binding {
     pub fn action(name: impl Into<String>, action: impl Action + 'static) -> Self {
         Self::Func(Function::action(name, action))
     }
@@ -30,7 +30,7 @@ impl Object {
         Self::Routine(routine)
     }
 
-    pub fn value(value: Value) -> Self {
+    pub fn value(value: Pointer) -> Self {
         Self::Value(value)
     }
 
@@ -60,14 +60,14 @@ impl Object {
         }
     }
 
-    pub fn as_value(&self) -> Option<&Value> {
+    pub fn as_value(&self) -> Option<&Pointer> {
         match self {
             Self::Value(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_value_mut(&mut self) -> Option<&mut Value> {
+    pub fn as_value_mut(&mut self) -> Option<&mut Pointer> {
         match self {
             Self::Value(v) => Some(v),
             _ => None,
@@ -75,27 +75,27 @@ impl Object {
     }
 }
 
-impl From<Function> for Object {
+impl From<Function> for Binding {
     fn from(value: Function) -> Self {
         Self::Func(value)
     }
 }
 
-impl From<Routine> for Object {
+impl From<Routine> for Binding {
     fn from(value: Routine) -> Self {
         Self::Routine(value)
     }
 }
 
-impl<T: Into<Value>> From<T> for Object {
+impl<T: Into<Pointer>> From<T> for Binding {
     fn from(value: T) -> Self {
         Self::Value(value.into())
     }
 }
 
-impl Eq for Object {}
+impl Eq for Binding {}
 
-impl PartialEq for Object {
+impl PartialEq for Binding {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Func(a), Self::Func(b)) => a.name() == b.name(),
@@ -106,8 +106,8 @@ impl PartialEq for Object {
     }
 }
 
-impl PartialEq<Value> for Object {
-    fn eq(&self, other: &Value) -> bool {
+impl PartialEq<Pointer> for Binding {
+    fn eq(&self, other: &Pointer) -> bool {
         if let Some(value) = self.as_value() {
             *value == *other
         } else {
@@ -116,8 +116,8 @@ impl PartialEq<Value> for Object {
     }
 }
 
-impl PartialEq<&Value> for Object {
-    fn eq(&self, other: &&Value) -> bool {
+impl PartialEq<&Pointer> for Binding {
+    fn eq(&self, other: &&Pointer) -> bool {
         if let Some(value) = self.as_value() {
             *value == **other
         } else {
@@ -126,7 +126,16 @@ impl PartialEq<&Value> for Object {
     }
 }
 
-impl serde::Serialize for Object {
+impl PartialEq<crate::Value<'_>> for Binding {
+    fn eq(&self, other: &crate::Value<'_>) -> bool {
+        match self.as_value() {
+            Some(value) => value.value() == *other,
+            None => false,
+        }
+    }
+}
+
+impl serde::Serialize for Binding {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
