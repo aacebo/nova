@@ -2377,6 +2377,7 @@ dependencies = [
  "nova-macros",
  "nova-reflect",
  "nova-schema",
+ "nova-template",
  "serde_json",
  "tempfile",
 ]
