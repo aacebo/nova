@@ -2,6 +2,7 @@ mod response;
 
 use std::sync::Arc;
 
+use nova_core::FromArgs;
 pub use response::*;
 
 pub trait Http {
@@ -45,32 +46,67 @@ pub fn patch(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_c
     send(reqwest::Method::PATCH, args)
 }
 
-fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let uri = args.at(0);
-    let uri = uri.as_str().ok_or(nova_core::Error::message("uri must be a string"))?;
-    let body = args.at(1);
-    let mut req = reqwest::blocking::Client::new().request(method, uri);
+pub enum Body {
+    Text(String),
+    Bytes(Vec<u8>),
+}
 
-    let headers = args.key("headers");
-    if !headers.is_undefined() && !headers.is_none() {
-        for key in headers.try_iter()? {
-            let value = headers.get_item(&key)?;
-            let key = key
-                .as_str()
-                .ok_or(nova_core::Error::message("header name must be a string"))?;
-            let value = value
-                .as_str()
-                .ok_or(nova_core::Error::message("header value must be a string"))?;
-            req = req.header(key, value);
+pub struct RequestArgs {
+    pub uri: String,
+    pub body: Option<Body>,
+    pub headers: Vec<(String, String)>,
+}
+
+impl FromArgs for RequestArgs {
+    type Error = Box<dyn std::error::Error>;
+
+    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
+        let uri = args.at(0);
+        let uri = uri.as_str().ok_or(nova_core::Error::message("uri must be a string"))?;
+        let value = args.at(1);
+        let body = if let Some(text) = value.as_str() {
+            Some(Body::Text(text.to_string()))
+        } else {
+            value.as_bytes().map(|bytes| Body::Bytes(bytes.to_vec()))
+        };
+
+        let mut headers = Vec::new();
+        let value = args.key("headers");
+
+        if !value.is_undefined() && !value.is_none() {
+            for key in value.try_iter()? {
+                let header = value.get_item(&key)?;
+                let key = key
+                    .as_str()
+                    .ok_or(nova_core::Error::message("header name must be a string"))?;
+                let header = header
+                    .as_str()
+                    .ok_or(nova_core::Error::message("header value must be a string"))?;
+
+                headers.push((key.to_string(), header.to_string()));
+            }
         }
+
+        Ok(Self {
+            uri: uri.to_string(),
+            body,
+            headers,
+        })
+    }
+}
+
+fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
+    let args = RequestArgs::from_args(args)?;
+    let mut req = reqwest::blocking::Client::new().request(method, args.uri);
+
+    for (key, value) in args.headers {
+        req = req.header(key, value);
     }
 
-    req = if let Some(text) = body.as_str() {
-        req.body(text.to_string())
-    } else if let Some(bytes) = body.as_bytes() {
-        req.body(bytes.to_vec())
-    } else {
-        req
+    req = match args.body {
+        Some(Body::Text(text)) => req.body(text),
+        Some(Body::Bytes(bytes)) => req.body(bytes),
+        None => req,
     };
 
     let res = req.send()?;

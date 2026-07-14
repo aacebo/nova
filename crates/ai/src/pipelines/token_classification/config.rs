@@ -1,6 +1,6 @@
 use candle_core::{DType, Device};
 
-use super::checkpoint::TokenClassificationCheckpoint;
+use super::model::TokenClassificationModelType;
 use super::{Extract, local, remote};
 use crate::clients::openai::OpenAI;
 use crate::models::ModelRef;
@@ -16,7 +16,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            model: TokenClassificationCheckpoint::BertLargeConll03.model(),
+            model: TokenClassificationModelType::BertLargeConll03.model(),
             api_key: None,
             device: Device::Cpu,
             dtype: DType::F32,

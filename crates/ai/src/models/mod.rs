@@ -119,6 +119,10 @@ impl ModelRef {
         matches!(self, Self::Remote { .. })
     }
 
+    pub fn loader(&self, device: Device, dtype: DType) -> Result<Loader> {
+        Ok(Loader::new(self.repository()?, device, dtype))
+    }
+
     pub fn repository(&self) -> Result<Arc<dyn Repository>> {
         match self {
             Self::Hub(id) => Ok(Arc::new(HuggingFace::new(id)?)),
@@ -128,10 +132,6 @@ impl ModelRef {
             },
             Self::Remote { id, .. } => Err(Error::Load(format!("{id} is a remote model and has no weights"))),
         }
-    }
-
-    pub fn loader(&self, device: Device, dtype: DType) -> Result<Loader> {
-        Ok(Loader::new(self.repository()?, device, dtype))
     }
 }
 

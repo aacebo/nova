@@ -1,6 +1,6 @@
 use candle_core::{DType, Device};
 
-use super::checkpoint::SentimentCheckpoint;
+use super::model::SentimentModelType;
 use super::{Classify, local, remote};
 use crate::clients::openai::OpenAI;
 use crate::models::ModelRef;
@@ -16,7 +16,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            model: SentimentCheckpoint::DistilBertSst2.model(),
+            model: SentimentModelType::DistilBertSst2.model(),
             api_key: None,
             device: Device::Cpu,
             dtype: DType::F32,

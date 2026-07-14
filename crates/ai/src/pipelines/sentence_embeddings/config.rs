@@ -1,6 +1,6 @@
 use candle_core::{DType, Device};
 
-use super::checkpoint::SentenceEmbeddingsCheckpoint;
+use super::model::SentenceEmbeddingsModelType;
 use super::{Embed, local, remote};
 use crate::clients::openai::OpenAI;
 use crate::models::ModelRef;
@@ -16,7 +16,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            model: SentenceEmbeddingsCheckpoint::AllMiniLmL12V2.model(),
+            model: SentenceEmbeddingsModelType::AllMiniLmL12V2.model(),
             api_key: None,
             device: Device::Cpu,
             dtype: DType::F32,

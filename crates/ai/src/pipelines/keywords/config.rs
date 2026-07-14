@@ -3,7 +3,7 @@ use candle_core::{DType, Device};
 use super::{Keywords, local, remote};
 use crate::clients::openai::OpenAI;
 use crate::models::ModelRef;
-use crate::pipelines::sentence_embeddings::SentenceEmbeddingsCheckpoint;
+use crate::pipelines::sentence_embeddings::SentenceEmbeddingsModelType;
 use crate::resources::{Provider, Result};
 
 pub struct Config {
@@ -17,7 +17,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            model: SentenceEmbeddingsCheckpoint::AllMiniLmL6V2.model(),
+            model: SentenceEmbeddingsModelType::AllMiniLmL6V2.model(),
             api_key: None,
             device: Device::Cpu,
             dtype: DType::F32,

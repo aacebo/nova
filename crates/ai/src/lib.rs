@@ -3,13 +3,17 @@ pub mod models;
 pub mod pipelines;
 pub mod resources;
 
-mod routines;
 mod types;
 
 use std::sync::Arc;
 
-pub use routines::*;
 pub use types::*;
+
+use crate::pipelines::keywords::keyword_extraction;
+use crate::pipelines::sentence_embeddings::embeddings;
+use crate::pipelines::sentiment::sentiment;
+use crate::pipelines::summarization::summarization;
+use crate::pipelines::token_classification::{entity_extraction, pii_extraction};
 
 pub trait AI {
     fn ai(self) -> Self;

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use nova_core::FromArgs;
+
 pub trait Codec {
     fn json(self) -> Self;
     fn yaml(self) -> Self;
@@ -53,22 +55,51 @@ impl nova_core::Reflect for Yaml {
     }
 }
 
+pub struct EncodeArgs {
+    pub value: nova_core::Value,
+}
+
+impl FromArgs for EncodeArgs {
+    type Error = Box<dyn std::error::Error>;
+
+    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
+        Ok(Self { value: args.at(0) })
+    }
+}
+
+pub struct DecodeArgs {
+    pub source: String,
+}
+
+impl FromArgs for DecodeArgs {
+    type Error = Box<dyn std::error::Error>;
+
+    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
+        let value = args.at(0);
+        let source = value.as_str().ok_or(nova_core::Error::message("value must be a string"))?;
+
+        Ok(Self {
+            source: source.to_string(),
+        })
+    }
+}
+
 pub fn json_encode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    Ok(serde_json::to_string(&args.at(0))?.into())
+    Ok(serde_json::to_string(&EncodeArgs::from_args(args)?.value)?.into())
 }
 
 pub fn json_decode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let value = args.at(0);
-    let source = value.as_str().ok_or(nova_core::Error::message("value must be a string"))?;
-    Ok(serde_json::from_str::<nova_core::Value>(source)?)
+    Ok(serde_json::from_str::<nova_core::Value>(
+        &DecodeArgs::from_args(args)?.source,
+    )?)
 }
 
 pub fn yaml_encode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    Ok(serde_norway::to_string(&args.at(0))?.into())
+    Ok(serde_norway::to_string(&EncodeArgs::from_args(args)?.value)?.into())
 }
 
 pub fn yaml_decode(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let value = args.at(0);
-    let source = value.as_str().ok_or(nova_core::Error::message("value must be a string"))?;
-    Ok(serde_norway::from_str::<nova_core::Value>(source)?)
+    Ok(serde_norway::from_str::<nova_core::Value>(
+        &DecodeArgs::from_args(args)?.source,
+    )?)
 }

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use nova_core::FromArgs;
+
 pub trait FileSystem {
     fn fs(self) -> Self;
 }
@@ -23,23 +25,51 @@ impl nova_core::Reflect for Fs {
     }
 }
 
+pub struct ReadArgs {
+    pub path: String,
+}
+
+impl FromArgs for ReadArgs {
+    type Error = Box<dyn std::error::Error>;
+
+    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
+        let path = args.at(0);
+        let path = path.as_str().ok_or(nova_core::Error::message("path must be a string"))?;
+
+        Ok(Self { path: path.to_string() })
+    }
+}
+
+pub struct WriteArgs {
+    pub path: String,
+    pub data: Vec<u8>,
+}
+
+impl FromArgs for WriteArgs {
+    type Error = Box<dyn std::error::Error>;
+
+    fn from_args(args: &nova_core::Args<'_>) -> Result<Self, Self::Error> {
+        let path = args.at(0);
+        let path = path.as_str().ok_or(nova_core::Error::message("path must be a string"))?;
+        let data = args.at(1);
+        let data = data.as_bytes().ok_or(nova_core::Error::message("invalid data type"))?;
+
+        Ok(Self {
+            path: path.to_string(),
+            data: data.to_vec(),
+        })
+    }
+}
+
 pub fn read(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<nova_core::Value, Box<dyn std::error::Error>> {
-    let path = args.at(0);
+    let args = ReadArgs::from_args(args)?;
     let base = std::env::current_dir()?;
-    let path = path.as_str().ok_or(nova_core::Error::message("path must be a string"))?;
-    let data = std::fs::read_to_string(base.join(path))?;
+    let data = std::fs::read_to_string(base.join(args.path))?;
     Ok(data.into())
 }
 
 pub fn write(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<(), Box<dyn std::error::Error>> {
-    let path = args.at(0);
+    let args = WriteArgs::from_args(args)?;
     let base = std::env::current_dir()?;
-    let path = path.as_str().ok_or(nova_core::Error::message("path must be a string"))?;
-    let data = args.at(1);
-
-    if let Some(data) = data.as_bytes() {
-        Ok(std::fs::write(base.join(path), data)?)
-    } else {
-        Err(Box::new(nova_core::Error::message("invalid data type")))
-    }
+    Ok(std::fs::write(base.join(args.path), args.data)?)
 }

@@ -4,6 +4,14 @@ pub use kargs::*;
 
 use crate::{Error, Value};
 
+pub trait FromArgs {
+    type Error;
+
+    fn from_args(args: &Args<'_>) -> Result<Self, Self::Error>
+    where
+        Self: Sized;
+}
+
 pub struct Args<'a> {
     pub args: &'a [Value],
     pub kargs: KArgs,
