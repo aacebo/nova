@@ -38,6 +38,18 @@ impl PartialEq<String> for TypeId {
     }
 }
 
+impl Ord for TypeId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for TypeId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
 impl AsRef<TypeId> for TypeId {
     fn as_ref(&self) -> &TypeId {
         self
@@ -61,5 +73,11 @@ impl std::ops::Deref for TypeId {
 impl std::ops::DerefMut for TypeId {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self
+    }
+}
+
+impl std::hash::Hash for TypeId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }

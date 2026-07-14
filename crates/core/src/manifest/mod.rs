@@ -20,6 +20,9 @@ pub struct Manifest {
     pub on: Vec<Trigger>,
 
     #[serde(default)]
+    pub include: Vec<String>,
+
+    #[serde(default)]
     pub args: Option<nova_schema::Schema>,
 
     #[serde(default)]
@@ -38,14 +41,15 @@ pub struct Manifest {
 impl Manifest {
     pub fn merge(&mut self, other: Self) -> &mut Self {
         self.on.extend(other.on);
-        self.args = match (self.args.take(), other.args) {
-            (Some(base), Some(next)) => Some(nova_schema::oneof!(base, next).into()),
-            (base, next) => base.or(next),
-        };
         self.vars.extend(other.vars);
         self.env.extend(other.env);
         self.templates.extend(other.templates);
         self.steps.extend(other.steps);
+        self.args = match (self.args.take(), other.args) {
+            (Some(base), Some(next)) => Some(nova_schema::oneof!(base, next).into()),
+            (base, next) => base.or(next),
+        };
+
         self
     }
 }
@@ -82,6 +86,7 @@ pub mod build {
     pub struct ManifestBuilder {
         name: Option<String>,
         on: Vec<Trigger>,
+        include: Vec<String>,
         args: Option<nova_schema::Schema>,
         vars: BTreeMap<String, Value>,
         env: BTreeMap<String, String>,
@@ -101,6 +106,11 @@ pub mod build {
 
         pub fn on(mut self, value: impl IntoIterator<Item = Trigger>) -> Self {
             self.on.extend(value);
+            self
+        }
+
+        pub fn include(mut self, value: impl IntoIterator<Item = impl Into<String>>) -> Self {
+            self.include.extend(value.into_iter().map(Into::into));
             self
         }
 
@@ -153,6 +163,7 @@ pub mod build {
             Manifest {
                 name: self.name.expect("manifest requires a `name`"),
                 on: self.on,
+                include: self.include,
                 args: self.args,
                 vars: self.vars,
                 env: self.env,
