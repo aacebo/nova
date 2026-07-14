@@ -73,7 +73,7 @@ impl Pointer {
         }
     }
 
-    fn as_any(&self) -> &dyn Any {
+    pub fn as_any(&self) -> &dyn Any {
         match self {
             Self::Value(v) => v.as_any(),
             Self::Call(v) => v.as_any(),
@@ -94,7 +94,7 @@ impl Pointer {
         is_truthy(&self.value())
     }
 
-    fn valueable(&self) -> Option<&Arc<dyn Valueable>> {
+    pub fn valueable(&self) -> Option<&Arc<dyn Valueable>> {
         match self {
             Self::Value(v) => Some(v),
             _ => None,
