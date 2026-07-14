@@ -21,7 +21,6 @@ impl Provider {
         }
     }
 
-    /// The environment variable a credential falls back to.
     pub const fn env(self) -> &'static str {
         match self {
             Self::OpenAI => "OPENAI_API_KEY",
