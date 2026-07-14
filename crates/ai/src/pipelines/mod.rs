@@ -188,8 +188,60 @@ pub fn load(model: &ModelRef, api_key: &Option<String>) -> Result<std::sync::Arc
     })
 }
 
-/// How many distinct models are loaded. Lets a test assert that two routines on one model hold one
-/// copy of the weights, rather than inferring it from timings.
-pub fn loaded() -> usize {
-    MODELS.len()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(model: &str) -> ModelArgs {
+        ModelArgs {
+            provider: None,
+            model: Some(model.to_string()),
+            base_url: None,
+        }
+    }
+
+    /// The defaults differ per capability, so a routine left to itself embeds with one model and
+    /// extracts keywords with another. That is what makes the next test worth writing.
+    #[test]
+    fn the_capability_defaults_are_different_models() {
+        assert_ne!(defaults::embed(), defaults::keywords());
+    }
+
+    /// An explicit `model=` overrides the per-capability default, so `ai.embeddings` and
+    /// `ai.keywords` on one model resolve to one cache key -- and the weights load once. Under a
+    /// cache keyed by capability rather than by model, these keys differed and the weights loaded
+    /// twice.
+    #[test]
+    fn two_routines_on_one_model_share_a_cache_key() {
+        let name = "sentence-transformers/all-MiniLM-L12-v2";
+
+        // `embeddings` and `keywords` resolve the same args against their own default.
+        let embed = args(name).resolve(defaults::embed()).unwrap();
+        let keywords = args(name).resolve(defaults::keywords()).unwrap();
+
+        assert_eq!(embed, keywords);
+        assert_eq!(Key::new(&embed, &None), Key::new(&keywords, &None));
+    }
+
+    /// Without `model=`, each routine falls back to its own default -- so they do NOT share.
+    #[test]
+    fn routines_left_on_their_defaults_do_not_share_a_cache_key() {
+        let embed = ModelArgs {
+            provider: None,
+            model: None,
+            base_url: None,
+        }
+        .resolve(defaults::embed())
+        .unwrap();
+
+        let keywords = ModelArgs {
+            provider: None,
+            model: None,
+            base_url: None,
+        }
+        .resolve(defaults::keywords())
+        .unwrap();
+
+        assert_ne!(Key::new(&embed, &None), Key::new(&keywords, &None));
+    }
 }

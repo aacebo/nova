@@ -37,6 +37,14 @@ impl<T: ?Sized> Cache<T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.entries.read().map(|entries| entries.len()).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn get_or_build(&self, key: Key, build: impl FnOnce() -> Result<Arc<T>>) -> Result<Arc<T>> {
         if let Ok(entries) = self.entries.read()
             && let Some(entry) = entries.get(&key)
@@ -53,20 +61,80 @@ impl<T: ?Sized> Cache<T> {
             Err(_) => Ok(entry),
         }
     }
-
-    /// How many distinct models are held. One cache keyed by model, not one per capability, so a
-    /// model used for two routines counts once -- which is what this exists to let a test check.
-    pub fn len(&self) -> usize {
-        self.entries.read().map(|entries| entries.len()).unwrap_or(0)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 impl<T: ?Sized> Default for Cache<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::*;
+    use crate::resources::ModelId;
+
+    fn model(repo: &str) -> ModelRef {
+        ModelRef::hub(repo.parse::<ModelId>().unwrap())
+    }
+
+    /// One cache keyed by model, not one per capability: a model asked for twice loads its weights
+    /// once and both callers get the same copy. Under a per-capability cache the build ran twice.
+    #[test]
+    fn one_key_builds_once() {
+        let cache: Cache<u32> = Cache::new();
+        let builds = AtomicUsize::new(0);
+        let key = Key::new(&model("sentence-transformers/all-MiniLM-L12-v2"), &None);
+
+        let build = || {
+            builds.fetch_add(1, Ordering::SeqCst);
+            Ok(Arc::new(7))
+        };
+
+        let first = cache.get_or_build(key.clone(), build).unwrap();
+        let second = cache.get_or_build(key, build).unwrap();
+
+        assert_eq!(builds.load(Ordering::SeqCst), 1);
+        assert!(Arc::ptr_eq(&first, &second), "both callers must hold one copy");
+    }
+
+    #[test]
+    fn a_different_model_is_a_different_entry() {
+        let cache: Cache<u32> = Cache::new();
+        let builds = AtomicUsize::new(0);
+
+        let build = || {
+            builds.fetch_add(1, Ordering::SeqCst);
+            Ok(Arc::new(7))
+        };
+
+        cache
+            .get_or_build(Key::new(&model("sentence-transformers/all-MiniLM-L12-v2"), &None), build)
+            .unwrap();
+        cache
+            .get_or_build(Key::new(&model("sentence-transformers/all-MiniLM-L6-v2"), &None), build)
+            .unwrap();
+
+        assert_eq!(builds.load(Ordering::SeqCst), 2);
+    }
+
+    /// Two callers with different credentials get separate clients, even on the same model.
+    #[test]
+    fn a_different_api_key_is_a_different_entry() {
+        let cache: Cache<u32> = Cache::new();
+        let builds = AtomicUsize::new(0);
+        let model = model("sentence-transformers/all-MiniLM-L12-v2");
+
+        let build = || {
+            builds.fetch_add(1, Ordering::SeqCst);
+            Ok(Arc::new(7))
+        };
+
+        cache.get_or_build(Key::new(&model, &Some("one".into())), build).unwrap();
+        cache.get_or_build(Key::new(&model, &Some("two".into())), build).unwrap();
+
+        assert_eq!(builds.load(Ordering::SeqCst), 2);
     }
 }
