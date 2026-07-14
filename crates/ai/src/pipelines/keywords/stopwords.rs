@@ -1,7 +1,3 @@
-pub fn contains(word: &str) -> bool {
-    STOPWORDS.contains(&word)
-}
-
 const STOPWORDS: &[&str] = &[
     "the", "and", "for", "are", "but", "not", "you", "all", "any", "can", "had", "her", "was", "one", "our", "out", "day", "get",
     "has", "him", "his", "how", "man", "new", "now", "old", "see", "two", "way", "who", "boy", "did", "its", "let", "put", "say",
@@ -10,3 +6,7 @@ const STOPWORDS: &[&str] = &[
     "them", "well", "were", "what", "would", "there", "their", "about", "which", "these", "could", "other", "into", "only",
     "also", "back", "after", "first", "because",
 ];
+
+pub fn contains(word: &str) -> bool {
+    STOPWORDS.contains(&word)
+}

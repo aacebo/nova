@@ -27,14 +27,13 @@ impl Local {
         })
     }
 
-    fn predict(&self, text: &[&str]) -> Result<Vec<Output>> {
+    pub fn predict(&self, text: &[&str]) -> Result<Vec<Output>> {
         if text.is_empty() {
             return Ok(Vec::new());
         }
 
         let encodings = self.tokenizer.encode_batch(text.to_vec(), true).map_err(Error::tokenize)?;
         let batch = Batch::new(encodings, &self.device)?;
-
         let probs = self.classifier.forward(&batch.ids, &batch.padding()?)?;
 
         Ok(probs

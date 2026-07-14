@@ -23,11 +23,11 @@ impl Local {
         })
     }
 
-    fn all(&self, text: &[&str]) -> Result<Vec<Vec<Keyword>>> {
+    pub fn predict(&self, text: &[&str]) -> Result<Vec<Vec<Keyword>>> {
         text.iter().map(|text| self.predict_one(text)).collect()
     }
 
-    fn predict_one(&self, text: &str) -> Result<Vec<Keyword>> {
+    pub fn predict_one(&self, text: &str) -> Result<Vec<Keyword>> {
         let candidates = candidates::extract(text);
 
         if candidates.is_empty() {
@@ -49,6 +49,6 @@ impl Local {
 
 impl Keywords for Local {
     fn keywords(&self, text: &[&str]) -> Result<Vec<Vec<Keyword>>> {
-        self.all(text)
+        self.predict(text)
     }
 }

@@ -37,11 +37,11 @@ impl Local {
         })
     }
 
-    fn all(&self, text: &[&str]) -> Result<Vec<String>> {
-        text.iter().map(|text| self.summarize_one(text)).collect()
+    pub fn eval(&self, text: &[&str]) -> Result<Vec<String>> {
+        text.iter().map(|text| self.eval_one(text)).collect()
     }
 
-    fn summarize_one(&self, text: &str) -> Result<String> {
+    pub fn eval_one(&self, text: &str) -> Result<String> {
         let encoding = self.tokenizer.encode(text, true).map_err(Error::tokenize)?;
         let ids = encoding.get_ids();
 
@@ -66,6 +66,6 @@ impl Local {
 
 impl Summarize for Local {
     fn summarize(&self, text: &[&str]) -> Result<Vec<String>> {
-        self.all(text)
+        self.eval(text)
     }
 }
