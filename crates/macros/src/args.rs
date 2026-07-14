@@ -13,10 +13,10 @@ pub enum Arg {
 impl Arg {
     pub fn stmt(&self) -> TokenStream {
         match self {
-            Self::Positional(expr) => zyn! { __args.push(::nova::Pointer::from({{ expr }})); },
+            Self::Positional(expr) => zyn! { __args.push(::nova::template::Pointer::from({{ expr }})); },
             Self::Named(key, expr) => {
                 let key = LitStr::new(&key.to_string(), key.span());
-                zyn! { __kargs.set({{ key }}, ::nova::Pointer::from({{ expr }})); }
+                zyn! { __kargs.set({{ key }}, ::nova::template::Pointer::from({{ expr }})); }
             }
             Self::SplatArgs(expr) => zyn! { __args = ({{ expr }}).to_vec(); },
             Self::SplatKargs(expr) => zyn! {
@@ -61,10 +61,10 @@ impl Args {
             .iter()
             .filter_map(|arg| match arg {
                 Arg::Positional(expr) => Some(zyn! {
-                    __args.push(::nova::Pointer::from({{ expr }}));
+                    __args.push(::nova::template::Pointer::from({{ expr }}));
                 }),
                 Arg::SplatArgs(expr) => Some(zyn! {
-                    __args.extend(({{ expr }}).iter().map(::nova::Pointer::from));
+                    __args.extend(({{ expr }}).iter().map(::nova::template::Pointer::from));
                 }),
                 _ => None,
             })
@@ -77,7 +77,7 @@ impl Args {
                 Arg::Named(key, expr) => {
                     let key = LitStr::new(&key.to_string(), key.span());
                     Some(zyn! {
-                        __kwargs.set({{ key }}, ::nova::Pointer::from({{ expr }}));
+                        __kwargs.set({{ key }}, ::nova::template::Pointer::from({{ expr }}));
                     })
                 }
                 Arg::SplatKargs(expr) => Some(zyn! {
@@ -91,11 +91,11 @@ impl Args {
 
         zyn! {
             {
-                let mut __args: ::std::vec::Vec<::nova::Pointer> = ::std::vec::Vec::new();
-                let mut __kwargs = ::nova::KArgs::new();
+                let mut __args: ::std::vec::Vec<::nova::template::Pointer> = ::std::vec::Vec::new();
+                let mut __kwargs = ::nova::template::KArgs::new();
                 @for (stmt in positional.iter()) { {{ stmt }} }
                 @for (stmt in named.iter()) { {{ stmt }} }
-                ::nova::Args::new(__args, __kwargs)
+                ::nova::template::Args::new(__args, __kwargs)
             }
         }
     }

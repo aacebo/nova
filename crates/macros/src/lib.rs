@@ -75,18 +75,18 @@ pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let stmts: Vec<_> = args.iter().map(args::Arg::stmt).collect();
     let invoke = zyn! {
         {
-            let mut __args: ::std::vec::Vec<::nova::Pointer> = ::std::vec::Vec::new();
-            let mut __kargs = ::nova::KArgs::new();
+            let mut __args: ::std::vec::Vec<::nova::template::Pointer> = ::std::vec::Vec::new();
+            let mut __kargs = ::nova::template::KArgs::new();
             @for (stmt in stmts.iter()) {
                 {{ stmt }}
             }
-            scope.call({{ name }}, ::nova::Args::new(__args, __kargs))?
+            scope.call({{ name }}, ::nova::template::Args::new(__args, __kargs))?
         }
     };
 
     let expanded = match coerce {
         Some(ty) => zyn! {
-            <{{ ty }} as ::std::convert::TryFrom<::nova::Pointer>>::try_from({{ invoke }})?
+            <{{ ty }} as ::std::convert::TryFrom<::nova::template::Pointer>>::try_from({{ invoke }})?
         },
         None => invoke,
     };

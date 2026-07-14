@@ -3,7 +3,9 @@ mod common;
 use std::sync::{Arc, Mutex};
 
 use common::Recorder;
-use nova::{Args, Manifest, Pointer, Scope, Value, args};
+use nova::reflect::Value;
+use nova::template::{Args, Pointer};
+use nova::{Manifest, Scope, args};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Pointer, Box<dyn std::error::Error>>;

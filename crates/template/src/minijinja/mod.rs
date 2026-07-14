@@ -63,6 +63,6 @@ impl Engine for Minijinja {
     fn eval(&self, expr: &str, ctx: &Arc<dyn Context>) -> Result<Pointer, Error> {
         let expr = self.env.compile_expression(expr)?;
         let value = expr.eval(Self::root(ctx))?;
-        Ok(Pointer::new(from_minijinja(&value)))
+        Ok(from_minijinja(&value))
     }
 }

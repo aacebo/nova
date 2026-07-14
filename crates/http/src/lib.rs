@@ -1,6 +1,7 @@
 mod response;
 
-use nova_core::{FromArgs, Function, Namespace, Pointer, ToType, ToValue, Type, Value};
+use nova_core::Function;
+use nova_template::{FromArgs, Namespace, Pointer};
 pub use response::*;
 
 pub trait Http {
@@ -16,18 +17,6 @@ impl Http for nova_core::Builder {
 #[derive(Debug)]
 pub struct Client;
 
-impl ToType for Client {
-    fn to_type(&self) -> Type {
-        Type::Any
-    }
-}
-
-impl ToValue for Client {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
-    }
-}
-
 impl Namespace for Client {
     fn member(&self, name: &str) -> Option<Pointer> {
         match name {
@@ -42,21 +31,25 @@ impl Namespace for Client {
     fn members(&self) -> Vec<String> {
         ["get", "post", "put", "patch"].iter().map(|s| s.to_string()).collect()
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
-pub fn get(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn get(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::GET, args)
 }
 
-pub fn post(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn post(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::POST, args)
 }
 
-pub fn put(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn put(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::PUT, args)
 }
 
-pub fn patch(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn patch(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     send(reqwest::Method::PATCH, args)
 }
 
@@ -74,13 +67,8 @@ pub struct RequestArgs {
 impl FromArgs for RequestArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_core::Args) -> Result<Self, Self::Error> {
-        let uri = args
-            .at(0)
-            .value()
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or(nova_core::Error::message("uri must be a string"))?;
+    fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
+        let uri = args.str(0).ok_or(nova_core::Error::message("uri must be a string"))?;
 
         let body = args.at(1).value().as_str().map(|s| Body::Text(s.to_string()));
 
@@ -105,7 +93,7 @@ impl FromArgs for RequestArgs {
     }
 }
 
-fn send(method: reqwest::Method, args: &nova_core::Args) -> Result<Pointer, Box<dyn std::error::Error>> {
+fn send(method: reqwest::Method, args: &nova_template::Args) -> Result<Pointer, Box<dyn std::error::Error>> {
     let args = RequestArgs::from_args(args)?;
     let mut req = reqwest::blocking::Client::new().request(method, args.uri);
 

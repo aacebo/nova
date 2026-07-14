@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use nova_core::{Dynamic, Reflect, ToType, ToValue, Type, Value};
+use nova_reflect::{Dynamic, Object, ToType, ToValue, Type, Value};
 
 #[derive(Debug, Clone)]
 pub struct Response {
@@ -31,12 +31,13 @@ impl ToType for Response {
     }
 }
 
-impl Reflect for Response {
+impl Object for Response {
     fn field(&self, name: &str) -> Value<'_> {
         match name {
             "status" => Value::from(self.status),
             "headers" => self.headers.to_value(),
-            "text" | "data" => Value::from(String::from_utf8_lossy(&self.data).into_owned()),
+            "data" => self.data.to_value(),
+            "text" => Value::from(String::from_utf8_lossy(&self.data).into_owned()),
             _ => Value::Undefined,
         }
     }

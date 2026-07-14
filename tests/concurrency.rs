@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use nova::{Args, KArgs, Scope, Value, args, get, set};
+use nova::reflect::Value;
+use nova::template::{Args, KArgs};
+use nova::{Scope, args, get, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 

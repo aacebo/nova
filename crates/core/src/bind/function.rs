@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{Action, Args, Call, Pointer, Predicate, Scope, ToType, ToValue, Type, Value};
+use nova_reflect::Value;
+use nova_template::{Args, Pointer};
+
+use crate::{Action, Call, Predicate, Scope};
 
 #[derive(Clone)]
 pub struct Function {
@@ -51,23 +54,10 @@ impl std::fmt::Debug for Function {
     }
 }
 
-impl ToType for Function {
-    fn to_type(&self) -> Type {
-        Type::Any
-    }
-}
-
-impl ToValue for Function {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
-    }
-}
-
 impl nova_template::Call for Function {
     fn call(&self, args: &Args) -> Result<Pointer, nova_template::Error> {
         let scope = args
-            .caller()
-            .and_then(|c| c.downcast::<Scope>())
+            .caller_as::<Scope>()
             .ok_or_else(|| nova_template::Error::message("no scope bound to template render"))?;
 
         let child = scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
@@ -76,6 +66,10 @@ impl nova_template::Call for Function {
         self.callback
             .invoke(&child_args, &child)
             .map_err(|err| nova_template::Error::message(err.to_string()))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

@@ -1,5 +1,6 @@
+use nova_template::{KArgs, Pointer};
+
 use super::Source;
-use crate::{KArgs, Pointer};
 
 pub fn call(
     name: impl Into<String>,

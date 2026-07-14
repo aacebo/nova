@@ -14,12 +14,10 @@ pub use nova_http as http;
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use nova_macros::*;
-#[cfg(feature = "reflect")]
 #[doc(inline)]
 pub use nova_reflect as reflect;
 #[cfg(feature = "schema")]
 #[doc(inline)]
 pub use nova_schema as schema;
-#[cfg(feature = "template")]
 #[doc(inline)]
 pub use nova_template as template;

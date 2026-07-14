@@ -17,29 +17,29 @@ impl std::fmt::Display for Offset {
 }
 
 impl nova_reflect::TypeOf for Offset {
-    fn type_of() -> nova_core::Type {
-        nova_core::Type::Any
+    fn type_of() -> nova_reflect::Type {
+        nova_reflect::Type::Any
     }
 }
 
-impl nova_core::ToType for Offset {
-    fn to_type(&self) -> nova_core::Type {
-        nova_core::Type::Any
+impl nova_reflect::ToType for Offset {
+    fn to_type(&self) -> nova_reflect::Type {
+        nova_reflect::Type::Any
     }
 }
 
-impl nova_core::Reflect for Offset {
-    fn field(&self, name: &str) -> nova_core::Value<'_> {
+impl nova_reflect::Object for Offset {
+    fn field(&self, name: &str) -> nova_reflect::Value<'_> {
         match name {
-            "begin" => nova_core::Value::from(self.begin),
-            "end" => nova_core::Value::from(self.end),
-            _ => nova_core::Value::Undefined,
+            "begin" => nova_reflect::Value::from(self.begin),
+            "end" => nova_reflect::Value::from(self.end),
+            _ => nova_reflect::Value::Undefined,
         }
     }
 }
 
-impl nova_core::ToValue for Offset {
-    fn to_value(&self) -> nova_core::Value<'_> {
-        nova_core::Value::Dynamic(nova_core::Dynamic::from_object(self))
+impl nova_reflect::ToValue for Offset {
+    fn to_value(&self) -> nova_reflect::Value<'_> {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(self))
     }
 }

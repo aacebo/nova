@@ -13,7 +13,7 @@ pub use value::*;
 pub trait Context: Send + Sync + std::fmt::Debug {
     fn resolve(&self, name: &str) -> Option<Pointer>;
     fn names(&self) -> Vec<String>;
-    fn as_caller(&self) -> Pointer;
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 pub trait Engine: Send + Sync {

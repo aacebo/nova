@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{
-    Action, Arena, Args, Binding, Diagnostic, Engine, Entry, Event, KArgs, Minijinja, Pointer, Slot, SlotMut, ToType, ToValue,
-    Traced, Type, Value, event,
-};
+use nova_reflect::{ToType, Type, Value};
+use nova_template::{Args, Engine, KArgs, Minijinja, Pointer};
+
+use crate::{Action, Arena, Binding, Diagnostic, Entry, Event, Slot, SlotMut, Traced, event};
 
 #[derive(Clone)]
 pub struct Scope(Arc<_Scope>);
@@ -22,8 +22,6 @@ struct _Scope {
 }
 
 impl Scope {
-    pub const KEY: &'static str = "__$scope__";
-
     pub(crate) fn new(name: impl Into<String>, arena: Arc<Mutex<Arena>>, events: crossbeam::Sender<Event>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: ulid::Ulid::new(),
@@ -38,9 +36,9 @@ impl Scope {
         }))
     }
 
-    pub(crate) fn with_engine(self, engine: impl Engine + 'static) -> Self {
+    pub(crate) fn with_engine(self, engine: Box<dyn Engine>) -> Self {
         let mut inner = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("with_engine on a shared scope"));
-        inner.engine = Arc::new(engine);
+        inner.engine = Arc::from(engine);
         Self(Arc::new(inner))
     }
 
@@ -242,10 +240,6 @@ impl Scope {
         func.invoke(&child_args, &child)
     }
 
-    fn as_context(&self) -> Arc<dyn crate::Context> {
-        Arc::new(self.clone())
-    }
-
     pub fn eval(&self, src: &str) -> Result<Pointer, Box<dyn std::error::Error>> {
         Ok(self.0.engine.eval(src, &self.as_context())?)
     }
@@ -260,6 +254,10 @@ impl Scope {
 
     pub fn dispatch(&self, source: impl Into<event::Source>) {
         let _ = self.0.events.send(event::new(self.0.trace_id, self.0.name.clone(), source));
+    }
+
+    fn as_context(&self) -> Arc<dyn nova_template::Context> {
+        Arc::new(self.clone())
     }
 }
 
@@ -283,14 +281,12 @@ impl ToType for Scope {
     }
 }
 
-impl ToValue for Scope {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
-    }
-}
-
-impl crate::Context for Scope {
+impl nova_template::Context for Scope {
     fn resolve(&self, name: &str) -> Option<Pointer> {
+        if name == "args" {
+            return Some(Pointer::new(self.args().to_vec()));
+        }
+
         if let Some(value) = self.kargs().get(name) {
             return Some(value.clone());
         }
@@ -308,7 +304,7 @@ impl crate::Context for Scope {
         let mut names: Vec<String> = self.0.symbols.lock().unwrap().keys().cloned().collect();
 
         if let Some(parent) = &self.0.parent {
-            names.extend(crate::Context::names(parent));
+            names.extend(nova_template::Context::names(parent));
         }
 
         names.sort();
@@ -316,7 +312,7 @@ impl crate::Context for Scope {
         names
     }
 
-    fn as_caller(&self) -> Pointer {
-        Pointer::new(self.clone())
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

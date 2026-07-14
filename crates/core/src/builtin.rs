@@ -1,4 +1,7 @@
-use crate::{Args, Builder, Diagnostic, Error, FromArgs, Pointer, Scope, Severity, Value};
+use nova_reflect::Value;
+use nova_template::{Args, FromArgs, Pointer};
+
+use crate::{Builder, Diagnostic, Error, Scope, Severity};
 
 pub struct EnvArgs {
     pub name: String,

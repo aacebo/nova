@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 use common::Recorder;
 use nova::event::object::{CallEvent, UpdateEvent};
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Args, Binding, Event, Pointer, Scope, Value, args, event};
+use nova::reflect::Value;
+use nova::template::{Args, Pointer};
+use nova::{Binding, Event, Scope, args, event};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 type FuncResult = Result<Pointer, Box<dyn std::error::Error>>;

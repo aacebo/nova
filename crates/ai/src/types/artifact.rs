@@ -1,4 +1,4 @@
-use nova_core::{Dynamic, Reflect, ToType, ToValue, Type, Value};
+use nova_reflect::{Dynamic, Object, ToType, ToValue, Type, Value};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Artifact {
@@ -13,7 +13,7 @@ impl ToType for Artifact {
     }
 }
 
-impl Reflect for Artifact {
+impl Object for Artifact {
     fn field(&self, name: &str) -> Value<'_> {
         match name {
             "name" => Value::from(self.name.clone()),

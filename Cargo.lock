@@ -2392,6 +2392,7 @@ dependencies = [
  "hf-hub",
  "nova-core",
  "nova-reflect",
+ "nova-template",
  "reqwest 0.13.4",
  "serde",
  "serde_json",
@@ -2415,6 +2416,8 @@ name = "nova-codec"
 version = "0.0.0"
 dependencies = [
  "nova-core",
+ "nova-reflect",
+ "nova-template",
  "serde_json",
  "serde_norway",
 ]
@@ -2436,6 +2439,8 @@ name = "nova-fs"
 version = "0.0.0"
 dependencies = [
  "nova-core",
+ "nova-reflect",
+ "nova-template",
 ]
 
 [[package]]
@@ -2443,6 +2448,8 @@ name = "nova-http"
 version = "0.0.0"
 dependencies = [
  "nova-core",
+ "nova-reflect",
+ "nova-template",
  "reqwest 0.13.4",
 ]
 

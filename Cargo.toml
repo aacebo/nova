@@ -60,8 +60,6 @@ codec = ["dep:nova-codec"]
 http = ["dep:nova-http"]
 macros = ["dep:nova-macros", "nova-reflect/macros"]
 schema = ["dep:nova-schema"]
-template = ["dep:nova-template"]
-reflect = ["dep:nova-reflect", "nova-reflect/serde"]
 json = ["nova-reflect/json"]
 
 [dependencies]
@@ -72,8 +70,8 @@ nova-codec = { workspace = true, optional = true }
 nova-http = { workspace = true, optional = true }
 nova-macros = { workspace = true, optional = true }
 nova-schema = { workspace = true, optional = true }
-nova-template = { workspace = true, optional = true }
-nova-reflect = { workspace = true, optional = true }
+nova-template = { workspace = true }
+nova-reflect = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 tempfile = "3"

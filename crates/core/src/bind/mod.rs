@@ -2,9 +2,10 @@ mod function;
 mod routine;
 
 pub use function::*;
+use nova_template::Pointer;
 pub use routine::*;
 
-use crate::{Action, Call, Pointer, Predicate};
+use crate::{Action, Call, Predicate};
 
 #[derive(Debug, Clone)]
 pub enum Binding {
@@ -126,8 +127,8 @@ impl PartialEq<&Pointer> for Binding {
     }
 }
 
-impl PartialEq<crate::Value<'_>> for Binding {
-    fn eq(&self, other: &crate::Value<'_>) -> bool {
+impl PartialEq<nova_reflect::Value<'_>> for Binding {
+    fn eq(&self, other: &nova_reflect::Value<'_>) -> bool {
         match self.as_value() {
             Some(value) => value.value() == *other,
             None => false,

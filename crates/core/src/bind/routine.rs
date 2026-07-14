@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{Action, Args, Binding, Error, Pointer, Scope, Step, ToType, ToValue, Type, Value, event};
+use nova_reflect::Value;
+use nova_template::{Args, Pointer};
+
+use crate::{Action, Binding, Error, Scope, Step, event};
 
 #[derive(Clone)]
 pub struct Routine {
@@ -76,18 +79,6 @@ impl std::fmt::Debug for Routine {
     }
 }
 
-impl ToType for Routine {
-    fn to_type(&self) -> Type {
-        Type::Any
-    }
-}
-
-impl ToValue for Routine {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
-    }
-}
-
 impl nova_template::Namespace for Routine {
     fn member(&self, name: &str) -> Option<Pointer> {
         self.get(name)
@@ -96,19 +87,26 @@ impl nova_template::Namespace for Routine {
     fn members(&self) -> Vec<String> {
         nova_template::Context::names(&self.scope)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl nova_template::Call for Routine {
     fn call(&self, args: &Args) -> Result<Pointer, nova_template::Error> {
         let caller = args
-            .caller()
-            .and_then(|c| c.downcast::<Scope>())
+            .caller_as::<Scope>()
             .ok_or_else(|| nova_template::Error::message("no scope bound to template render"))?;
 
         self.invoke(args, caller)
             .map_err(|err| nova_template::Error::message(err.to_string()))?;
 
         Ok(Pointer::new(Value::Null))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -126,7 +124,12 @@ impl Action for Routine {
             let skipped = step
                 .cond
                 .as_ref()
-                .map(|cond| !child.eval(cond).map(|v| crate::is_truthy(&v.value())).unwrap_or(false))
+                .map(|cond| {
+                    !child
+                        .eval(cond)
+                        .map(|v| nova_template::is_truthy(&v.value()))
+                        .unwrap_or(false)
+                })
                 .unwrap_or(false);
 
             if skipped {

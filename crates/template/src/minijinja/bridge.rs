@@ -8,7 +8,40 @@ use crate::{Args, Context, KArgs, Pointer};
 
 const CONTEXT_KEY: &str = "__$ctx__";
 
-pub(crate) fn from_minijinja(value: &minijinja::Value) -> Value<'static> {
+pub(crate) fn from_minijinja(value: &minijinja::Value) -> Pointer {
+    if let Some(pointer) = value.downcast_object_ref::<Pointer>() {
+        return pointer.clone();
+    }
+
+    match value.kind() {
+        ValueKind::Map => {
+            let mut entries: std::collections::BTreeMap<Pointer, Pointer> = std::collections::BTreeMap::new();
+
+            if let Ok(keys) = value.try_iter() {
+                for key in keys {
+                    let item = value.get_item(&key).unwrap_or_default();
+                    entries.insert(from_minijinja(&key), from_minijinja(&item));
+                }
+            }
+
+            Pointer::new(entries)
+        }
+        ValueKind::Seq | ValueKind::Iterable => {
+            let mut items: Vec<Pointer> = Vec::new();
+
+            if let Ok(values) = value.try_iter() {
+                for item in values {
+                    items.push(from_minijinja(&item));
+                }
+            }
+
+            Pointer::new(items)
+        }
+        _ => Pointer::new(scalar_from_minijinja(value)),
+    }
+}
+
+fn scalar_from_minijinja(value: &minijinja::Value) -> Value<'static> {
     match value.kind() {
         ValueKind::None | ValueKind::Undefined => Value::Null,
         ValueKind::Bool => Value::Bool(value.is_true()),
@@ -24,31 +57,6 @@ pub(crate) fn from_minijinja(value: &minijinja::Value) -> Value<'static> {
             }
         }
         ValueKind::String => Value::Str(nova_reflect::Str(std::borrow::Cow::Owned(value.to_string()))),
-        ValueKind::Map => {
-            let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
-            let mut map = nova_reflect::Map::new(&ty);
-
-            if let Ok(keys) = value.try_iter() {
-                for key in keys {
-                    let item = value.get_item(&key).unwrap_or_default();
-                    map.insert(from_minijinja(&key), from_minijinja(&item));
-                }
-            }
-
-            Value::Map(map)
-        }
-        ValueKind::Seq | ValueKind::Iterable => {
-            let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
-            let mut map = nova_reflect::Map::new(&ty);
-
-            if let Ok(items) = value.try_iter() {
-                for (i, item) in items.enumerate() {
-                    map.insert(Value::Number(Number::Int(Int::U64(i as u64))), from_minijinja(&item));
-                }
-            }
-
-            Value::Map(map)
-        }
         _ => Value::Null,
     }
 }
@@ -72,7 +80,12 @@ pub(crate) fn to_minijinja(value: Value<'_>) -> minijinja::Value {
 }
 
 pub(crate) fn pointer_to_minijinja(pointer: Pointer) -> minijinja::Value {
-    if pointer.is_callable() || pointer.as_namespace().is_some() || pointer.value().is_dynamic() {
+    let composite = {
+        let value = pointer.value();
+        value.is_dynamic() || value.is_map()
+    };
+
+    if composite || pointer.is_callable() || pointer.as_namespace().is_some() {
         return minijinja::Value::from_object(pointer);
     }
 
@@ -84,7 +97,7 @@ fn kwargs_to_kargs(kwargs: minijinja::value::Kwargs) -> Result<KArgs, Error> {
 
     for key in kwargs.args() {
         let value: minijinja::Value = kwargs.get(key)?;
-        kargs.set(key, Pointer::new(from_minijinja(&value)));
+        kargs.set(key, from_minijinja(&value));
     }
 
     kwargs.assert_all_used()?;
@@ -95,7 +108,7 @@ fn to_args(state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<Args, Err
     let (positional, kwargs): (&[minijinja::Value], minijinja::value::Kwargs) = minijinja::value::from_args(args)?;
 
     let args = Args::new(
-        positional.iter().map(|v| Pointer::new(from_minijinja(v))).collect::<Vec<_>>(),
+        positional.iter().map(from_minijinja).collect::<Vec<_>>(),
         kwargs_to_kargs(kwargs)?,
     );
 
@@ -128,8 +141,8 @@ impl Object for Pointer {
 
         let value = self.value();
 
-        if let Value::Map(map) = &value {
-            return map.get(&from_minijinja(key)).map(|v| to_minijinja(v.clone()));
+        if value.is_map() {
+            return self.key(scalar_from_minijinja(key)).map(pointer_to_minijinja);
         }
 
         let dynamic = value.as_dynamic()?;
@@ -200,26 +213,15 @@ impl Object for Pointer {
     }
 
     fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, Error> {
-        if let Some(call) = self.as_call() {
-            let args = to_args(state, args)?;
-
-            return call
-                .call(&args)
-                .map(pointer_to_minijinja)
-                .map_err(|e| Error::new(ErrorKind::InvalidOperation, e.to_string()));
-        }
-
-        let value = self.value();
-        let callable = value
-            .as_dynamic()
-            .and_then(|d| d.as_callable())
+        let call = self
+            .as_call()
             .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "object is not callable"))?;
 
-        let values: Vec<Value> = args.iter().map(from_minijinja).collect();
+        let args = to_args(state, args)?;
 
-        nova_reflect::Callable::call(callable, &values)
-            .map(to_minijinja)
-            .map_err(|e| Error::new(ErrorKind::InvalidOperation, e))
+        call.call(&args)
+            .map(pointer_to_minijinja)
+            .map_err(|e| Error::new(ErrorKind::InvalidOperation, e.to_string()))
     }
 
     fn call_method(
@@ -245,7 +247,8 @@ impl Object for Pointer {
             .and_then(|d| d.as_object())
             .ok_or_else(|| Error::new(ErrorKind::UnknownMethod, format!("no method '{name}'")))?;
 
-        let values: Vec<Value> = args.iter().map(from_minijinja).collect();
+        let owned: Vec<Pointer> = args.iter().map(from_minijinja).collect();
+        let values: Vec<Value> = owned.iter().map(|p| p.value()).collect();
 
         nova_reflect::Object::call(object, name, &values)
             .map(to_minijinja)
@@ -261,8 +264,8 @@ impl ContextObject {
         Self(ctx)
     }
 
-    fn caller(&self) -> Pointer {
-        self.0.as_caller()
+    fn caller(&self) -> Arc<dyn Context> {
+        self.0.clone()
     }
 }
 

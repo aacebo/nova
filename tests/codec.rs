@@ -8,7 +8,7 @@ use nova::codec::Codec;
 #[cfg(feature = "fs")]
 use nova::fs::FileSystem;
 
-fn sample() -> nova::Pointer {
+fn sample() -> nova::template::Pointer {
     to_pointer(BTreeMap::from([
         ("name".to_string(), "nova".to_string()),
         ("kind".to_string(), "codec".to_string()),

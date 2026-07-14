@@ -1,4 +1,4 @@
-use nova_core::{Dynamic, Reflect, ToType, ToValue, Type, Value};
+use nova_reflect::{Dynamic, Object, ToType, ToValue, Type, Value};
 
 use super::Offset;
 
@@ -17,7 +17,7 @@ impl ToType for Annotation {
     }
 }
 
-impl Reflect for Annotation {
+impl Object for Annotation {
     fn field(&self, name: &str) -> Value<'_> {
         match name {
             "name" => Value::from(self.name.clone()),

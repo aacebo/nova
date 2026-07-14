@@ -43,6 +43,30 @@ impl KArgs {
         self.0.get_mut(key)
     }
 
+    pub fn get_required<T>(&self, key: &str) -> Result<T, crate::Error>
+    where
+        T: TryFrom<Pointer>,
+        T::Error: std::fmt::Display,
+    {
+        let value = self
+            .0
+            .get(key)
+            .cloned()
+            .ok_or_else(|| crate::Error::message(format!("missing required argument `{key}`")))?;
+
+        T::try_from(value).map_err(|err| crate::Error::message(err.to_string()))
+    }
+
+    pub fn get_or_default<T>(&self, key: &str) -> T
+    where
+        T: TryFrom<Pointer> + Default,
+    {
+        match self.0.get(key).cloned() {
+            Some(value) => T::try_from(value).unwrap_or_default(),
+            None => T::default(),
+        }
+    }
+
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<Pointer>) -> &mut Self {
         self.0.insert(key.into(), value.into());
         self
@@ -71,7 +95,7 @@ impl std::ops::Index<&str> for KArgs {
 pub struct Args {
     args: Vec<Pointer>,
     kargs: KArgs,
-    caller: Option<Pointer>,
+    caller: Option<std::sync::Arc<dyn crate::Context>>,
 }
 
 impl Args {
@@ -83,7 +107,7 @@ impl Args {
         }
     }
 
-    pub fn with_caller(mut self, caller: Pointer) -> Self {
+    pub fn with_caller(mut self, caller: std::sync::Arc<dyn crate::Context>) -> Self {
         self.caller = Some(caller);
         self
     }
@@ -96,8 +120,12 @@ impl Args {
         &self.kargs
     }
 
-    pub fn caller(&self) -> Option<&Pointer> {
+    pub fn caller(&self) -> Option<&std::sync::Arc<dyn crate::Context>> {
         self.caller.as_ref()
+    }
+
+    pub fn caller_as<T: 'static>(&self) -> Option<&T> {
+        self.caller.as_ref()?.as_any().downcast_ref::<T>()
     }
 
     pub fn at(&self, index: usize) -> Pointer {
@@ -116,6 +144,38 @@ impl Args {
 
     pub fn get(&self, index: usize) -> Option<&Pointer> {
         self.args.get(index)
+    }
+
+    pub fn str(&self, index: usize) -> Option<String> {
+        self.at(index).value().as_str().map(|s| s.to_string())
+    }
+
+    pub fn key_str(&self, key: impl AsRef<str>) -> Option<String> {
+        self.key(key).value().as_str().map(|s| s.to_string())
+    }
+
+    pub fn u64(&self, index: usize) -> Option<u64> {
+        self.at(index).value().to_u64()
+    }
+
+    pub fn key_u64(&self, key: impl AsRef<str>) -> Option<u64> {
+        self.key(key).value().to_u64()
+    }
+
+    pub fn f64(&self, index: usize) -> Option<f64> {
+        self.at(index).value().to_f64()
+    }
+
+    pub fn key_f64(&self, key: impl AsRef<str>) -> Option<f64> {
+        self.key(key).value().to_f64()
+    }
+
+    pub fn bool(&self, index: usize) -> bool {
+        self.at(index).is_truthy()
+    }
+
+    pub fn key_bool(&self, key: impl AsRef<str>) -> bool {
+        self.key(key).is_truthy()
     }
 
     pub fn get_key(&self, key: impl AsRef<str>) -> Option<&Pointer> {

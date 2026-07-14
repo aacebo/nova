@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::Recorder;
-use nova::{Args, Scope, Value, args, del, get, get_mut, has, set};
+use nova::reflect::Value;
+use nova::template::Args;
+use nova::{Scope, args, del, get, get_mut, has, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 

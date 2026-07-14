@@ -6,7 +6,8 @@ pub mod tasks;
 
 mod types;
 
-use nova_core::{Function, Namespace, Pointer, ToType, ToValue, Type, Value};
+use nova_core::Function;
+use nova_template::{Namespace, Pointer};
 pub use types::*;
 
 use crate::pipelines::{embeddings, entities, keywords, pii, sentiment, summarize};
@@ -23,18 +24,6 @@ impl AI for nova_core::Builder {
 
 #[derive(Debug)]
 pub struct Ai;
-
-impl ToType for Ai {
-    fn to_type(&self) -> Type {
-        Type::Any
-    }
-}
-
-impl ToValue for Ai {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
-    }
-}
 
 impl Namespace for Ai {
     fn member(&self, name: &str) -> Option<Pointer> {
@@ -56,5 +45,9 @@ impl Namespace for Ai {
             .iter()
             .map(|s| s.to_string())
             .collect()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

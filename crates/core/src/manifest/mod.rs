@@ -3,10 +3,11 @@ mod trigger;
 
 use std::collections::BTreeMap;
 
+use nova_template::Pointer;
 pub use step::*;
 pub use trigger::*;
 
-use crate::{Pointer, Runtime};
+use crate::Runtime;
 
 pub fn manifest() -> build::ManifestBuilder {
     build::ManifestBuilder::new()

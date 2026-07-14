@@ -3,7 +3,8 @@
 use std::sync::{Arc, Mutex};
 
 use nova::event::step::{EndEvent, StartEvent};
-use nova::{Diagnostic, Event, Observer, Pointer, Severity};
+use nova::template::Pointer;
+use nova::{Diagnostic, Event, Observer, Severity};
 
 #[derive(Clone, Default)]
 pub struct Recorder(Arc<Inner>);
@@ -102,6 +103,6 @@ impl Recorder {
     }
 }
 
-pub fn to_pointer<T: nova::ToValue>(value: T) -> Pointer {
+pub fn to_pointer<T: nova::reflect::ToValue>(value: T) -> Pointer {
     Pointer::new(value.to_value().into_owned())
 }

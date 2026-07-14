@@ -11,8 +11,8 @@ pub use diagnostic::*;
 pub use error::*;
 pub use event::{Event, Observer};
 pub use manifest::*;
-pub use nova_reflect::{Dynamic, Object as Reflect, ToType, ToValue, Type, Value};
-pub use nova_template::{Args, Context, Engine, FromArgs, KArgs, Minijinja, Namespace, Pointer, is_truthy};
+use nova_reflect::Value;
+use nova_template::{Args, Engine, KArgs, Minijinja, Pointer, is_truthy};
 pub use state::*;
 
 pub trait Action: Send + Sync {
@@ -101,12 +101,15 @@ impl Drop for Runtime {
     }
 }
 
+type EngineFactory = Box<dyn Fn() -> Box<dyn Engine> + Send + Sync>;
+
 pub struct Builder {
     scope: Scope,
     templates: Vec<(String, String)>,
     manifests: Vec<Manifest>,
     events: crossbeam::Receiver<Event>,
     observers: Vec<Box<dyn Observer>>,
+    engine: EngineFactory,
 }
 
 impl Default for Builder {
@@ -124,6 +127,7 @@ impl Builder {
             manifests: Vec::new(),
             events: receiver,
             observers: Vec::new(),
+            engine: Box::new(|| Box::new(Minijinja::new())),
         };
 
         builtin::register(builder)
@@ -185,8 +189,17 @@ impl Builder {
         self
     }
 
+    pub fn engine<E, F>(mut self, factory: F) -> Self
+    where
+        E: Engine + 'static,
+        F: Fn() -> E + Send + Sync + 'static,
+    {
+        self.engine = Box::new(move || Box::new(factory()));
+        self
+    }
+
     pub fn build(self) -> Result<Runtime, Box<dyn std::error::Error>> {
-        let mut env = Minijinja::new();
+        let mut env = (self.engine)();
 
         for (name, source) in self.templates {
             env.add_template(&name, &source)?;
@@ -207,7 +220,7 @@ impl Builder {
         }
 
         for (name, manifest) in merged {
-            let mut cenv = Minijinja::new();
+            let mut cenv = (self.engine)();
 
             for (tmpl, source) in &manifest.templates {
                 cenv.add_template(tmpl, source)?;

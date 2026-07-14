@@ -51,8 +51,8 @@ impl Context for Scope {
         self.vars.iter().map(|(k, _)| k.clone()).collect()
     }
 
-    fn as_caller(&self) -> Pointer {
-        Pointer::new(self.clone())
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -80,8 +80,7 @@ impl Call for Echo {
 
         // caller must be recoverable as the concrete Scope
         let caller = args
-            .caller()
-            .and_then(|c| c.downcast::<Scope>())
+            .caller_as::<Scope>()
             .map(|s| s.name.clone())
             .unwrap_or_else(|| "<no caller>".to_string());
 
@@ -95,6 +94,10 @@ impl Call for Echo {
             positional.join(","),
             kw.join(",")
         ))))))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -233,8 +236,8 @@ impl Context for Nested {
     fn names(&self) -> Vec<String> {
         vec!["outer".into()]
     }
-    fn as_caller(&self) -> Pointer {
-        Pointer::new(Value::Null)
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -287,8 +290,8 @@ impl Context for VecCtx {
     fn names(&self) -> Vec<String> {
         vec!["obj".into()]
     }
-    fn as_caller(&self) -> Pointer {
-        Pointer::new(Value::Null)
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

@@ -3,7 +3,7 @@
 mod common;
 
 use common::Recorder;
-use nova::Value;
+use nova::reflect::Value;
 use nova::schema::{Schema, number, object, string};
 
 fn build(manifest: nova::Manifest, recorder: &Recorder) -> Result<nova::Runtime, Box<dyn std::error::Error>> {

@@ -1,4 +1,6 @@
-use nova_core::{FromArgs, Function, Namespace, Pointer, ToType, ToValue, Type, Value};
+use nova_core::Function;
+use nova_reflect::Value;
+use nova_template::{FromArgs, Namespace, Pointer};
 
 pub trait FileSystem {
     fn fs(self) -> Self;
@@ -13,18 +15,6 @@ impl FileSystem for nova_core::Builder {
 #[derive(Debug)]
 pub struct Fs;
 
-impl ToType for Fs {
-    fn to_type(&self) -> Type {
-        Type::Any
-    }
-}
-
-impl ToValue for Fs {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
-    }
-}
-
 impl Namespace for Fs {
     fn member(&self, name: &str) -> Option<Pointer> {
         match name {
@@ -37,6 +27,10 @@ impl Namespace for Fs {
     fn members(&self) -> Vec<String> {
         vec!["read".to_string(), "write".to_string()]
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 pub struct ReadArgs {
@@ -46,14 +40,8 @@ pub struct ReadArgs {
 impl FromArgs for ReadArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_core::Args) -> Result<Self, Self::Error> {
-        let path = args
-            .at(0)
-            .value()
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or(nova_core::Error::message("path must be a string"))?;
-
+    fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
+        let path = args.str(0).ok_or(nova_core::Error::message("path must be a string"))?;
         Ok(Self { path })
     }
 }
@@ -66,36 +54,36 @@ pub struct WriteArgs {
 impl FromArgs for WriteArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_core::Args) -> Result<Self, Self::Error> {
-        let path = args
-            .at(0)
-            .value()
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or(nova_core::Error::message("path must be a string"))?;
-
-        let data = args
-            .at(1)
-            .value()
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or(nova_core::Error::message("invalid data type"))?;
-
-        Ok(Self {
-            path,
-            data: data.into_bytes(),
-        })
+    fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
+        let path = args.str(0).ok_or(nova_core::Error::message("path must be a string"))?;
+        let data = to_bytes(&args.at(1).value()).ok_or(nova_core::Error::message("invalid data type"))?;
+        Ok(Self { path, data })
     }
 }
 
-pub fn read(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+fn to_bytes(value: &Value<'_>) -> Option<Vec<u8>> {
+    if let Some(text) = value.as_str() {
+        return Some(text.as_bytes().to_vec());
+    }
+
+    let seq = value.as_dynamic()?.as_sequence()?;
+    let mut bytes = Vec::with_capacity(seq.len());
+
+    for i in 0..seq.len() {
+        bytes.push(u8::try_from(seq.index(i)).ok()?);
+    }
+
+    Some(bytes)
+}
+
+pub fn read(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
     let args = ReadArgs::from_args(args)?;
     let base = std::env::current_dir()?;
     let data = std::fs::read_to_string(base.join(args.path))?;
     Ok(Pointer::new(Value::from(data)))
 }
 
-pub fn write(args: &nova_core::Args, _scope: &nova_core::Scope) -> Result<(), Box<dyn std::error::Error>> {
+pub fn write(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<(), Box<dyn std::error::Error>> {
     let args = WriteArgs::from_args(args)?;
     let base = std::env::current_dir()?;
     Ok(std::fs::write(base.join(args.path), args.data)?)

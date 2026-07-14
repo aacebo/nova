@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::{Action, Args, KArgs, Pointer, Scope};
+use nova_template::{Args, KArgs, Pointer};
+
+use crate::{Action, Scope};
 
 pub fn step() -> build::StepBuilder {
     build::StepBuilder::new()
@@ -35,7 +37,10 @@ impl std::ops::DerefMut for Step {
 impl Action for Step {
     fn invoke(&self, _args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(cond) = &self.cond
-            && !scope.eval(cond).map(|v| crate::is_truthy(&v.value())).unwrap_or(false)
+            && !scope
+                .eval(cond)
+                .map(|v| nova_template::is_truthy(&v.value()))
+                .unwrap_or(false)
         {
             return Ok(());
         }
