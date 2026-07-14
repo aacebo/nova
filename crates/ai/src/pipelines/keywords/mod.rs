@@ -11,7 +11,7 @@ pub use config::Config;
 use nova_core::FromArgs;
 
 use crate::models::ModelRef;
-use crate::pipelines::sentence_embeddings::SentenceEmbeddingsModelType;
+use crate::pipelines::embeddings::SentenceEmbeddingsModelType;
 use crate::pipelines::{Cache, Key, Keywords, ScoredArgs, borrow};
 use crate::resources::Result;
 use crate::{Annotation, Offset};
@@ -24,7 +24,7 @@ pub fn get(model: &ModelRef, api_key: &Option<String>) -> Result<Arc<dyn Keyword
     })
 }
 
-pub fn keyword_extraction(
+pub fn run(
     args: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> std::result::Result<nova_core::Value, Box<dyn std::error::Error>> {

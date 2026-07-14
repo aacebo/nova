@@ -2,9 +2,9 @@ mod anchor;
 mod cache;
 mod common;
 
-pub mod generation;
+pub mod embeddings;
+pub mod generate;
 pub mod keywords;
-pub mod sentence_embeddings;
 pub mod sentiment;
 pub mod summarize;
 pub mod token_classification;

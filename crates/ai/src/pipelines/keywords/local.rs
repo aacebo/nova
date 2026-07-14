@@ -1,6 +1,6 @@
 use super::config::Config;
 use super::{Keywords, candidates, scorer};
-use crate::pipelines::{Embed, sentence_embeddings};
+use crate::pipelines::{Embed, embeddings};
 use crate::resources::Result;
 use crate::types::Keyword;
 
@@ -15,7 +15,7 @@ impl Local {
     pub fn new(config: Config) -> Result<Self> {
         // Through the shared cache: `ai.embeddings` and `ai.keywords.extract` on the same model
         // then hold one copy of the weights, not two.
-        let embeddings = sentence_embeddings::get(&config.model, &config.api_key)?;
+        let embeddings = embeddings::get(&config.model, &config.api_key)?;
 
         Ok(Self {
             embeddings,

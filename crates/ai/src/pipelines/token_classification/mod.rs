@@ -24,7 +24,7 @@ pub fn get(model: &ModelRef, api_key: &Option<String>) -> Result<Arc<dyn Extract
     })
 }
 
-pub fn entity_extraction(
+pub fn extract_entities(
     args: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> std::result::Result<nova_core::Value, Box<dyn std::error::Error>> {
@@ -61,7 +61,7 @@ pub fn entity_extraction(
     ))
 }
 
-pub fn pii_extraction(
+pub fn extract_pii(
     args: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> std::result::Result<nova_core::Value, Box<dyn std::error::Error>> {

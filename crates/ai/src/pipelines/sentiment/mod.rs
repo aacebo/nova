@@ -22,7 +22,7 @@ pub fn get(model: &ModelRef, api_key: &Option<String>) -> Result<Arc<dyn Classif
     })
 }
 
-pub fn sentiment(
+pub fn run(
     args: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> std::result::Result<nova_core::Value, Box<dyn std::error::Error>> {

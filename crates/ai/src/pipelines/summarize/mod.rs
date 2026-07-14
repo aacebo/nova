@@ -10,8 +10,7 @@ pub use model::SummarizationModelType;
 use nova_core::FromArgs;
 
 use crate::models::ModelRef;
-use crate::pipelines::sentence_embeddings::{self, SentenceEmbeddingsModelType};
-use crate::pipelines::{Cache, Key, Summarize, TextArgs, borrow};
+use crate::pipelines::{Cache, Key, Summarize, TextArgs, borrow, embeddings};
 use crate::resources::Result;
 use crate::{Artifact, ArtifactContent};
 
@@ -41,8 +40,8 @@ pub fn run(
 
     let model = model.resolve(SummarizationModelType::BartLargeCnn.model())?;
     let out = get(&model, &api_key)?.summarize(&borrow(&text))?;
-    let embedder = SentenceEmbeddingsModelType::AllMiniLmL12V2.model();
-    let embeddings = sentence_embeddings::get(&embedder, &None)?;
+    let embedder = embeddings::SentenceEmbeddingsModelType::AllMiniLmL12V2.model();
+    let embeddings = embeddings::get(&embedder, &None)?;
     let mut artifacts: Vec<Artifact> = Vec::new();
 
     for summary in out {

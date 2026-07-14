@@ -4,13 +4,13 @@ use candle_core::{Device, Tensor};
 use tokenizers::Tokenizer;
 
 use super::config::Config;
-use crate::models::bart::{self, Bart};
-use crate::pipelines::{Summarize, generation};
+use crate::models::bart;
+use crate::pipelines::{Summarize, generate};
 use crate::resources::{Error, Result};
 
 pub struct Local {
-    model: Mutex<Bart>,
-    generation: generation::Config,
+    model: Mutex<bart::Bart>,
+    generation: generate::Config,
     tokenizer: Tokenizer,
     max_position_embeddings: usize,
     device: Device,
@@ -22,14 +22,14 @@ impl Local {
         let model: bart::Config = repo.config()?;
         let device = repo.device().clone();
 
-        let mut generation = generation::Config::from(&model);
+        let mut generation = generate::Config::from(&model);
 
         if let Some(beams) = config.beams {
             generation = generation.beams(beams);
         }
 
         Ok(Self {
-            model: Mutex::new(Bart::new(&model, repo.vars()?).map_err(Error::load)?),
+            model: Mutex::new(bart::Bart::new(&model, repo.vars()?).map_err(Error::load)?),
             generation,
             tokenizer: repo.tokenizer()?,
             max_position_embeddings: model.max_position_embeddings,
@@ -55,7 +55,7 @@ impl Local {
             .lock()
             .map_err(|_| Error::Inference("summarization model lock poisoned".to_string()))?;
 
-        let tokens = generation::generate(&mut model, &self.generation, &input, &self.device)?;
+        let tokens = generate::run(&mut model, &self.generation, &input, &self.device)?;
 
         self.tokenizer
             .decode(&tokens, true)

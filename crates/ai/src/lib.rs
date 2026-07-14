@@ -9,11 +9,7 @@ use std::sync::Arc;
 
 pub use types::*;
 
-use crate::pipelines::keywords::keyword_extraction;
-use crate::pipelines::sentence_embeddings::embeddings;
-use crate::pipelines::sentiment::sentiment;
-use crate::pipelines::summarize::run;
-use crate::pipelines::token_classification::{entity_extraction, pii_extraction};
+use crate::pipelines::{embeddings, keywords, sentiment, summarize, token_classification};
 
 pub trait AI {
     fn ai(self) -> Self;
@@ -33,16 +29,19 @@ impl nova_core::Reflect for Ai {
         match key.as_str()? {
             "embeddings" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.embeddings",
-                embeddings,
+                embeddings::run,
             ))),
             "entities" => Some(nova_core::Value::from_object(Entities)),
             "keywords" => Some(nova_core::Value::from_object(Keywords)),
             "pii" => Some(nova_core::Value::from_object(Pii)),
             "sentiment" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.sentiment",
-                sentiment,
+                sentiment::run,
             ))),
-            "summarize" => Some(nova_core::Value::from_object(nova_core::Function::func("ai.summarize", run))),
+            "summarize" => Some(nova_core::Value::from_object(nova_core::Function::func(
+                "ai.summarize",
+                summarize::run,
+            ))),
             _ => None,
         }
     }
@@ -56,7 +55,7 @@ impl nova_core::Reflect for Entities {
         match key.as_str()? {
             "extract" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.entities.extract",
-                entity_extraction,
+                token_classification::extract_entities,
             ))),
             _ => None,
         }
@@ -71,7 +70,7 @@ impl nova_core::Reflect for Keywords {
         match key.as_str()? {
             "extract" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.keywords.extract",
-                keyword_extraction,
+                keywords::run,
             ))),
             _ => None,
         }
@@ -86,7 +85,7 @@ impl nova_core::Reflect for Pii {
         match key.as_str()? {
             "extract" => Some(nova_core::Value::from_object(nova_core::Function::func(
                 "ai.pii.extract",
-                pii_extraction,
+                token_classification::extract_pii,
             ))),
             _ => None,
         }

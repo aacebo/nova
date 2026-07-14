@@ -3,7 +3,7 @@ use candle_core::{DType, Device};
 use super::{Keywords, local, remote};
 use crate::clients::openai::OpenAI;
 use crate::models::ModelRef;
-use crate::pipelines::sentence_embeddings::SentenceEmbeddingsModelType;
+use crate::pipelines::embeddings::SentenceEmbeddingsModelType;
 use crate::resources::{Provider, Result};
 
 pub struct Config {
