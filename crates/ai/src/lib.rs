@@ -12,7 +12,7 @@ pub use types::*;
 use crate::pipelines::keywords::keyword_extraction;
 use crate::pipelines::sentence_embeddings::embeddings;
 use crate::pipelines::sentiment::sentiment;
-use crate::pipelines::summarization::summarization;
+use crate::pipelines::summarize::run;
 use crate::pipelines::token_classification::{entity_extraction, pii_extraction};
 
 pub trait AI {
@@ -42,10 +42,7 @@ impl nova_core::Reflect for Ai {
                 "ai.sentiment",
                 sentiment,
             ))),
-            "summarize" => Some(nova_core::Value::from_object(nova_core::Function::func(
-                "ai.summarize",
-                summarization,
-            ))),
+            "summarize" => Some(nova_core::Value::from_object(nova_core::Function::func("ai.summarize", run))),
             _ => None,
         }
     }

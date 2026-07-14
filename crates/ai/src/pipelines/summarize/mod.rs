@@ -25,7 +25,7 @@ pub fn get(model: &ModelRef, api_key: &Option<String>) -> Result<Arc<dyn Summari
     })
 }
 
-pub fn summarization(
+pub fn run(
     args: &nova_core::Args,
     _scope: &nova_core::Scope,
 ) -> std::result::Result<nova_core::Value, Box<dyn std::error::Error>> {
