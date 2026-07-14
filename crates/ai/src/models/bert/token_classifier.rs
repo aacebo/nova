@@ -3,8 +3,10 @@ use candle_nn::{Linear, Module, VarBuilder, ops};
 
 use super::config::Config;
 use super::model::Bert;
-use crate::models::Forward;
+use crate::models::{Context, Forward, TokenClassify, Word};
 use crate::resources::{Error, Result};
+use crate::tasks::{aggregation, bioes};
+use crate::types::Entity;
 
 pub struct TokenClassifier {
     bert: Bert,
@@ -45,5 +47,46 @@ impl Forward for TokenClassifier {
 
     fn forward(&self, (ids, mask): Self::Input) -> Result<Self::Output> {
         self.forward(&ids, &mask)
+    }
+}
+
+impl TokenClassify for TokenClassifier {
+    /// IOB1 decoding: CoNLL-03 entities may start with `I-`, and `B-` only splits adjacent
+    /// same-type entities.
+    fn entities(&self, cx: &Context, text: &[&str]) -> Result<Vec<Vec<Entity>>> {
+        text.iter()
+            .map(|text| Ok(aggregation::entities(self.words(cx, text)?, text)))
+            .collect()
+    }
+
+    /// BIOES decoding plus a score filter -- a different decode of the same labelled words.
+    fn pii(&self, cx: &Context, text: &[&str], min_score: f64) -> Result<Vec<Vec<Entity>>> {
+        text.iter()
+            .map(|text| Ok(bioes::entities(self.words(cx, text)?, text, min_score)))
+            .collect()
+    }
+}
+
+impl TokenClassifier {
+    /// Sub-word pieces merged into whole words, each carrying the label its tokens voted for.
+    /// Both decodes above start here.
+    fn words(&self, cx: &Context, text: &str) -> Result<Vec<Word>> {
+        let encoding = cx.encode_one(text)?;
+        let ids = encoding.get_ids();
+
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let shape = (1, ids.len());
+        let input = Tensor::from_slice(ids, shape, cx.device()).map_err(Error::inference)?;
+        let mask = Tensor::from_slice(encoding.get_attention_mask(), shape, cx.device()).map_err(Error::inference)?;
+        let probs = self
+            .forward(&input, &mask)?
+            .squeeze(0)
+            .and_then(|probs| probs.to_vec2::<f32>())
+            .map_err(Error::inference)?;
+
+        aggregation::words(&probs, &encoding, self.labels())
     }
 }

@@ -1,15 +1,9 @@
 use tokenizers::Encoding;
 
+use super::char_offset;
+use crate::models::Word;
 use crate::resources::{Error, Result};
 use crate::types::{Entity, Offset};
-
-/// A whole word: sub-word pieces already merged, carrying BYTE offsets into the source text.
-pub struct Word {
-    pub label: String,
-    pub score: f64,
-    pub start: usize,
-    pub end: usize,
-}
 
 /// Merges sub-word pieces back into whole words, averaging their scores. The label of a word's
 /// first piece wins, matching HuggingFace's aggregation.
@@ -119,9 +113,4 @@ fn best(row: &[f32], labels: &[String]) -> Result<(String, f32)> {
         .ok_or_else(|| Error::Inference(format!("no label for index {index}")))?;
 
     Ok((label.clone(), *score))
-}
-
-fn char_offset(text: &str, byte_offset: usize) -> u32 {
-    let byte_offset = byte_offset.min(text.len());
-    text.char_indices().take_while(|(index, _)| *index < byte_offset).count() as u32
 }

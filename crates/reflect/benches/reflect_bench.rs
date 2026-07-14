@@ -183,14 +183,14 @@ fn serialize_object_json(c: &mut Criterion) {
 fn valuable_visit_struct(c: &mut Criterion) {
     let user = sample_user();
     c.bench_function("valuable/visit_struct", |b| {
-        b.iter(|| black_box(bench_valuable_visit_struct(&user)));
+        b.iter(|| bench_valuable_visit_struct(black_box(&user)));
     });
 }
 
 fn valuable_visit_vec_string(c: &mut Criterion) {
     let v = sample_strings();
     c.bench_function("valuable/visit_vec_string", |b| {
-        b.iter(|| black_box(bench_valuable_visit_vec_string(&v)));
+        b.iter(|| bench_valuable_visit_vec_string(black_box(&v)));
     });
 }
 

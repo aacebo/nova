@@ -50,6 +50,28 @@ impl OpenAI {
         serde_json::from_str(&content).map_err(Error::inference)
     }
 
+    /// A plain chat completion. Generation returns prose, so unlike `json` it is not constrained
+    /// to a schema -- wrapping a summary in a JSON envelope only to unwrap it buys nothing.
+    pub fn complete(&self, prompt: &str, input: &str, max_len: Option<usize>) -> Result<String> {
+        let mut body = serde_json::json!({
+            "model": self.model.to_string(),
+            "messages": [Message::system(prompt), Message::user(input)],
+        });
+
+        if let Some(max_len) = max_len {
+            body["max_completion_tokens"] = serde_json::json!(max_len);
+        }
+
+        let response: ChatResponse = self.post("chat/completions", &body)?;
+
+        response
+            .choices
+            .into_iter()
+            .next()
+            .map(|choice| choice.message.content.trim().to_string())
+            .ok_or_else(|| Error::Inference("no completion returned".to_string()))
+    }
+
     pub fn embeddings(&self, text: &[&str]) -> Result<Vec<Vec<f32>>> {
         let body = serde_json::json!({
             "model": self.model.to_string(),

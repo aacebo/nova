@@ -91,6 +91,12 @@ impl Config {
         self
     }
 
+    /// A label map is what a classification head announces: a checkpoint carrying `id2label` can
+    /// token-classify, one without it is an embedder.
+    pub fn has_labels(&self) -> bool {
+        !self.id2label.is_empty()
+    }
+
     /// `id2label` is keyed by stringified index; flatten it into a dense, ordered Vec.
     pub fn labels(&self) -> Result<Vec<String>> {
         let mut labels = vec![String::new(); self.id2label.len()];

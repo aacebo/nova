@@ -55,11 +55,11 @@ The four `examples/` dirs form a de-facto tutorial: **order-guard** (arg schema 
 
 ## Rough edges & recommendations
 
-- **No CI** — the biggest gap. `.github/` is absent, so nothing enforces the tooling that already exists. **Add a GitHub Actions workflow running `cargo lint` + `cargo test --workspace`.**
+- **CI** — `.github/workflows/ci.yml` runs fmt + clippy (`-D warnings`) + build + test on every push and PR. It omits `--all-targets` from the clippy step, so benches go unlinted.
 - **Duplicated guard evaluation** — the `if:` condition is evaluated in both `Step::invoke` (`manifest/step.rs:37`) and `Routine::invoke` (`object/routine.rs:117`). Evaluate once and thread the result through.
 - **Locking friction** — `Scope` takes fine-grained mutexes on `symbols`/`Arena` per access, and `with_env` (`state/scope.rs:41`) `panic!`s if the scope `Arc` is shared. Worth revisiting the concurrency model.
 - **Uneven coverage** — `reflect`/`schema` are well unit-tested, but `core` (the engine), `cli`, and the thin io crates (`http`/`fs`/`ai`/`codec`) lean almost entirely on integration tests, and the shipped `examples/*.yml` aren't wired into any test. **Add smoke tests that parse/execute each example manifest.**
 - **Stringly-typed errors** — `Box<dyn Error>` throughout; steps convert errors to strings. A typed error enum would improve diagnostics.
-- **`ai` crate** — very heavy deps (ort/tch/rust-bert ONNX) behind a thin surface (`Artifact`/`Span`/`Annotation`), with no `Builder` integration yet. Still on the backlog.
+- **`ai` crate** — heavy deps (candle + tokenizers + hf-hub) behind a thin surface (`Artifact`/`Span`/`Annotation`). Wired into `Builder` via the `AI` extension trait; each pipeline runs local (candle) or remote (OpenAI-compatible) off a single `ModelRef`.
 - **Config cruft** — `.editorconfig` carries inherited-from-rustc entries referencing paths that don't exist in this repo.
 - **Stub README** — no user-facing docs (addressed alongside this report); `docs.rs`/homepage URLs in `Cargo.toml` are aspirational placeholders.

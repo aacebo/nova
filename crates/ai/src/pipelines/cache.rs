@@ -53,6 +53,16 @@ impl<T: ?Sized> Cache<T> {
             Err(_) => Ok(entry),
         }
     }
+
+    /// How many distinct models are held. One cache keyed by model, not one per capability, so a
+    /// model used for two routines counts once -- which is what this exists to let a test check.
+    pub fn len(&self) -> usize {
+        self.entries.read().map(|entries| entries.len()).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl<T: ?Sized> Default for Cache<T> {

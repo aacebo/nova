@@ -3,7 +3,7 @@ use candle_nn::VarBuilder;
 
 use super::config::Config;
 use super::model::Bert;
-use crate::models::Forward;
+use crate::models::{Context, Embed, Forward};
 use crate::resources::{Error, Result};
 
 pub struct Embedder {
@@ -51,5 +51,19 @@ impl Forward for Embedder {
 
     fn forward(&self, (ids, mask): Self::Input) -> Result<Self::Output> {
         self.forward(&ids, &mask)
+    }
+}
+
+impl Embed for Embedder {
+    fn embed(&self, cx: &Context, text: &[&str]) -> Result<Vec<Vec<f32>>> {
+        if text.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let batch = cx.encode(text)?;
+
+        self.forward(&batch.ids, &batch.mask)?
+            .to_vec2::<f32>()
+            .map_err(Error::inference)
     }
 }

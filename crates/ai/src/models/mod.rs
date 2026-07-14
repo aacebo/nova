@@ -2,14 +2,21 @@ pub mod bart;
 pub mod bert;
 pub mod distilbert;
 
+mod capability;
+mod loaded;
+mod remote;
+
 use std::str::FromStr;
 use std::sync::Arc;
 
 use candle_core::{DType, Device};
+pub use capability::{Classify, Context, Embed, GenOpts, Generate, Label, TokenClassify, Word};
+pub use loaded::Loaded;
 
 use crate::clients::fs::FileSystem;
 use crate::clients::hf::HuggingFace;
 use crate::clients::http::Http;
+use crate::clients::openai::OpenAI;
 use crate::resources::{Error, Loader, ModelId, Provider, Repository, Resource, Result, Uri};
 
 pub trait Forward: Send + Sync {
@@ -79,46 +86,15 @@ impl std::fmt::Display for Architecture {
     }
 }
 
+/// A model whose weights we load and run ourselves. Every variant has weights, so `repository`
+/// and `loader` are total -- a model with no weights cannot be built as a `LocalModel`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ModelRef {
+pub enum LocalModel {
     Hub(ModelId),
-    Local(Resource),
-    Remote {
-        provider: Provider,
-        id: ModelId,
-        base_url: Option<String>,
-    },
+    Path(Resource),
 }
 
-impl ModelRef {
-    pub fn hub(id: ModelId) -> Self {
-        Self::Hub(id)
-    }
-
-    pub fn local(uri: Uri) -> Self {
-        Self::Local(Resource::new(uri))
-    }
-
-    pub fn remote(provider: Provider, id: ModelId) -> Self {
-        Self::Remote {
-            provider,
-            id,
-            base_url: None,
-        }
-    }
-
-    pub fn base_url(mut self, url: Option<String>) -> Self {
-        if let Self::Remote { base_url, .. } = &mut self {
-            *base_url = url;
-        }
-
-        self
-    }
-
-    pub fn is_remote(&self) -> bool {
-        matches!(self, Self::Remote { .. })
-    }
-
+impl LocalModel {
     pub fn loader(&self, device: Device, dtype: DType) -> Result<Loader> {
         Ok(Loader::new(self.repository()?, device, dtype))
     }
@@ -126,11 +102,117 @@ impl ModelRef {
     pub fn repository(&self) -> Result<Arc<dyn Repository>> {
         match self {
             Self::Hub(id) => Ok(Arc::new(HuggingFace::new(id)?)),
-            Self::Local(resource) => match &resource.uri {
+            Self::Path(resource) => match &resource.uri {
                 Uri::Local(path) => Ok(Arc::new(FileSystem::new(path))),
                 Uri::Http(_) => Ok(Arc::new(Http::new(resource.uri.clone()))),
             },
-            Self::Remote { id, .. } => Err(Error::Load(format!("{id} is a remote model and has no weights"))),
+        }
+    }
+}
+
+impl std::fmt::Display for LocalModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Hub(id) => write!(f, "{id}"),
+            Self::Path(resource) => write!(f, "{resource}"),
+        }
+    }
+}
+
+/// A model we call over the wire. It has an endpoint, never weights.
+#[derive(Debug, Clone)]
+pub struct RemoteModel {
+    pub provider: Provider,
+    pub id: ModelId,
+    pub base_url: Option<String>,
+    pub api_key: Option<String>,
+}
+
+impl RemoteModel {
+    pub fn new(provider: Provider, id: ModelId) -> Self {
+        Self {
+            provider,
+            id,
+            base_url: None,
+            api_key: None,
+        }
+    }
+
+    pub fn base_url(mut self, url: Option<String>) -> Self {
+        self.base_url = url;
+        self
+    }
+
+    pub fn api_key(mut self, api_key: Option<String>) -> Self {
+        self.api_key = api_key;
+        self
+    }
+
+    pub fn client(&self) -> OpenAI {
+        match self.provider {
+            Provider::OpenAI => OpenAI::new(self.id.clone(), self.base_url.clone(), self.api_key.clone()),
+        }
+    }
+}
+
+/// Identity is the endpoint, not the credential. `RemoteModel` sits inside the cache
+/// [`Key`](crate::pipelines::Key), which fingerprints the api key rather than storing it -- so
+/// hashing the raw key here would put it in a long-lived map, and two keys against the same
+/// endpoint would wrongly look like different models.
+impl PartialEq for RemoteModel {
+    fn eq(&self, other: &Self) -> bool {
+        self.provider == other.provider && self.id == other.id && self.base_url == other.base_url
+    }
+}
+
+impl Eq for RemoteModel {}
+
+impl std::hash::Hash for RemoteModel {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.provider.hash(state);
+        self.id.hash(state);
+        self.base_url.hash(state);
+    }
+}
+
+impl std::fmt::Display for RemoteModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.provider, self.id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ModelRef {
+    Local(LocalModel),
+    Remote(RemoteModel),
+}
+
+impl ModelRef {
+    pub fn hub(id: ModelId) -> Self {
+        Self::Local(LocalModel::Hub(id))
+    }
+
+    pub fn local(uri: Uri) -> Self {
+        Self::Local(LocalModel::Path(Resource::new(uri)))
+    }
+
+    pub fn remote(provider: Provider, id: ModelId) -> Self {
+        Self::Remote(RemoteModel::new(provider, id))
+    }
+
+    pub fn base_url(mut self, url: Option<String>) -> Self {
+        if let Self::Remote(remote) = self {
+            self = Self::Remote(remote.base_url(url));
+        }
+
+        self
+    }
+
+    /// The weights-bearing model, or an error naming the remote one that has none.
+    pub fn local_or_err(&self) -> Result<&LocalModel> {
+        match self {
+            Self::Local(model) => Ok(model),
+            Self::Remote(remote) => Err(Error::Load(format!("{remote} is a remote model and has no weights"))),
         }
     }
 }
@@ -138,9 +220,8 @@ impl ModelRef {
 impl std::fmt::Display for ModelRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Hub(id) => write!(f, "{id}"),
-            Self::Local(resource) => write!(f, "{resource}"),
-            Self::Remote { provider, id, .. } => write!(f, "{provider}:{id}"),
+            Self::Local(model) => write!(f, "{model}"),
+            Self::Remote(remote) => write!(f, "{remote}"),
         }
     }
 }

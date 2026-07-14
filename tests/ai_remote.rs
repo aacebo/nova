@@ -17,9 +17,16 @@ fn routine() -> nova::build::ManifestBuilder {
 }
 
 /// The chat-completions shape every OpenAI-compatible provider returns.
+///
+/// A schema-constrained completion: the model's answer is JSON, carried as a string.
 fn completion(content: serde_json::Value) -> serde_json::Value {
+    text_completion(&content.to_string())
+}
+
+/// A plain completion: the model's answer is prose, carried as-is.
+fn text_completion(content: &str) -> serde_json::Value {
     serde_json::json!({
-        "choices": [{ "message": { "content": content.to_string() } }],
+        "choices": [{ "message": { "content": content } }],
     })
 }
 
@@ -27,10 +34,11 @@ fn completion(content: serde_json::Value) -> serde_json::Value {
 fn remote_summarize_returns_the_same_shape_as_local() {
     let server = MockServer::start();
 
+    // Generation is a plain completion, not a schema-constrained one: the model answers with the
+    // summary itself, not a JSON envelope around it.
     let mock = server.mock(|when, then| {
         when.method(POST).path("/chat/completions");
-        then.status(200)
-            .json_body(completion(serde_json::json!({ "summary": "A remote summary." })));
+        then.status(200).json_body(text_completion("A remote summary."));
     });
 
     let recorder = Recorder::new();
@@ -62,7 +70,7 @@ fn remote_sentiment_returns_the_same_shape_as_local() {
     let mock = server.mock(|when, then| {
         when.method(POST).path("/chat/completions");
         then.status(200)
-            .json_body(completion(serde_json::json!({ "polarity": "negative", "score": 0.91 })));
+            .json_body(completion(serde_json::json!({ "label": "negative", "score": 0.91 })));
     });
 
     let recorder = Recorder::new();
@@ -131,7 +139,7 @@ fn remote_entities_reanchor_offsets_in_the_source() {
         &recorder,
         routine()
             .step(nova::step().run(format!(
-                "{{% set found = ai.entities.extract('Satya works at Microsoft', provider='openai', \
+                "{{% set found = ai.entities('Satya works at Microsoft', provider='openai', \
                  model='gpt-5', base_url='{}', api_key='test') %}}\
                  {{{{ info(found[0].text ~ ':' ~ found[0].label ~ ':' ~ found[0].spans[0].begin ~ '-' ~ found[0].spans[0].end) }}}}",
                 server.base_url()
@@ -213,7 +221,7 @@ fn different_api_keys_do_not_share_a_cached_client() {
             .path("/chat/completions")
             .header("authorization", "Bearer key-a");
         then.status(200)
-            .json_body(completion(serde_json::json!({ "polarity": "positive", "score": 0.9 })));
+            .json_body(completion(serde_json::json!({ "label": "positive", "score": 0.9 })));
     });
 
     let second = server.mock(|when, then| {
@@ -221,7 +229,7 @@ fn different_api_keys_do_not_share_a_cached_client() {
             .path("/chat/completions")
             .header("authorization", "Bearer key-b");
         then.status(200)
-            .json_body(completion(serde_json::json!({ "polarity": "negative", "score": 0.9 })));
+            .json_body(completion(serde_json::json!({ "label": "negative", "score": 0.9 })));
     });
 
     let recorder = Recorder::new();

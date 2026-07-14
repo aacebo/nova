@@ -25,30 +25,21 @@ fn sentiment_rejects_non_string_text() {
 #[test]
 fn entity_extraction_rejects_non_string_text() {
     let recorder = Recorder::new();
-    run(
-        &recorder,
-        routine().step(nova::step().run("{{ ai.entities.extract(42) }}")).build(),
-    );
+    run(&recorder, routine().step(nova::step().run("{{ ai.entities(42) }}")).build());
     assert!(recorder.has_error());
 }
 
 #[test]
 fn keyword_extraction_rejects_non_string_text() {
     let recorder = Recorder::new();
-    run(
-        &recorder,
-        routine().step(nova::step().run("{{ ai.keywords.extract(42) }}")).build(),
-    );
+    run(&recorder, routine().step(nova::step().run("{{ ai.keywords(42) }}")).build());
     assert!(recorder.has_error());
 }
 
 #[test]
 fn pii_extraction_rejects_non_string_text() {
     let recorder = Recorder::new();
-    run(
-        &recorder,
-        routine().step(nova::step().run("{{ ai.pii.extract(42) }}")).build(),
-    );
+    run(&recorder, routine().step(nova::step().run("{{ ai.pii(42) }}")).build());
     assert!(recorder.has_error());
 }
 
@@ -124,7 +115,7 @@ fn entity_extraction_finds_person_org_and_location() {
         &recorder,
         routine()
             .step(nova::step().run(
-                "{% set found = ai.entities.extract('Satya Nadella works at Microsoft in Seattle', min_score=0.5) %}\
+                "{% set found = ai.entities('Satya Nadella works at Microsoft in Seattle', min_score=0.5) %}\
                  {{ info(found | map(attribute='label') | join(',')) }}",
             ))
             .build(),
@@ -200,7 +191,7 @@ fn keyword_extraction_finds_salient_terms() {
         &recorder,
         routine()
             .step(nova::step().run(
-                "{% set words = ai.keywords.extract('The battery life on this laptop is absolutely terrible') %}\
+                "{% set words = ai.keywords('The battery life on this laptop is absolutely terrible') %}\
                  {{ info(words | map(attribute='text') | join(',')) }}",
             ))
             .build(),
@@ -223,7 +214,7 @@ fn pii_extraction_finds_entities() {
         &recorder,
         routine()
             .step(nova::step().run(
-                "{% set found = ai.pii.extract('Contact Sarah Connor at Cyberdyne Systems in Los Angeles', min_score=0.5) %}\
+                "{% set found = ai.pii('Contact Sarah Connor at Cyberdyne Systems in Los Angeles', min_score=0.5) %}\
                  {{ info(found | map(attribute='text') | join('|')) }}",
             ))
             .build(),
@@ -264,4 +255,83 @@ fn embeddings_load_from_a_local_directory() {
 
     assert!(!recorder.has_error(), "{:?}", recorder.messages());
     assert!(recorder.messages().iter().any(|m| m == "384"), "{:?}", recorder.messages());
+}
+
+/// The empty cells of the capability matrix must fail loudly. A sentence embedder has no decoder,
+/// so asking it to generate is an error -- named, and raised before any inference runs.
+#[test]
+#[ignore]
+fn a_model_that_cannot_generate_is_rejected() {
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .step(
+                nova::step().run("{{ ai.summarize('some text to summarize', model='sentence-transformers/all-MiniLM-L6-v2') }}"),
+            )
+            .build(),
+    );
+
+    assert!(recorder.has_error(), "an embedder cannot generate");
+
+    let reported = recorder.messages().join(" ");
+    assert!(
+        reported.contains("cannot generate"),
+        "the error should name the missing capability, got {reported:?}"
+    );
+}
+
+/// Likewise: BART is a summarizer, not a sentence embedder.
+#[test]
+#[ignore]
+fn a_model_that_cannot_embed_is_rejected() {
+    let recorder = Recorder::new();
+    run(
+        &recorder,
+        routine()
+            .step(nova::step().run("{{ ai.embeddings('hello', model='facebook/bart-large-cnn') }}"))
+            .build(),
+    );
+
+    assert!(recorder.has_error(), "a summarizer cannot embed");
+}
+
+/// The payoff of one cache keyed by model rather than five keyed by capability: `ai.embeddings`
+/// and `ai.keywords` on the same model hold ONE copy of the weights.
+///
+/// Counting loaded models is the observable, not timing -- the cache is a process-wide static, so
+/// a wall-clock comparison would measure whichever test happened to run first.
+#[test]
+#[ignore]
+fn two_routines_on_one_model_load_the_weights_once() {
+    let model = "sentence-transformers/all-MiniLM-L12-v2";
+    let recorder = Recorder::new();
+
+    // Load it once through `embeddings`, whatever the cache already holds from other tests.
+    run(
+        &recorder,
+        routine()
+            .step(nova::step().run(format!("{{{{ ai.embeddings('warm the cache', model='{model}') }}}}")))
+            .build(),
+    );
+
+    let loaded = nova::ai::pipelines::loaded();
+
+    // `keywords` needs the same capability from the same model, so it must reuse that copy rather
+    // than load a second one. Under a per-capability cache this is where the weights loaded twice.
+    run(
+        &recorder,
+        routine()
+            .step(nova::step().run(format!(
+                "{{{{ ai.keywords('the battery life on this laptop is terrible', model='{model}') }}}}"
+            )))
+            .build(),
+    );
+
+    assert!(!recorder.has_error(), "{:?}", recorder.messages());
+    assert_eq!(
+        nova::ai::pipelines::loaded(),
+        loaded,
+        "keywords must reuse the embedder that embeddings loaded, not load its own copy"
+    );
 }

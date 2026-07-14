@@ -12,6 +12,16 @@ impl Polarity {
             Self::Negative => "negative",
         }
     }
+
+    /// Sentiment is a binary reading of a general classification label. SST-2 emits `NEGATIVE` /
+    /// `POSITIVE`; a hosted model answers in whatever case it likes. Anything that is not
+    /// recognisably negative reads as positive, matching the old `positive >= negative` rule.
+    pub fn from_label(label: &str) -> Self {
+        match label.trim().to_lowercase().as_str() {
+            "negative" | "neg" | "label_0" => Self::Negative,
+            _ => Self::Positive,
+        }
+    }
 }
 
 impl std::fmt::Display for Polarity {

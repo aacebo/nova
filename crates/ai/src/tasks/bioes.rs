@@ -1,4 +1,5 @@
-use super::aggregation::Word;
+use super::char_offset;
+use crate::models::Word;
 use crate::types::{Entity, Offset};
 
 /// BIOES decoding, distinct from the plain IOB1 aggregation used for NER: it honours `E-`/`S-`
@@ -191,11 +192,6 @@ impl Builder {
             end: self.end,
         }
     }
-}
-
-fn char_offset(text: &str, byte_offset: usize) -> u32 {
-    let byte_offset = byte_offset.min(text.len());
-    text.char_indices().take_while(|(index, _)| *index < byte_offset).count() as u32
 }
 
 #[cfg(test)]

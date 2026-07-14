@@ -217,9 +217,9 @@ steps:
 | `yaml.encode(v)` `yaml.decode(s)`   | YAML encode / decode.                      |
 | `http.get(url)`                     | HTTP request — returns `.status`, etc.     |
 | `ai.sentiment(text)`                | Sentiment classification (annotations).    |
-| `ai.entities.extract(text)`         | Named-entity extraction (annotations).     |
-| `ai.keywords.extract(text)`         | Keyword extraction (annotations).          |
-| `ai.pii.extract(text)`              | PII detection (annotations).               |
+| `ai.entities(text)`                 | Named-entity extraction (annotations).     |
+| `ai.keywords(text)`                 | Keyword extraction (annotations).          |
+| `ai.pii(text)`                      | PII detection (annotations).               |
 | `ai.embeddings(text)`               | Sentence embeddings (artifacts + vectors). |
 | `ai.summarize(text)`                | Abstractive summarization (artifacts).     |
 
@@ -227,9 +227,48 @@ Standard minijinja filters (`| length`), loops with `loop.index`, `{% set %}`, a
 
 ### AI routines
 
-The `ai` module wraps [rust-bert](https://github.com/guillaume-be/rust-bert) NLP pipelines (enabled by the `ai` feature, on by default in the CLI). Each routine accepts a single string **or** a list of strings, plus an optional `min_score` keyword to filter low-confidence results. Models are downloaded on first use and cached per worker thread.
+The `ai` module runs NLP pipelines on [candle](https://github.com/huggingface/candle) (enabled by the `ai` feature, on by default in the CLI). Each routine accepts a single string **or** a list of strings, plus an optional `min_score` keyword to filter low-confidence results. Models are downloaded on first use and cached per `(model, api_key)` for the life of the process — a model used by two routines is loaded once.
 
-`ai.sentiment`, `ai.entities.extract`, `ai.keywords.extract`, and `ai.pii.extract` return **annotations** (`name`, `label`, `text`, `score`, `spans`); `ai.embeddings` and `ai.summarize` return **artifacts** (`name`, `value`, and, for embeddings, a `vector`).
+Every routine runs either **locally** (weights loaded and executed with candle) or **remotely** (an OpenAI-compatible endpoint), decided by the model you name:
+
+```yaml
+{{ ai.sentiment(text) }}                                        # local default (distilbert)
+{{ ai.sentiment(text, model='distilbert-base-uncased-finetuned-sst-2-english') }}
+{{ ai.sentiment(text, provider='openai', model='gpt-5') }}      # remote
+```
+
+A local model has weights; a remote model has an endpoint. Naming a `provider` selects the remote path, and `base_url` points it at any OpenAI-compatible host (Azure, Ollama, vLLM, OpenRouter, …).
+
+`ai.sentiment`, `ai.entities`, `ai.keywords`, and `ai.pii` return **annotations** (`name`, `label`, `text`, `score`, `spans`); `ai.embeddings` and `ai.summarize` return **artifacts** (`name`, `value`, and, for embeddings, a `vector`).
+
+#### Which models can do what
+
+Each routine needs a **capability** from the model you name. A local model provides the capabilities its architecture has; a hosted model provides all of them.
+
+| model | embed | classify | token-classify | generate |
+|---|:---:|:---:|:---:|:---:|
+| **BERT** — `sentence-transformers/*` | ✓ | — | — | — |
+| **BERT + label map** — e.g. `dbmdz/bert-large-cased-finetuned-conll03-english` | — | — | ✓ | — |
+| **DistilBERT** — e.g. `distilbert-base-uncased-finetuned-sst-2-english` | — | ✓ | — | — |
+| **BART** — `facebook/bart-large-cnn`, `-xsum` | — | — | — | ✓ |
+| **Hosted** — `provider='openai'`, any OpenAI-compatible host | ✓ | ✓ | ✓ | ✓ |
+
+| routine | needs | default model |
+|---|---|---|
+| `ai.embeddings` | embed | `sentence-transformers/all-MiniLM-L12-v2` |
+| `ai.keywords` | embed — KeyBERT ranks candidate phrases by similarity to the document | `sentence-transformers/all-MiniLM-L6-v2` |
+| `ai.sentiment` | classify | `distilbert-base-uncased-finetuned-sst-2-english` |
+| `ai.entities` / `ai.pii` | token-classify | `dbmdz/bert-large-cased-finetuned-conll03-english` |
+| `ai.summarize` | generate | `facebook/bart-large-cnn` |
+
+Naming a model that lacks the capability is an error, raised before any inference runs:
+
+```
+ai.summarize(text, model='sentence-transformers/all-MiniLM-L6-v2')
+  → sentence-transformers/all-MiniLM-L6-v2 cannot generate
+```
+
+A BERT checkpoint embeds or token-classifies depending on whether it ships a label map (`id2label`) — a classification head is exactly what that announces.
 
 ```yaml
 name: analyze
@@ -309,7 +348,7 @@ The [`examples/`](examples/) directory doubles as a tutorial — each is runnabl
 | **build-pipeline** | A prioritized pipeline: writes/reads a JSON artifact, loops over build stages, asserts via shell exit codes, delegates to a `report` subroutine. | `nova run 'examples/build-pipeline/*.yml'` |
 | **http-healthcheck** | Probes a URL with `http.get`, writes a status file, then a lower-priority `notify` routine reads it back — cross-file ordering by priority. | `nova run 'examples/http-healthcheck/*.yml'` |
 | **batch-report** | Fans out over records with a `{% for %}` loop, calls a `format` subroutine per item, aggregates with shell, round-trips through YAML. | `nova run 'examples/batch-report/*.yml'` |
-| **review-triage** | Runs rust-bert NLP over customer reviews: a `classify` subroutine scores sentiment and extracts entities and keywords for each. Needs the `ai` feature. | `nova run 'examples/review-triage/*.yml'` |
+| **review-triage** | Runs NLP over customer reviews: a `classify` subroutine scores sentiment and extracts entities and keywords for each. Needs the `ai` feature. | `nova run 'examples/review-triage/*.yml'` |
 
 ---
 
@@ -326,7 +365,7 @@ Nova is a Cargo workspace. The root `nova` crate re-exports feature-gated capabi
 | `fs`      | `fs`      | Filesystem module (`fs.read` / `fs.write`).                          |
 | `codec`   | `codec`   | Encoding modules (`json`, `yaml`).                                   |
 | `http`    | `http`    | HTTP module (`http.get`).                                            |
-| `ai`      | `ai`      | AI module: rust-bert NLP routines (`ai.sentiment`, `ai.embeddings`, …). |
+| `ai`      | `ai`      | AI module: candle NLP routines (`ai.sentiment`, `ai.embeddings`, …). |
 
 For a deeper walkthrough of the design and a candid review of strengths and rough edges, see [REPORT.md](REPORT.md).
 

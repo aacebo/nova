@@ -21,14 +21,14 @@ steps:
 
   - name: entities
     run: |
-      {% set found = ai.entities.extract(text, min_score=0.9) %}
+      {% set found = ai.entities(text, min_score=0.9) %}
       {% if found %}
         {{ info('#' ~ index ~ ' entities: ' ~ (found | map(attribute='text') | join(', '))) }}
       {% endif %}
 
   - name: keywords
     run: |
-      {% set words = ai.keywords.extract(text) %}
+      {% set words = ai.keywords(text) %}
       {% if words %}
         {{ info('#' ~ index ~ ' keywords: ' ~ (words | map(attribute='text') | join(', '))) }}
       {% endif %}

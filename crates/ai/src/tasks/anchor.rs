@@ -1,3 +1,4 @@
+use super::char_offset;
 use crate::types::Offset;
 
 /// Locates `needle` in `text` so a remote result can carry a real span.
@@ -28,11 +29,6 @@ pub fn all(text: &str, needle: &str) -> Vec<Offset> {
     }
 
     offsets
-}
-
-fn char_offset(text: &str, byte_offset: usize) -> u32 {
-    let byte_offset = byte_offset.min(text.len());
-    text.char_indices().take_while(|(index, _)| *index < byte_offset).count() as u32
 }
 
 #[cfg(test)]

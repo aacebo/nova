@@ -3,7 +3,7 @@ use candle_nn::{Linear, Module, VarBuilder, ops};
 
 use super::config::Config;
 use super::model::DistilBert;
-use crate::models::Forward;
+use crate::models::{Classify, Context, Forward, Label};
 use crate::resources::{Error, Result};
 
 const LABELS: usize = 2;
@@ -45,5 +45,36 @@ impl Forward for SequenceClassifier {
 
     fn forward(&self, (ids, padding): Self::Input) -> Result<Self::Output> {
         self.forward(&ids, &padding)
+    }
+}
+
+impl Classify for SequenceClassifier {
+    fn classify(&self, cx: &Context, text: &[&str]) -> Result<Vec<Label>> {
+        if text.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let batch = cx.encode(text)?;
+        let probs = self.forward(&batch.ids, &batch.padding()?)?;
+
+        Ok(probs
+            .into_iter()
+            .map(|row| {
+                // SST-2 label order: 0 = NEGATIVE, 1 = POSITIVE. The head emits the label; reading
+                // it as a sentiment polarity is the task's job, not the model's.
+                let (negative, positive) = (row[0], row[1]);
+
+                match positive >= negative {
+                    true => Label {
+                        label: "positive".to_string(),
+                        score: positive as f64,
+                    },
+                    false => Label {
+                        label: "negative".to_string(),
+                        score: negative as f64,
+                    },
+                }
+            })
+            .collect())
     }
 }

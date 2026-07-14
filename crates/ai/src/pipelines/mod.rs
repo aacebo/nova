@@ -1,43 +1,18 @@
-mod anchor;
 mod cache;
-mod common;
+mod routines;
 
-pub mod embeddings;
+pub mod common;
 pub mod generate;
-pub mod keywords;
-pub mod sentiment;
-pub mod summarize;
-pub mod token_classification;
 
 pub use cache::{Cache, Key};
+pub use common::Batch;
 use nova_core::{Args, FromArgs};
+pub use routines::{embeddings, entities, keywords, pii, sentiment, summarize};
 
 use crate::models::ModelRef;
 use crate::resources::{ModelId, Provider, Result, Uri};
-use crate::types::{Entity, Keyword, Sentiment};
 
 type RoutineResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-pub trait Embed: Send + Sync {
-    fn embed(&self, text: &[&str]) -> Result<Vec<Vec<f32>>>;
-}
-
-pub trait Classify: Send + Sync {
-    fn classify(&self, text: &[&str]) -> Result<Vec<Sentiment>>;
-}
-
-pub trait Keywords: Send + Sync {
-    fn keywords(&self, text: &[&str]) -> Result<Vec<Vec<Keyword>>>;
-}
-
-pub trait Extract: Send + Sync {
-    fn entities(&self, text: &[&str]) -> Result<Vec<Vec<Entity>>>;
-    fn pii(&self, text: &[&str], min_score: f64) -> Result<Vec<Vec<Entity>>>;
-}
-
-pub trait Summarize: Send + Sync {
-    fn summarize(&self, text: &[&str]) -> Result<Vec<String>>;
-}
 
 pub struct ModelArgs {
     provider: Option<String>,
@@ -163,4 +138,58 @@ fn string(args: &Args, key: &str) -> RoutineResult<Option<String>> {
             .map(|value| Some(value.to_string()))
             .ok_or_else(|| nova_core::Error::message(format!("{key} must be a string")).into()),
     }
+}
+
+/// Default models, one per capability. A model that cannot serve the routine you called is an
+/// error -- the empty cells of the capability matrix.
+pub(crate) mod defaults {
+    use crate::models::ModelRef;
+    use crate::resources::ModelId;
+
+    fn hub(repo: &str) -> ModelRef {
+        ModelRef::hub(repo.parse::<ModelId>().expect("built-in model ids are valid"))
+    }
+
+    pub fn embed() -> ModelRef {
+        hub("sentence-transformers/all-MiniLM-L12-v2")
+    }
+
+    pub fn keywords() -> ModelRef {
+        hub("sentence-transformers/all-MiniLM-L6-v2")
+    }
+
+    pub fn classify() -> ModelRef {
+        hub("distilbert-base-uncased-finetuned-sst-2-english")
+    }
+
+    pub fn token_classify() -> ModelRef {
+        hub("dbmdz/bert-large-cased-finetuned-conll03-english")
+    }
+
+    pub fn generate() -> ModelRef {
+        hub("facebook/bart-large-cnn")
+    }
+}
+
+static MODELS: std::sync::LazyLock<Cache<crate::models::Loaded>> = std::sync::LazyLock::new(Cache::new);
+
+/// One cache of loaded models, keyed by `(model, api_key)` -- not one per capability. A model used
+/// for two routines now loads its weights once.
+pub fn load(model: &ModelRef, api_key: &Option<String>) -> Result<std::sync::Arc<crate::models::Loaded>> {
+    use candle_core::{DType, Device};
+
+    MODELS.get_or_build(Key::new(model, api_key), || {
+        Ok(std::sync::Arc::new(crate::models::Loaded::new(
+            model,
+            api_key,
+            Device::Cpu,
+            DType::F32,
+        )?))
+    })
+}
+
+/// How many distinct models are loaded. Lets a test assert that two routines on one model hold one
+/// copy of the weights, rather than inferring it from timings.
+pub fn loaded() -> usize {
+    MODELS.len()
 }
