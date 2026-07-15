@@ -104,5 +104,5 @@ impl Recorder {
 }
 
 pub fn to_pointer<T: nova::reflect::ToValue>(value: T) -> Pointer {
-    Pointer::new(value.to_value().into_owned())
+    Pointer::new(value.to_value().to_owned())
 }

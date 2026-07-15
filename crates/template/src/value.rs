@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use nova_reflect::{ToValue, Value};
+use nova_reflect::{ToValue, Value, ValueRef};
 
 pub trait Valueable: ToValue + Send + Sync + std::fmt::Debug + 'static {
     fn as_any(&self) -> &dyn Any;
@@ -66,10 +66,10 @@ impl Pointer {
         self.as_call().is_some()
     }
 
-    pub fn value(&self) -> Value<'_> {
+    pub fn value(&self) -> ValueRef<'_> {
         match self {
-            Self::Value(v) => v.to_value(),
-            _ => Value::Undefined,
+            Self::Value(v) => v.to_value_ref(),
+            _ => ValueRef::Undefined,
         }
     }
 
@@ -131,7 +131,7 @@ impl Pointer {
         }))
     }
 
-    pub fn key(&self, key: Value<'static>) -> Option<Pointer> {
+    pub fn key(&self, key: Value) -> Option<Pointer> {
         let parent = self.valueable()?;
         let value = self.value();
         value.as_map()?.get(&key)?;
@@ -146,16 +146,16 @@ impl Pointer {
 #[derive(Debug)]
 struct Key {
     parent: Arc<dyn Valueable>,
-    key: Value<'static>,
+    key: Value,
 }
 
 impl ToValue for Key {
-    fn to_value(&self) -> Value<'_> {
-        let parent = self.parent.to_value();
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        let parent = self.parent.to_value_ref();
 
         match parent.as_map().and_then(|m| m.get(&self.key)) {
-            Some(value) => value.clone(),
-            None => Value::Undefined,
+            Some(value) => value.as_ref(),
+            None => ValueRef::Undefined,
         }
     }
 }
@@ -167,12 +167,12 @@ struct Index {
 }
 
 impl ToValue for Index {
-    fn to_value(&self) -> Value<'_> {
-        let parent = self.parent.to_value();
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        let parent = self.parent.to_value_ref();
 
         match parent.as_dynamic().and_then(|d| d.as_sequence()) {
             Some(seq) => seq.index(self.index),
-            None => Value::Undefined,
+            None => ValueRef::Undefined,
         }
     }
 }
@@ -184,18 +184,18 @@ struct Field {
 }
 
 impl ToValue for Field {
-    fn to_value(&self) -> Value<'_> {
-        let parent = self.parent.to_value();
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        let parent = self.parent.to_value_ref();
 
         match parent.as_dynamic().and_then(|d| d.as_object()) {
             Some(object) => object.field(&self.name),
-            None => Value::Undefined,
+            None => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for Pointer {
-    fn to_value(&self) -> Value<'_> {
+    fn to_value_ref(&self) -> ValueRef<'_> {
         self.value()
     }
 }
@@ -235,9 +235,15 @@ impl PartialEq for Pointer {
     }
 }
 
-impl PartialEq<Value<'_>> for Pointer {
-    fn eq(&self, other: &Value<'_>) -> bool {
+impl PartialEq<ValueRef<'_>> for Pointer {
+    fn eq(&self, other: &ValueRef<'_>) -> bool {
         self.value() == *other
+    }
+}
+
+impl PartialEq<Value> for Pointer {
+    fn eq(&self, other: &Value) -> bool {
+        self.value() == other.as_ref()
     }
 }
 
@@ -255,9 +261,15 @@ impl PartialOrd for Pointer {
     }
 }
 
-impl PartialOrd<Value<'_>> for Pointer {
-    fn partial_cmp(&self, other: &Value<'_>) -> Option<std::cmp::Ordering> {
+impl PartialOrd<ValueRef<'_>> for Pointer {
+    fn partial_cmp(&self, other: &ValueRef<'_>) -> Option<std::cmp::Ordering> {
         self.value().partial_cmp(other)
+    }
+}
+
+impl PartialOrd<Value> for Pointer {
+    fn partial_cmp(&self, other: &Value) -> Option<std::cmp::Ordering> {
+        self.value().partial_cmp(&other.as_ref())
     }
 }
 
@@ -348,9 +360,7 @@ impl<'de> serde::de::Visitor<'de> for PointerVisitor {
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Str(nova_reflect::Str(std::borrow::Cow::Owned(
-            v.to_string(),
-        )))))
+        Ok(Pointer::new(Value::Str(nova_reflect::Str::from(v))))
     }
 
     fn visit_unit<E>(self) -> Result<Self::Value, E> {
@@ -376,25 +386,38 @@ impl<'de> serde::de::Visitor<'de> for PointerVisitor {
     }
 
     fn visit_map<A: serde::de::MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
-        let mut entries: std::collections::BTreeMap<Pointer, Pointer> = std::collections::BTreeMap::new();
+        let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
+        let mut map = nova_reflect::Map::new(&ty);
 
         while let Some((key, value)) = access.next_entry::<Pointer, Pointer>()? {
-            entries.insert(key, value);
+            map.insert(key.value().to_owned(), value.value().to_owned());
         }
 
-        Ok(Pointer::new(entries))
+        Ok(Pointer::new(Value::Map(map)))
     }
 }
 
-impl From<Value<'static>> for Pointer {
-    fn from(value: Value<'static>) -> Self {
+impl From<Value> for Pointer {
+    fn from(value: Value) -> Self {
         Pointer::new(value)
     }
 }
 
-impl From<&Value<'_>> for Pointer {
-    fn from(value: &Value<'_>) -> Self {
-        Pointer::new(value.clone().into_owned())
+impl From<&Value> for Pointer {
+    fn from(value: &Value) -> Self {
+        Pointer::new(value.clone())
+    }
+}
+
+impl From<ValueRef<'_>> for Pointer {
+    fn from(value: ValueRef<'_>) -> Self {
+        Pointer::new(value.to_owned())
+    }
+}
+
+impl From<&ValueRef<'_>> for Pointer {
+    fn from(value: &ValueRef<'_>) -> Self {
+        Pointer::new(value.to_owned())
     }
 }
 
@@ -455,16 +478,14 @@ pub trait Namespace: Send + Sync + std::fmt::Debug + 'static {
     fn as_any(&self) -> &dyn Any;
 }
 
-pub fn is_truthy(value: &Value<'_>) -> bool {
+pub fn is_truthy(value: &ValueRef<'_>) -> bool {
     match value {
-        Value::Bool(v) => *v,
-        Value::Number(v) => v.to_f64() != 0.0,
-        Value::Str(v) => !v.is_empty(),
-        Value::Map(v) => !v.is_empty(),
-        Value::Ref(v) => is_truthy(v.value),
-        Value::Mut(v) => is_truthy(v.value),
-        Value::Dynamic(v) if v.is_sequence() => !v.is_empty(),
-        Value::Dynamic(_) => true,
-        Value::Null | Value::Undefined => false,
+        ValueRef::Bool(v) => *v,
+        ValueRef::Number(v) => v.to_f64() != 0.0,
+        ValueRef::Str(v) => !v.is_empty(),
+        ValueRef::Map(v) => !v.is_empty(),
+        ValueRef::Dynamic(v) if v.is_sequence() => !v.is_empty(),
+        ValueRef::Dynamic(_) => true,
+        ValueRef::Null | ValueRef::Undefined => false,
     }
 }

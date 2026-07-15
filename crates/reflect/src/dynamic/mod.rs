@@ -2,28 +2,38 @@ mod callable;
 mod object;
 mod sequence;
 
+use std::sync::Arc;
+
 pub use callable::*;
 pub use object::*;
 pub use sequence::*;
 
 #[derive(Debug, Clone)]
-pub enum Dynamic<'a> {
-    Object(&'a (dyn Object + 'a)),
-    Sequence(&'a (dyn Sequence + 'a)),
-    Callable(&'a (dyn Callable + 'a)),
+pub enum Dynamic {
+    Object(Arc<dyn Object>),
+    Sequence(Arc<dyn Sequence>),
+    Callable(Arc<dyn Callable>),
 }
 
-impl<'a> Dynamic<'a> {
-    pub fn from_object<T: Object + 'a>(value: &'a T) -> Self {
+impl Dynamic {
+    pub fn from_object<T: Object + 'static>(value: Arc<T>) -> Self {
         Self::Object(value)
     }
 
-    pub fn from_sequence<T: Sequence + 'a>(value: &'a T) -> Self {
+    pub fn from_sequence<T: Sequence + 'static>(value: Arc<T>) -> Self {
         Self::Sequence(value)
     }
 
-    pub fn from_callable<T: Callable + 'a>(value: &'a T) -> Self {
+    pub fn from_callable<T: Callable + 'static>(value: Arc<T>) -> Self {
         Self::Callable(value)
+    }
+
+    pub fn as_ref(&self) -> DynamicRef<'_> {
+        match self {
+            Self::Object(v) => DynamicRef::Object(v.as_ref()),
+            Self::Sequence(v) => DynamicRef::Sequence(v.as_ref()),
+            Self::Callable(v) => DynamicRef::Callable(v.as_ref()),
+        }
     }
 
     pub fn to_type(&self) -> crate::Type {
@@ -34,7 +44,7 @@ impl<'a> Dynamic<'a> {
         }
     }
 
-    pub fn call(&self, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+    pub fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Callable(v) => v.call(args),
             v => Err(format!("'{}' is not callable", v.to_type())),
@@ -64,6 +74,194 @@ impl<'a> Dynamic<'a> {
         matches!(self, Self::Callable(_))
     }
 
+    pub fn as_object(&self) -> Option<&dyn Object> {
+        match self {
+            Self::Object(v) => Some(v.as_ref()),
+            _ => None,
+        }
+    }
+
+    pub fn as_sequence(&self) -> Option<&dyn Sequence> {
+        match self {
+            Self::Sequence(v) => Some(v.as_ref()),
+            _ => None,
+        }
+    }
+
+    pub fn as_callable(&self) -> Option<&dyn Callable> {
+        match self {
+            Self::Callable(v) => Some(v.as_ref()),
+            _ => None,
+        }
+    }
+}
+
+impl crate::TypeOf for Dynamic {
+    fn type_of() -> crate::Type {
+        crate::Type::Any
+    }
+}
+
+impl crate::ToType for Dynamic {
+    fn to_type(&self) -> crate::Type {
+        match self {
+            Self::Object(v) => v.to_type(),
+            Self::Sequence(v) => v.to_type(),
+            Self::Callable(v) => v.to_type(),
+        }
+    }
+}
+
+impl crate::ToValue for Dynamic {
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Dynamic(self.as_ref())
+    }
+}
+
+impl Object for Dynamic {
+    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+        match self {
+            Self::Object(v) => v.field(name),
+            _ => crate::ValueRef::Undefined,
+        }
+    }
+
+    fn call(&self, name: &str, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
+        match self {
+            Self::Object(v) => v.call(name, args),
+            _ => Err(format!("no method '{}'", name)),
+        }
+    }
+}
+
+impl Sequence for Dynamic {
+    fn len(&self) -> usize {
+        match self {
+            Self::Sequence(v) => v.len(),
+            _ => 0,
+        }
+    }
+
+    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+        match self {
+            Self::Sequence(v) => v.index(i),
+            _ => crate::ValueRef::Undefined,
+        }
+    }
+}
+
+impl Callable for Dynamic {
+    fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
+        match self {
+            Self::Callable(v) => v.call(args),
+            v => Err(format!("'{}' is not callable", v.to_type())),
+        }
+    }
+}
+
+impl std::fmt::Display for Dynamic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ty = self.to_type();
+        write!(f, "<{}>", ty)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Dynamic {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_ref().serialize(serializer)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum DynamicRef<'a> {
+    Object(&'a (dyn Object + 'a)),
+    Sequence(&'a (dyn Sequence + 'a)),
+    Callable(&'a (dyn Callable + 'a)),
+}
+
+impl<'a> DynamicRef<'a> {
+    pub fn from_object<T: Object + 'a>(value: &'a T) -> Self {
+        Self::Object(value)
+    }
+
+    pub fn from_sequence<T: Sequence + 'a>(value: &'a T) -> Self {
+        Self::Sequence(value)
+    }
+
+    pub fn from_callable<T: Callable + 'a>(value: &'a T) -> Self {
+        Self::Callable(value)
+    }
+
+    pub fn to_type(&self) -> crate::Type {
+        match self {
+            Self::Object(v) => v.to_type(),
+            Self::Sequence(v) => v.to_type(),
+            Self::Callable(v) => v.to_type(),
+        }
+    }
+
+    pub fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
+        match self {
+            Self::Callable(v) => v.call(args),
+            v => Err(format!("'{}' is not callable", v.to_type())),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Sequence(v) => v.len(),
+            _ => 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn is_object(&self) -> bool {
+        matches!(self, Self::Object(_))
+    }
+
+    pub fn is_sequence(&self) -> bool {
+        matches!(self, Self::Sequence(_))
+    }
+
+    pub fn is_callable(&self) -> bool {
+        matches!(self, Self::Callable(_))
+    }
+
+    pub fn materialize(&self) -> crate::Value {
+        let ty = crate::MapType::new(crate::Type::Any, crate::Type::Any, crate::Type::Any);
+
+        match self {
+            Self::Callable(_) => crate::Value::Undefined,
+            Self::Object(v) => {
+                if let Some(entries) = v.entries() {
+                    return crate::Value::Map(entries);
+                }
+
+                let mut map = crate::Map::new(&ty);
+
+                if let Some(st) = v.to_type().to_struct() {
+                    for field in st.fields().iter() {
+                        let name = field.name().to_string();
+                        map.insert(crate::Value::Str(crate::Str::from(name.as_str())), v.field(&name).to_owned());
+                    }
+                }
+
+                crate::Value::Map(map)
+            }
+            Self::Sequence(v) => {
+                let data = (0..v.len()).map(|i| v.index(i).to_owned()).collect::<Vec<_>>();
+                crate::Value::Dynamic(Dynamic::from_sequence(Arc::new(OwnedSequence::new(data))))
+            }
+        }
+    }
+
     pub fn as_object(&self) -> Option<&'a (dyn Object + 'a)> {
         match self {
             Self::Object(v) => Some(*v),
@@ -86,13 +284,13 @@ impl<'a> Dynamic<'a> {
     }
 }
 
-impl<'a> crate::TypeOf for Dynamic<'a> {
+impl<'a> crate::TypeOf for DynamicRef<'a> {
     fn type_of() -> crate::Type {
         crate::Type::Any
     }
 }
 
-impl<'a> crate::ToType for Dynamic<'a> {
+impl<'a> crate::ToType for DynamicRef<'a> {
     fn to_type(&self) -> crate::Type {
         match self {
             Self::Object(v) => v.to_type(),
@@ -102,21 +300,21 @@ impl<'a> crate::ToType for Dynamic<'a> {
     }
 }
 
-impl<'a> crate::ToValue for Dynamic<'a> {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Dynamic(self.clone())
+impl<'a> crate::ToValue for DynamicRef<'a> {
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Dynamic(self.clone())
     }
 }
 
-impl<'a> Object for Dynamic<'a> {
-    fn field(&self, name: &str) -> crate::Value<'_> {
+impl<'a> Object for DynamicRef<'a> {
+    fn field(&self, name: &str) -> crate::ValueRef<'_> {
         match self {
             Self::Object(v) => v.field(name),
-            _ => crate::Value::Undefined,
+            _ => crate::ValueRef::Undefined,
         }
     }
 
-    fn call(&self, name: &str, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+    fn call(&self, name: &str, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Object(v) => v.call(name, args),
             _ => Err(format!("no method '{}'", name)),
@@ -124,7 +322,7 @@ impl<'a> Object for Dynamic<'a> {
     }
 }
 
-impl<'a> Sequence for Dynamic<'a> {
+impl<'a> Sequence for DynamicRef<'a> {
     fn len(&self) -> usize {
         match self {
             Self::Sequence(v) => v.len(),
@@ -132,16 +330,16 @@ impl<'a> Sequence for Dynamic<'a> {
         }
     }
 
-    fn index(&self, i: usize) -> crate::Value<'_> {
+    fn index(&self, i: usize) -> crate::ValueRef<'_> {
         match self {
             Self::Sequence(v) => v.index(i),
-            _ => crate::Value::Undefined,
+            _ => crate::ValueRef::Undefined,
         }
     }
 }
 
-impl<'a> Callable for Dynamic<'a> {
-    fn call(&self, args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+impl<'a> Callable for DynamicRef<'a> {
+    fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Callable(v) => v.call(args),
             v => Err(format!("'{}' is not callable", v.to_type())),
@@ -149,7 +347,7 @@ impl<'a> Callable for Dynamic<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for Dynamic<'a> {
+impl<'a> std::fmt::Display for DynamicRef<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ty = self.to_type();
         write!(f, "<{}>", ty)
@@ -157,7 +355,7 @@ impl<'a> std::fmt::Display for Dynamic<'a> {
 }
 
 #[cfg(feature = "serde")]
-impl<'a> serde::Serialize for Dynamic<'a> {
+impl<'a> serde::Serialize for DynamicRef<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -166,6 +364,16 @@ impl<'a> serde::Serialize for Dynamic<'a> {
 
         match self {
             Self::Callable(_) => serializer.serialize_none(),
+            Self::Object(v) if v.entries_by_ref().is_some() => {
+                let entries = v.entries_by_ref().unwrap();
+                let mut ser = serializer.serialize_map(Some(entries.len()))?;
+
+                for (k, val) in &entries {
+                    ser.serialize_entry(&k.to_string(), val)?;
+                }
+
+                ser.end()
+            }
             Self::Object(v) => {
                 let ty = v.to_type().to_struct();
                 let fields = ty.as_ref().map(|t| t.fields());

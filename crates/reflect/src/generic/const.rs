@@ -3,7 +3,7 @@
 pub struct ConstParam {
     pub name: String,
     pub ty: crate::Type,
-    pub default: Option<crate::Value<'static>>,
+    pub default: Option<crate::Value>,
 }
 
 impl ConstParam {
@@ -15,7 +15,7 @@ impl ConstParam {
         }
     }
 
-    pub fn with_default(self, default: &crate::Value<'static>) -> Self {
+    pub fn with_default(self, default: &crate::Value) -> Self {
         let mut next = self.clone();
         next.default = Some(default.clone());
         next
@@ -33,7 +33,7 @@ impl ConstParam {
         &self.ty
     }
 
-    pub fn default(&self) -> Option<&crate::Value<'static>> {
+    pub fn default(&self) -> Option<&crate::Value> {
         match &self.default {
             None => None,
             Some(v) => Some(v),

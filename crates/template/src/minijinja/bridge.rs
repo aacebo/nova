@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::{Enumerator, Object, ObjectRepr, ValueKind};
 use minijinja::{Error, ErrorKind, State};
-use nova_reflect::{Int, Number, Value};
+use nova_reflect::{Int, Number, Value, ValueRef};
 
 use crate::{Args, Context, KArgs, Pointer};
 
@@ -41,7 +41,7 @@ pub(crate) fn from_minijinja(value: &minijinja::Value) -> Pointer {
     }
 }
 
-fn scalar_from_minijinja(value: &minijinja::Value) -> Value<'static> {
+fn scalar_from_minijinja(value: &minijinja::Value) -> Value {
     match value.kind() {
         ValueKind::None | ValueKind::Undefined => Value::Null,
         ValueKind::Bool => Value::Bool(value.is_true()),
@@ -56,26 +56,24 @@ fn scalar_from_minijinja(value: &minijinja::Value) -> Value<'static> {
                 Value::Null
             }
         }
-        ValueKind::String => Value::Str(nova_reflect::Str(std::borrow::Cow::Owned(value.to_string()))),
+        ValueKind::String => Value::Str(nova_reflect::Str::from(value.to_string())),
         _ => Value::Null,
     }
 }
 
-pub(crate) fn to_minijinja(value: Value<'_>) -> minijinja::Value {
+pub(crate) fn to_minijinja(value: ValueRef<'_>) -> minijinja::Value {
     match value {
-        Value::Bool(v) => minijinja::Value::from(v),
-        Value::Number(v) => match v {
+        ValueRef::Bool(v) => minijinja::Value::from(v),
+        ValueRef::Number(v) => match v {
             Number::Int(Int::U64(n)) => minijinja::Value::from(n),
             Number::Int(i) => minijinja::Value::from(i.to_i128() as i64),
             Number::Float(f) => minijinja::Value::from(f.to_f64_raw()),
         },
-        Value::Str(v) => minijinja::Value::from(v.to_string()),
-        Value::Null => minijinja::Value::from(()),
-        Value::Undefined => minijinja::Value::UNDEFINED,
-        Value::Ref(v) => to_minijinja(v.value.clone()),
-        Value::Mut(v) => to_minijinja(v.value.clone()),
-        Value::Dynamic(_) => minijinja::Value::UNDEFINED,
-        other => minijinja::Value::from_object(Pointer::new(other.into_owned())),
+        ValueRef::Str(v) => minijinja::Value::from(v.to_string()),
+        ValueRef::Null => minijinja::Value::from(()),
+        ValueRef::Undefined => minijinja::Value::UNDEFINED,
+        ValueRef::Dynamic(_) => minijinja::Value::UNDEFINED,
+        other => minijinja::Value::from_object(Pointer::new(other.to_owned())),
     }
 }
 
@@ -127,9 +125,9 @@ impl Object for Pointer {
         }
 
         match self.value() {
-            Value::Map(_) => ObjectRepr::Map,
-            Value::Dynamic(d) if d.is_sequence() => ObjectRepr::Seq,
-            Value::Dynamic(d) if d.is_object() => ObjectRepr::Map,
+            ValueRef::Map(_) => ObjectRepr::Map,
+            ValueRef::Dynamic(d) if d.is_sequence() => ObjectRepr::Seq,
+            ValueRef::Dynamic(d) if d.is_object() => ObjectRepr::Map,
             _ => ObjectRepr::Plain,
         }
     }
@@ -166,8 +164,8 @@ impl Object for Pointer {
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         let value = self.value();
 
-        if let Value::Map(map) = &value {
-            let keys: Vec<minijinja::Value> = map.keys().map(|k| to_minijinja(k.clone())).collect();
+        if let ValueRef::Map(map) = &value {
+            let keys: Vec<minijinja::Value> = map.keys().map(|k| to_minijinja(k.as_ref())).collect();
             return Enumerator::Values(keys);
         }
 
@@ -201,9 +199,9 @@ impl Object for Pointer {
         let value = self.value();
 
         match &value {
-            Value::Map(map) => Some(map.len()),
-            Value::Dynamic(d) if d.is_sequence() => Some(d.len()),
-            Value::Dynamic(d) if d.is_object() => d.to_type().to_struct().map(|t| t.len()),
+            ValueRef::Map(map) => Some(map.len()),
+            ValueRef::Dynamic(d) if d.is_sequence() => Some(d.len()),
+            ValueRef::Dynamic(d) if d.is_object() => d.to_type().to_struct().map(|t| t.len()),
             _ => None,
         }
     }
@@ -248,10 +246,10 @@ impl Object for Pointer {
             .ok_or_else(|| Error::new(ErrorKind::UnknownMethod, format!("no method '{name}'")))?;
 
         let owned: Vec<Pointer> = args.iter().map(from_minijinja).collect();
-        let values: Vec<Value> = owned.iter().map(|p| p.value()).collect();
+        let values: Vec<ValueRef> = owned.iter().map(|p| p.value()).collect();
 
         nova_reflect::Object::call(object, name, &values)
-            .map(to_minijinja)
+            .map(|v| to_minijinja(v.as_ref()))
             .map_err(|e| Error::new(ErrorKind::InvalidOperation, e))
     }
 }

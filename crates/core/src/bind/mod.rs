@@ -127,10 +127,19 @@ impl PartialEq<&Pointer> for Binding {
     }
 }
 
-impl PartialEq<nova_reflect::Value<'_>> for Binding {
-    fn eq(&self, other: &nova_reflect::Value<'_>) -> bool {
+impl PartialEq<nova_reflect::ValueRef<'_>> for Binding {
+    fn eq(&self, other: &nova_reflect::ValueRef<'_>) -> bool {
         match self.as_value() {
             Some(value) => value.value() == *other,
+            None => false,
+        }
+    }
+}
+
+impl PartialEq<nova_reflect::Value> for Binding {
+    fn eq(&self, other: &nova_reflect::Value) -> bool {
+        match self.as_value() {
+            Some(value) => value.value() == other.as_ref(),
             None => false,
         }
     }

@@ -217,7 +217,7 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
     runtime.call("caller", args!(n = 1)).unwrap();
     let recorded = seen.lock().unwrap();
     assert_eq!(recorded.len(), 1);
-    assert_eq!(recorded[0].get("n").map(|v| v.value()), Some(Value::from(2)));
+    assert_eq!(recorded[0].get("n").map(|v| v.value().to_owned()), Some(Value::from(2)));
 }
 
 #[test]

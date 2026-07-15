@@ -19,10 +19,10 @@ impl<T> crate::ToType for Option<T> {
 }
 
 impl<T: crate::ToValue> crate::ToValue for Option<T> {
-    fn to_value(&self) -> crate::Value<'_> {
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
         match self {
-            None => crate::Value::Null,
-            Some(v) => v.to_value(),
+            None => crate::ValueRef::Null,
+            Some(v) => v.to_value_ref(),
         }
     }
 }

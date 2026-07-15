@@ -59,7 +59,7 @@ impl Routine {
         let mut instance = nova_reflect::Map::new(&ty);
 
         for (key, value) in args.iter() {
-            instance.insert(key.into_owned(), value.into_owned());
+            instance.insert(key, value.to_owned());
         }
 
         let instance = nova_reflect::Value::Map(instance);

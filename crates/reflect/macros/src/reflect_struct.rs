@@ -40,23 +40,23 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
         }
 
         impl ::nova_reflect::ToValue for #name {
-            fn to_value(&self) -> ::nova_reflect::Value<'_> {
-                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(self))
+            fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
+                ::nova_reflect::ValueRef::Dynamic(::nova_reflect::DynamicRef::from_object(self))
             }
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &str) -> ::nova_reflect::Value<'_> {
+            fn field(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
                 #(#arms)*
 
-                ::nova_reflect::Value::Undefined
+                ::nova_reflect::ValueRef::Undefined
             }
 
             fn call(
                 &self,
                 name: &str,
-                args: &[::nova_reflect::Value],
-            ) -> ::std::result::Result<::nova_reflect::Value<'_>, ::std::string::String> {
+                args: &[::nova_reflect::ValueRef],
+            ) -> ::std::result::Result<::nova_reflect::Value, ::std::string::String> {
                 #[allow(unused_imports)]
                 use ::nova_reflect::Methods as _;
 
@@ -78,12 +78,12 @@ fn field_arms(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
                     parse::FieldAttr::Ignore => None,
                     parse::FieldAttr::Alias(alias) => Some(quote! {
                         if name == #alias {
-                            return ::nova_reflect::ToValue::to_value(&self.#ident);
+                            return ::nova_reflect::ToValue::to_value_ref(&self.#ident);
                         }
                     }),
                     parse::FieldAttr::Default => Some(quote! {
                         if name == stringify!(#ident) {
-                            return ::nova_reflect::ToValue::to_value(&self.#ident);
+                            return ::nova_reflect::ToValue::to_value_ref(&self.#ident);
                         }
                     }),
                 }
@@ -103,7 +103,7 @@ fn field_arms(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
 
                 Some(quote! {
                     if name == #key {
-                        return ::nova_reflect::ToValue::to_value(&self.#index);
+                        return ::nova_reflect::ToValue::to_value_ref(&self.#index);
                     }
                 })
             })
@@ -141,23 +141,23 @@ pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
         }
 
         impl ::nova_reflect::ToValue for #name {
-            fn to_value(&self) -> ::nova_reflect::Value<'_> {
-                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(self))
+            fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
+                ::nova_reflect::ValueRef::Dynamic(::nova_reflect::DynamicRef::from_object(self))
             }
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &str) -> ::nova_reflect::Value<'_> {
+            fn field(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
                 #(#arms)*
 
-                ::nova_reflect::Value::Undefined
+                ::nova_reflect::ValueRef::Undefined
             }
 
             fn call(
                 &self,
                 name: &str,
-                args: &[::nova_reflect::Value],
-            ) -> ::std::result::Result<::nova_reflect::Value<'_>, ::std::string::String> {
+                args: &[::nova_reflect::ValueRef],
+            ) -> ::std::result::Result<::nova_reflect::Value, ::std::string::String> {
                 #[allow(unused_imports)]
                 use ::nova_reflect::Methods as _;
 

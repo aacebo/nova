@@ -185,8 +185,8 @@ where
     A: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
     B: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
 {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Dynamic(crate::Dynamic::from_object(self))
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Dynamic(crate::DynamicRef::from_object(self))
     }
 }
 
@@ -195,11 +195,11 @@ where
     A: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
     B: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
 {
-    fn field(&self, name: &str) -> crate::Value<'_> {
+    fn field(&self, name: &str) -> crate::ValueRef<'_> {
         match name {
-            "0" => self.0.to_value(),
-            "1" => self.1.to_value(),
-            _ => crate::Value::Undefined,
+            "0" => self.0.to_value_ref(),
+            "1" => self.1.to_value_ref(),
+            _ => crate::ValueRef::Undefined,
         }
     }
 }

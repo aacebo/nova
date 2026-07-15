@@ -1,5 +1,5 @@
 use nova_core::Function;
-use nova_reflect::Value;
+use nova_reflect::{Value, ValueRef};
 use nova_template::{FromArgs, Namespace, Pointer};
 
 pub trait FileSystem {
@@ -61,7 +61,7 @@ impl FromArgs for WriteArgs {
     }
 }
 
-fn to_bytes(value: &Value<'_>) -> Option<Vec<u8>> {
+fn to_bytes(value: &ValueRef<'_>) -> Option<Vec<u8>> {
     if let Some(text) = value.as_str() {
         return Some(text.as_bytes().to_vec());
     }

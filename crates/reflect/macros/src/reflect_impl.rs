@@ -41,8 +41,8 @@ pub fn attr(item: &syn::ItemImpl) -> proc_macro2::TokenStream {
             pub fn call_method(
                 &self,
                 name: &str,
-                args: &[::nova_reflect::Value],
-            ) -> ::std::result::Result<::nova_reflect::Value<'static>, ::std::string::String> {
+                args: &[::nova_reflect::ValueRef],
+            ) -> ::std::result::Result<::nova_reflect::Value, ::std::string::String> {
                 match name {
                     #(#dispatch)*
                     _ => ::std::result::Result::Err(::std::format!("no method '{}'", name)),
@@ -66,8 +66,8 @@ impl MemberMethod {
         let bindings = self.params.iter().enumerate().map(|(i, ty)| {
             let var = quote::format_ident!("a{}", i);
             quote! {
-                let #var = <#ty as ::std::convert::TryFrom<::nova_reflect::Value>>::try_from(
-                    args.get(#i).cloned().unwrap_or(::nova_reflect::Value::Undefined)
+                let #var = <#ty as ::std::convert::TryFrom<::nova_reflect::ValueRef>>::try_from(
+                    args.get(#i).cloned().unwrap_or(::nova_reflect::ValueRef::Undefined)
                 )?;
             }
         });

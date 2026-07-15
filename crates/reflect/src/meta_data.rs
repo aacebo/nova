@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
-pub struct MetaData(BTreeMap<String, Arc<crate::Value<'static>>>);
+pub struct MetaData(BTreeMap<String, Arc<crate::Value>>);
 
 impl MetaData {
     pub fn new() -> Self {
@@ -18,7 +18,7 @@ impl MetaData {
         self.0.is_empty()
     }
 
-    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, String, Arc<crate::Value<'static>>> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, String, Arc<crate::Value>> {
         self.0.iter()
     }
 
@@ -26,7 +26,7 @@ impl MetaData {
         self.0.contains_key(key)
     }
 
-    pub fn get(&self, key: &str) -> Option<&crate::Value<'static>> {
+    pub fn get(&self, key: &str) -> Option<&crate::Value> {
         self.0.get(key).map(Arc::as_ref)
     }
 
@@ -39,7 +39,7 @@ impl MetaData {
     }
 }
 
-impl<const N: usize, V: Into<crate::Value<'static>>> From<[(&str, V); N]> for MetaData {
+impl<const N: usize, V: Into<crate::Value>> From<[(&str, V); N]> for MetaData {
     fn from(items: [(&str, V); N]) -> Self {
         let mut data = BTreeMap::new();
 
@@ -52,7 +52,7 @@ impl<const N: usize, V: Into<crate::Value<'static>>> From<[(&str, V); N]> for Me
 }
 
 impl std::ops::Index<&str> for MetaData {
-    type Output = crate::Value<'static>;
+    type Output = crate::Value;
 
     fn index(&self, index: &str) -> &Self::Output {
         self.get(index).unwrap()
@@ -93,13 +93,13 @@ impl crate::ToType for MetaData {
 }
 
 impl crate::ToValue for MetaData {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Dynamic(crate::Dynamic::from_object(self))
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Dynamic(crate::DynamicRef::from_object(self))
     }
 }
 
 impl crate::Object for MetaData {
-    fn field(&self, name: &str) -> crate::Value<'_> {
-        self.get(name).cloned().unwrap_or(crate::Value::Undefined)
+    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+        self.get(name).map(crate::Value::as_ref).unwrap_or(crate::ValueRef::Undefined)
     }
 }

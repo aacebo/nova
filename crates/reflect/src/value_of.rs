@@ -1,20 +1,19 @@
 #[macro_export]
 macro_rules! value_of {
-    [$value:expr] => {
-        $crate::ToValue::to_value(&$value)
+    (&$value:expr) => {
+        $crate::ToValue::to_value_ref(&$value)
     };
-    ($($anything:tt)*) => {
-        $crate::value_of!($($anything)*)
+    ($value:expr) => {
+        $crate::ToValue::to_value(&$value)
     };
 }
 
-/// ## ToValue
-///
-/// implemented by types that can reflect their value.
-/// The lifetime `'a` ties the returned [`Value`] to the borrow of `self`,
-/// allowing string/slice data to be borrowed rather than cloned.
 pub trait ToValue {
-    fn to_value(&self) -> crate::Value<'_>;
+    fn to_value_ref(&self) -> crate::ValueRef<'_>;
+
+    fn to_value(&self) -> crate::Value {
+        self.to_value_ref().to_owned()
+    }
 }
 
 #[cfg(feature = "serde")]
@@ -23,7 +22,7 @@ impl serde::Serialize for dyn ToValue {
     where
         S: serde::Serializer,
     {
-        self.to_value().serialize(serializer)
+        self.to_value_ref().serialize(serializer)
     }
 }
 

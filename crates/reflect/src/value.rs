@@ -1,40 +1,28 @@
 use crate::ToType;
 
 #[derive(Debug, Clone)]
-pub enum Value<'a> {
+pub enum Value {
     Bool(bool),
     Number(crate::Number),
-    Str(crate::Str<'a>),
-    Map(crate::Map<'a>),
-    Mut(crate::Mut<'a>),
-    Ref(crate::Ref<'a>),
-    Dynamic(crate::Dynamic<'a>),
+    Str(crate::Str),
+    Map(crate::Map),
+    Dynamic(crate::Dynamic),
     Null,
     Undefined,
 }
 
-impl<'a> Value<'a> {
-    pub const UNDEFINED: Value<'static> = Value::Undefined;
+impl Value {
+    pub const UNDEFINED: Value = Value::Undefined;
 
-    pub fn into_owned(self) -> Value<'static> {
+    pub fn as_ref(&self) -> ValueRef<'_> {
         match self {
-            Self::Bool(v) => Value::Bool(v),
-            Self::Number(v) => Value::Number(v),
-            Self::Str(v) => Value::Str(crate::Str(std::borrow::Cow::Owned(v.0.into_owned()))),
-            Self::Null => Value::Null,
-            Self::Undefined => Value::Undefined,
-            Self::Map(v) => {
-                let mut map = crate::Map::new(&v.ty);
-
-                for (k, val) in v.data {
-                    map.insert(k.into_owned(), val.into_owned());
-                }
-
-                Value::Map(map)
-            }
-            Self::Ref(v) => v.value.clone().into_owned(),
-            Self::Mut(v) => v.value.clone().into_owned(),
-            Self::Dynamic(_) => Value::Undefined,
+            Self::Bool(v) => ValueRef::Bool(*v),
+            Self::Number(v) => ValueRef::Number(*v),
+            Self::Str(v) => ValueRef::Str(v.as_ref()),
+            Self::Map(v) => ValueRef::Map(v),
+            Self::Dynamic(v) => ValueRef::Dynamic(v.as_ref()),
+            Self::Null => ValueRef::Null,
+            Self::Undefined => ValueRef::Undefined,
         }
     }
 
@@ -44,8 +32,6 @@ impl<'a> Value<'a> {
             Self::Number(v) => v.to_type(),
             Self::Str(v) => v.to_type(),
             Self::Map(v) => v.to_type(),
-            Self::Mut(v) => v.to_type(),
-            Self::Ref(v) => v.to_type(),
             Self::Dynamic(v) => v.to_type(),
             Self::Null | Self::Undefined => crate::Type::Void,
         }
@@ -55,8 +41,6 @@ impl<'a> Value<'a> {
         match self {
             Self::Map(v) => v.len(),
             Self::Str(v) => v.len(),
-            Self::Mut(v) => v.len(),
-            Self::Ref(v) => v.len(),
             Self::Dynamic(v) if v.is_sequence() => v.len(),
             _ => 0,
         }
@@ -66,25 +50,11 @@ impl<'a> Value<'a> {
         self.len() == 0
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Self> {
-        match self {
-            Self::Mut(v) => v.iter(),
-            Self::Ref(v) => v.iter(),
-            _ => [].iter(),
-        }
-    }
-
     pub fn is_bool(&self) -> bool {
         matches!(self, Self::Bool(_))
     }
     pub fn is_number(&self) -> bool {
         matches!(self, Self::Number(_))
-    }
-    pub fn is_mut(&self) -> bool {
-        matches!(self, Self::Mut(_))
-    }
-    pub fn is_ref(&self) -> bool {
-        matches!(self, Self::Ref(_))
     }
     pub fn is_str(&self) -> bool {
         matches!(self, Self::Str(_))
@@ -105,8 +75,6 @@ impl<'a> Value<'a> {
     pub fn as_bool(&self) -> Option<&bool> {
         match self {
             Self::Bool(v) => Some(v),
-            Self::Ref(v) => v.as_bool(),
-            Self::Mut(v) => v.as_bool(),
             _ => None,
         }
     }
@@ -114,29 +82,25 @@ impl<'a> Value<'a> {
     pub fn as_number(&self) -> Option<&crate::Number> {
         match self {
             Self::Number(v) => Some(v),
-            Self::Ref(v) => v.as_number(),
-            Self::Mut(v) => v.as_number(),
             _ => None,
         }
     }
 
-    pub fn as_str(&self) -> Option<&crate::Str<'a>> {
+    pub fn as_str(&self) -> Option<&crate::Str> {
         match self {
             Self::Str(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_dynamic(&self) -> Option<&crate::Dynamic<'a>> {
+    pub fn as_dynamic(&self) -> Option<&crate::Dynamic> {
         match self {
             Self::Dynamic(v) => Some(v),
-            Self::Ref(v) => v.as_dynamic(),
-            Self::Mut(v) => v.as_dynamic(),
             _ => None,
         }
     }
 
-    pub fn as_map(&self) -> Option<&crate::Map<'a>> {
+    pub fn as_map(&self) -> Option<&crate::Map> {
         match self {
             Self::Map(v) => Some(v),
             _ => None,
@@ -151,75 +115,62 @@ impl<'a> Value<'a> {
         self.as_number().copied()
     }
 
-    pub fn to_mut(&self) -> Option<crate::Mut<'a>> {
-        match self {
-            Self::Mut(v) => Some(v.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn to_ref(&self) -> Option<crate::Ref<'a>> {
-        match self {
-            Self::Ref(v) => Some(v.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn to_str(&self) -> Option<crate::Str<'a>> {
+    pub fn to_str(&self) -> Option<crate::Str> {
         self.as_str().cloned()
     }
 
-    pub fn to_dynamic(&self) -> Option<crate::Dynamic<'a>> {
+    pub fn to_dynamic(&self) -> Option<crate::Dynamic> {
         self.as_dynamic().cloned()
     }
 
-    pub fn to_map(&self) -> Option<crate::Map<'a>> {
+    pub fn to_map(&self) -> Option<crate::Map> {
         self.as_map().cloned()
     }
 }
 
-impl<'a> AsRef<Value<'a>> for Value<'a> {
-    fn as_ref(&self) -> &Value<'a> {
+impl AsRef<Value> for Value {
+    fn as_ref(&self) -> &Value {
         self
     }
 }
 
-impl<'a> crate::TypeOf for Value<'a> {
+impl<'a> From<ValueRef<'a>> for Value {
+    fn from(value: ValueRef<'a>) -> Self {
+        value.to_owned()
+    }
+}
+
+impl<'a> From<&ValueRef<'a>> for Value {
+    fn from(value: &ValueRef<'a>) -> Self {
+        value.to_owned()
+    }
+}
+
+impl crate::TypeOf for Value {
     fn type_of() -> crate::Type {
         crate::Type::Any
     }
 }
 
-impl<'a> crate::ToType for Value<'a> {
+impl crate::ToType for Value {
     fn to_type(&self) -> crate::Type {
-        match self {
-            Self::Bool(v) => v.to_type(),
-            Self::Number(v) => v.to_type(),
-            Self::Str(v) => v.to_type(),
-            Self::Map(v) => v.to_type(),
-            Self::Mut(v) => v.to_type(),
-            Self::Ref(v) => v.to_type(),
-            Self::Dynamic(v) => v.to_type(),
-            Self::Null | Self::Undefined => crate::Type::Void,
-        }
+        Value::to_type(self)
     }
 }
 
-impl<'a> crate::ToValue for Value<'a> {
-    fn to_value(&self) -> crate::Value<'_> {
-        self.clone()
+impl crate::ToValue for Value {
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        self.as_ref()
     }
 }
 
-impl<'a> PartialEq for Value<'a> {
+impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match self {
             Self::Bool(v) => other.as_bool() == Some(v),
             Self::Number(v) => other.as_number() == Some(v),
             Self::Str(v) => other.as_str() == Some(v),
             Self::Map(v) => other.as_map() == Some(v),
-            Self::Mut(v) => other.to_mut().as_ref() == Some(v),
-            Self::Ref(v) => other.to_ref().as_ref() == Some(v),
             Self::Null => other.is_null(),
             Self::Undefined => other.is_undefined(),
             _ => false,
@@ -227,36 +178,24 @@ impl<'a> PartialEq for Value<'a> {
     }
 }
 
-impl<'a> PartialEq<dyn crate::ToValue> for Value<'a> {
-    fn eq(&self, other: &dyn crate::ToValue) -> bool {
-        self.eq(&other.to_value())
+impl<'a> PartialEq<ValueRef<'a>> for Value {
+    fn eq(&self, other: &ValueRef<'a>) -> bool {
+        self.as_ref() == *other
     }
 }
 
-impl<'a> std::ops::Index<usize> for Value<'a> {
+impl std::ops::Index<&str> for Value {
     type Output = Self;
 
-    fn index(&self, _index: usize) -> &Self::Output {
+    fn index(&self, index: &str) -> &Self::Output {
         match self {
-            Self::Ref(v) => v.index(_index),
-            Self::Mut(v) => v.index(_index),
+            Self::Map(v) => v.index(&Value::Str(crate::Str::from(index))),
             _ => &Value::UNDEFINED,
         }
     }
 }
 
-impl<'a> std::ops::Index<&'a str> for Value<'a> {
-    type Output = Self;
-
-    fn index(&self, index: &'a str) -> &Self::Output {
-        match self {
-            Self::Map(v) => v.index(&crate::Value::Str(crate::Str(std::borrow::Cow::Borrowed(index)))),
-            _ => &Value::UNDEFINED,
-        }
-    }
-}
-
-impl<'a> std::ops::Index<&Self> for Value<'a> {
+impl std::ops::Index<&Self> for Value {
     type Output = Self;
 
     fn index(&self, index: &Self) -> &Self::Output {
@@ -267,15 +206,13 @@ impl<'a> std::ops::Index<&Self> for Value<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for Value<'a> {
+impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Bool(v) => write!(f, "{}", v),
             Self::Number(v) => write!(f, "{}", v),
             Self::Str(v) => write!(f, "{}", v),
             Self::Map(v) => write!(f, "{}", v),
-            Self::Mut(v) => write!(f, "{}", v),
-            Self::Ref(v) => write!(f, "{}", v),
             Self::Dynamic(v) => write!(f, "{}", v),
             Self::Null => write!(f, "<null>"),
             Self::Undefined => write!(f, "<undefined>"),
@@ -283,20 +220,14 @@ impl<'a> std::fmt::Display for Value<'a> {
     }
 }
 
-impl<'a> Eq for Value<'a> {}
+impl Eq for Value {}
 
-impl<'a> Ord for Value<'a> {
+impl Ord for Value {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::ops::Deref;
-
         let ord = match (self, other) {
             (Self::Bool(a), Self::Bool(b)) => a.partial_cmp(b),
             (Self::Number(a), Self::Number(b)) => a.partial_cmp(b),
             (Self::Str(a), Self::Str(b)) => a.0.partial_cmp(&b.0),
-            (Self::Mut(a), _) => a.deref().partial_cmp(other),
-            (Self::Ref(a), _) => a.deref().partial_cmp(other),
-            (_, Self::Mut(b)) => self.partial_cmp(b.deref()),
-            (_, Self::Ref(b)) => self.partial_cmp(b.deref()),
             _ => None,
         };
 
@@ -304,22 +235,247 @@ impl<'a> Ord for Value<'a> {
     }
 }
 
-impl<'a> PartialOrd for Value<'a> {
+impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'a> serde::Serialize for Value<'a> {
+impl serde::Serialize for Value {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Bool(v) => v.serialize(s),
             Self::Number(v) => v.serialize(s),
-            Self::Str(v) => v.0.serialize(s),
+            Self::Str(v) => v.serialize(s),
             Self::Map(v) => v.serialize(s),
-            Self::Mut(v) => v.value.serialize(s),
-            Self::Ref(v) => v.value.serialize(s),
+            Self::Dynamic(v) => v.serialize(s),
+            Self::Null | Self::Undefined => s.serialize_none(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ValueRef<'a> {
+    Bool(bool),
+    Number(crate::Number),
+    Str(&'a str),
+    Map(&'a crate::Map),
+    Dynamic(crate::DynamicRef<'a>),
+    Null,
+    Undefined,
+}
+
+impl<'a> ValueRef<'a> {
+    pub const UNDEFINED: ValueRef<'static> = ValueRef::Undefined;
+
+    pub fn to_owned(&self) -> Value {
+        match self {
+            Self::Bool(v) => Value::Bool(*v),
+            Self::Number(v) => Value::Number(*v),
+            Self::Str(v) => Value::Str(crate::Str::from(*v)),
+            Self::Map(v) => Value::Map((*v).clone()),
+            Self::Null => Value::Null,
+            Self::Undefined => Value::Undefined,
+            Self::Dynamic(v) => v.materialize(),
+        }
+    }
+
+    pub fn to_type(&self) -> crate::Type {
+        match self {
+            Self::Bool(v) => v.to_type(),
+            Self::Number(v) => v.to_type(),
+            Self::Str(_) => crate::Type::Str(crate::StrType),
+            Self::Map(v) => v.to_type(),
+            Self::Dynamic(v) => v.to_type(),
+            Self::Null | Self::Undefined => crate::Type::Void,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Map(v) => v.len(),
+            Self::Str(v) => v.len(),
+            Self::Dynamic(v) if v.is_sequence() => v.len(),
+            _ => 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Self::Bool(_))
+    }
+    pub fn is_number(&self) -> bool {
+        matches!(self, Self::Number(_))
+    }
+    pub fn is_str(&self) -> bool {
+        matches!(self, Self::Str(_))
+    }
+    pub fn is_map(&self) -> bool {
+        matches!(self, Self::Map(_))
+    }
+    pub fn is_dynamic(&self) -> bool {
+        matches!(self, Self::Dynamic(_))
+    }
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+    pub fn is_undefined(&self) -> bool {
+        matches!(self, Self::Undefined)
+    }
+
+    pub fn as_bool(&self) -> Option<&bool> {
+        match self {
+            Self::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_number(&self) -> Option<&crate::Number> {
+        match self {
+            Self::Number(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&'a str> {
+        match self {
+            Self::Str(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub fn as_dynamic(&self) -> Option<crate::DynamicRef<'a>> {
+        match self {
+            Self::Dynamic(v) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn as_map(&self) -> Option<&'a crate::Map> {
+        match self {
+            Self::Map(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub fn to_bool(&self) -> Option<bool> {
+        self.as_bool().copied()
+    }
+
+    pub fn to_number(&self) -> Option<crate::Number> {
+        self.as_number().copied()
+    }
+
+    pub fn to_str(&self) -> Option<String> {
+        self.as_str().map(|v| v.to_string())
+    }
+
+    pub fn to_dynamic(&self) -> Option<crate::DynamicRef<'a>> {
+        self.as_dynamic()
+    }
+
+    pub fn to_map(&self) -> Option<crate::Map> {
+        self.as_map().cloned()
+    }
+}
+
+impl<'a> AsRef<ValueRef<'a>> for ValueRef<'a> {
+    fn as_ref(&self) -> &ValueRef<'a> {
+        self
+    }
+}
+
+impl<'a> crate::TypeOf for ValueRef<'a> {
+    fn type_of() -> crate::Type {
+        crate::Type::Any
+    }
+}
+
+impl<'a> crate::ToType for ValueRef<'a> {
+    fn to_type(&self) -> crate::Type {
+        ValueRef::to_type(self)
+    }
+}
+
+impl<'a> crate::ToValue for ValueRef<'a> {
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        self.clone()
+    }
+}
+
+impl<'a> PartialEq for ValueRef<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Self::Bool(v) => other.as_bool() == Some(v),
+            Self::Number(v) => other.as_number() == Some(v),
+            Self::Str(v) => other.as_str() == Some(*v),
+            Self::Map(v) => other.as_map() == Some(*v),
+            Self::Null => other.is_null(),
+            Self::Undefined => other.is_undefined(),
+            _ => false,
+        }
+    }
+}
+
+impl<'a> PartialEq<Value> for ValueRef<'a> {
+    fn eq(&self, other: &Value) -> bool {
+        *self == other.as_ref()
+    }
+}
+
+impl<'a> PartialEq<dyn crate::ToValue> for ValueRef<'a> {
+    fn eq(&self, other: &dyn crate::ToValue) -> bool {
+        self.eq(&other.to_value())
+    }
+}
+
+impl<'a> std::fmt::Display for ValueRef<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bool(v) => write!(f, "{}", v),
+            Self::Number(v) => write!(f, "{}", v),
+            Self::Str(v) => write!(f, "{}", v),
+            Self::Map(v) => write!(f, "{}", v),
+            Self::Dynamic(v) => write!(f, "{}", v),
+            Self::Null => write!(f, "<null>"),
+            Self::Undefined => write!(f, "<undefined>"),
+        }
+    }
+}
+
+impl<'a> Eq for ValueRef<'a> {}
+
+impl<'a> Ord for ValueRef<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let ord = match (self, other) {
+            (Self::Bool(a), Self::Bool(b)) => a.partial_cmp(b),
+            (Self::Number(a), Self::Number(b)) => a.partial_cmp(b),
+            (Self::Str(a), Self::Str(b)) => a.partial_cmp(b),
+            _ => None,
+        };
+
+        ord.unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl<'a> PartialOrd for ValueRef<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'a> serde::Serialize for ValueRef<'a> {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Bool(v) => v.serialize(s),
+            Self::Number(v) => v.serialize(s),
+            Self::Str(v) => v.serialize(s),
+            Self::Map(v) => v.serialize(s),
             Self::Dynamic(v) => v.serialize(s),
             Self::Null | Self::Undefined => s.serialize_none(),
         }

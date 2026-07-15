@@ -4,9 +4,46 @@
 /// and the values of their individual elements
 pub trait Sequence: std::fmt::Debug + Send + Sync + crate::ToType {
     fn len(&self) -> usize;
-    fn index(&self, i: usize) -> crate::Value<'_>;
+    fn index(&self, i: usize) -> crate::ValueRef<'_>;
     fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OwnedSequence {
+    ty: crate::Type,
+    data: Vec<crate::Value>,
+}
+
+impl OwnedSequence {
+    pub fn new(data: Vec<crate::Value>) -> Self {
+        let elem = data.first().map(crate::ToType::to_type).unwrap_or(crate::Type::Any);
+        let ty = crate::Type::Slice(crate::SliceType {
+            ty: std::sync::Arc::new(elem),
+            capacity: None,
+        });
+
+        Self { ty, data }
+    }
+}
+
+impl crate::ToType for OwnedSequence {
+    fn to_type(&self) -> crate::Type {
+        self.ty.clone()
+    }
+}
+
+impl Sequence for OwnedSequence {
+    fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+        match self.data.get(i) {
+            Some(v) => v.as_ref(),
+            None => crate::ValueRef::Null,
+        }
     }
 }
 
@@ -47,8 +84,8 @@ impl<T> crate::ToValue for Vec<T>
 where
     T: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Dynamic(crate::Dynamic::from_sequence(self))
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Dynamic(crate::DynamicRef::from_sequence(self))
     }
 }
 
@@ -60,10 +97,10 @@ where
         self.len()
     }
 
-    fn index(&self, i: usize) -> crate::Value<'_> {
+    fn index(&self, i: usize) -> crate::ValueRef<'_> {
         match self.get(i) {
-            None => crate::Value::Null,
-            Some(v) => v.to_value(),
+            None => crate::ValueRef::Null,
+            Some(v) => v.to_value_ref(),
         }
     }
 }
@@ -76,10 +113,10 @@ where
         N
     }
 
-    fn index(&self, i: usize) -> crate::Value<'_> {
+    fn index(&self, i: usize) -> crate::ValueRef<'_> {
         match self.get(i) {
-            None => crate::Value::Null,
-            Some(v) => v.to_value(),
+            None => crate::ValueRef::Null,
+            Some(v) => v.to_value_ref(),
         }
     }
 }
@@ -88,19 +125,19 @@ impl<const N: usize, T> crate::ToValue for [T; N]
 where
     T: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Dynamic(crate::Dynamic::from_sequence(self))
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Dynamic(crate::DynamicRef::from_sequence(self))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{Dynamic, ToValue};
+    use crate::{DynamicRef, ToValue};
 
     #[test]
     pub fn vec_sequence_index_returns_element() {
         let vec = vec![10_i32, 20, 30];
-        let dynamic = Dynamic::from_sequence(&vec);
+        let dynamic = DynamicRef::from_sequence(&vec);
 
         assert_eq!(dynamic.len(), 3);
         assert_eq!(dynamic.as_sequence().unwrap().index(1).to_i32(), Some(20));

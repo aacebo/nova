@@ -12,7 +12,7 @@ where
 }
 
 impl<T: crate::ToValue> crate::ToValue for std::sync::Arc<T> {
-    fn to_value(&self) -> crate::Value<'_> {
-        self.as_ref().to_value()
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        self.as_ref().to_value_ref()
     }
 }

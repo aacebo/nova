@@ -4,7 +4,25 @@ macro_rules! float {
         /// Value: Implementations
         ///
 
-        impl crate::Value<'_> {
+        impl crate::ValueRef<'_> {
+            pub fn is_float(&self) -> bool {
+                return match self {
+                    Self::Number(v) => v.is_float(),
+                    _ => false,
+                };
+            }
+
+            $(
+                pub fn $is_type(&self) -> bool {
+                    return match self {
+                        Self::Number(v) => v.$is_type(),
+                        _ => false,
+                    };
+                }
+            )*
+        }
+
+        impl crate::Value {
             pub fn is_float(&self) -> bool {
                 return match self {
                     Self::Number(v) => v.is_float(),
@@ -24,28 +42,44 @@ macro_rules! float {
 
         $(
             impl crate::ToValue for $type {
-                fn to_value(&self) -> crate::Value<'static> {
-                    return crate::Value::Number(crate::Number::Float(crate::Float::$name(*self)));
+                fn to_value_ref(&self) -> crate::ValueRef<'static> {
+                    return crate::ValueRef::Number(crate::Number::Float(crate::Float::$name(*self)));
                 }
             }
 
-            impl From<$type> for crate::Value<'static> {
+            impl From<$type> for crate::Value {
                 fn from(value: $type) -> Self {
                     return Self::Number(crate::Number::Float(crate::Float::$name(value)));
                 }
             }
 
-            impl TryFrom<crate::Value<'_>> for $type {
+            impl<'a> From<$type> for crate::ValueRef<'a> {
+                fn from(value: $type) -> Self {
+                    return Self::Number(crate::Number::Float(crate::Float::$name(value)));
+                }
+            }
+
+            impl TryFrom<crate::ValueRef<'_>> for $type {
                 type Error = String;
 
-                fn try_from(value: crate::Value<'_>) -> Result<Self, Self::Error> {
+                fn try_from(value: crate::ValueRef<'_>) -> Result<Self, Self::Error> {
                     return value.$to_type().ok_or_else(|| {
                         format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
                     });
                 }
             }
 
-            impl AsRef<$type> for crate::Value<'_> {
+            impl TryFrom<crate::Value> for $type {
+                type Error = String;
+
+                fn try_from(value: crate::Value) -> Result<Self, Self::Error> {
+                    return value.$to_type().ok_or_else(|| {
+                        format!("cannot convert '{}' to '{}'", value.to_type(), stringify!($type))
+                    });
+                }
+            }
+
+            impl AsRef<$type> for crate::ValueRef<'_> {
                 fn as_ref(&self) -> &$type {
                     return match self {
                         Self::Number(v) => AsRef::<$type>::as_ref(v),
@@ -54,7 +88,7 @@ macro_rules! float {
                 }
             }
 
-            impl AsMut<$type> for crate::Value<'_> {
+            impl AsMut<$type> for crate::ValueRef<'_> {
                 fn as_mut(&mut self) -> &mut $type {
                     return match self {
                         Self::Number(v) => AsMut::<$type>::as_mut(v),
@@ -169,8 +203,8 @@ macro_rules! float {
         }
 
         impl crate::ToValue for crate::Float {
-            fn to_value(&self) -> crate::Value<'static> {
-                return crate::Value::Number(crate::Number::Float(*self));
+            fn to_value_ref(&self) -> crate::ValueRef<'static> {
+                return crate::ValueRef::Number(crate::Number::Float(*self));
             }
         }
 
@@ -208,7 +242,13 @@ macro_rules! float {
             }
         )*
 
-        impl PartialEq<crate::Value<'_>> for crate::Float {
+        impl PartialEq<crate::ValueRef<'_>> for crate::Float {
+            fn eq(&self, other: &crate::ValueRef) -> bool {
+                return other.as_number().and_then(|n| n.as_float()) == Some(self);
+            }
+        }
+
+        impl PartialEq<crate::Value> for crate::Float {
             fn eq(&self, other: &crate::Value) -> bool {
                 return other.as_number().and_then(|n| n.as_float()) == Some(self);
             }

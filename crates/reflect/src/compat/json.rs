@@ -1,18 +1,24 @@
 use crate::Value;
 
-impl From<&Value<'_>> for serde_json::Value {
-    fn from(value: &Value<'_>) -> Self {
+impl From<&Value> for serde_json::Value {
+    fn from(value: &Value) -> Self {
         serde_json::to_value(value).unwrap_or(serde_json::Value::Null)
     }
 }
 
-impl From<Value<'_>> for serde_json::Value {
-    fn from(value: Value<'_>) -> Self {
+impl From<Value> for serde_json::Value {
+    fn from(value: Value) -> Self {
         Self::from(&value)
     }
 }
 
-impl From<serde_json::Value> for Value<'static> {
+impl<'a> From<&crate::ValueRef<'a>> for serde_json::Value {
+    fn from(value: &crate::ValueRef<'a>) -> Self {
+        serde_json::to_value(value).unwrap_or(serde_json::Value::Null)
+    }
+}
+
+impl From<serde_json::Value> for Value {
     fn from(value: serde_json::Value) -> Self {
         match value {
             serde_json::Value::Null => Value::Null,
@@ -28,7 +34,7 @@ impl From<serde_json::Value> for Value<'static> {
                     Value::Null
                 }
             }
-            serde_json::Value::String(s) => Value::Str(crate::Str(std::borrow::Cow::Owned(s))),
+            serde_json::Value::String(s) => Value::Str(crate::Str::from(s)),
             serde_json::Value::Array(items) => {
                 let ty = crate::MapType::new(crate::Type::Any, crate::Type::Any, crate::Type::Any);
                 let mut map = crate::Map::new(&ty);
@@ -47,7 +53,7 @@ impl From<serde_json::Value> for Value<'static> {
                 let mut map = crate::Map::new(&ty);
 
                 for (key, item) in obj {
-                    map.insert(Value::Str(crate::Str(std::borrow::Cow::Owned(key))), Value::from(item));
+                    map.insert(Value::Str(crate::Str::from(key)), Value::from(item));
                 }
 
                 Value::Map(map)
@@ -100,7 +106,7 @@ mod test {
 
         let map = value.to_map().unwrap();
         let first = map.get(&Value::Number(crate::Number::Int(crate::Int::U64(0)))).unwrap();
-        let expected: Value<'static> = "a".to_string().into();
+        let expected: Value = "a".to_string().into();
         assert_eq!(first, &expected);
     }
 }

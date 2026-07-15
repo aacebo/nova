@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use nova_reflect::{Dynamic, Str, ToType, ToValue, Type, Value};
+use nova_reflect::{DynamicRef, Str, ToType, ToValue, Type, Value, ValueRef};
 use nova_template::{Args, Call, Context, Engine, Error, Minijinja, Pointer};
 
 #[derive(Debug, Clone)]
@@ -17,17 +17,17 @@ impl ToType for Scope {
 }
 
 impl nova_reflect::Object for Scope {
-    fn field(&self, name: &str) -> Value<'_> {
+    fn field(&self, name: &str) -> ValueRef<'_> {
         match name {
-            "name" => Value::Str(Str(std::borrow::Cow::Borrowed(&self.name))),
-            _ => Value::Undefined,
+            "name" => ValueRef::Str(&self.name),
+            _ => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for Scope {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_object(self))
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Dynamic(DynamicRef::from_object(self))
     }
 }
 
@@ -44,7 +44,7 @@ impl Context for Scope {
         self.vars
             .iter()
             .find(|(k, _)| k == name)
-            .map(|(_, v)| Pointer::new(Value::Str(Str(std::borrow::Cow::Owned(v.clone())))))
+            .map(|(_, v)| Pointer::new(Value::Str(Str::from(v.clone()))))
     }
 
     fn names(&self) -> Vec<String> {
@@ -69,8 +69,8 @@ impl ToType for Echo {
 }
 
 impl ToValue for Echo {
-    fn to_value(&self) -> Value<'_> {
-        Value::Undefined
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Undefined
     }
 }
 
@@ -89,11 +89,11 @@ impl Call for Echo {
         let mut kw: Vec<String> = args.kargs().iter().map(|(k, v)| format!("{k}={}", v.value())).collect();
         kw.sort();
 
-        Ok(Pointer::new(Value::Str(Str(std::borrow::Cow::Owned(format!(
+        Ok(Pointer::new(Value::Str(Str::from(format!(
             "caller={caller} pos=[{}] kw=[{}]",
             positional.join(","),
             kw.join(",")
-        ))))))
+        )))))
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -180,17 +180,17 @@ impl ToType for Inner {
 }
 
 impl nova_reflect::Object for Inner {
-    fn field(&self, name: &str) -> Value<'_> {
+    fn field(&self, name: &str) -> ValueRef<'_> {
         match name {
-            "city" => Value::Str(Str(std::borrow::Cow::Borrowed(&self.city))),
-            _ => Value::Undefined,
+            "city" => ValueRef::Str(&self.city),
+            _ => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for Inner {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_object(self))
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Dynamic(DynamicRef::from_object(self))
     }
 }
 
@@ -206,18 +206,18 @@ impl ToType for Outer {
 }
 
 impl nova_reflect::Object for Outer {
-    fn field(&self, name: &str) -> Value<'_> {
+    fn field(&self, name: &str) -> ValueRef<'_> {
         match name {
             // a field that is ITSELF a dynamic object
-            "inner" => self.inner.to_value(),
-            _ => Value::Undefined,
+            "inner" => self.inner.to_value_ref(),
+            _ => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for Outer {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_object(self))
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Dynamic(DynamicRef::from_object(self))
     }
 }
 
@@ -261,17 +261,17 @@ impl ToType for WithVec {
 }
 
 impl nova_reflect::Object for WithVec {
-    fn field(&self, name: &str) -> Value<'_> {
+    fn field(&self, name: &str) -> ValueRef<'_> {
         match name {
-            "vector" => self.vector.to_value(),
-            _ => Value::Undefined,
+            "vector" => self.vector.to_value_ref(),
+            _ => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for WithVec {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_object(self))
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Dynamic(DynamicRef::from_object(self))
     }
 }
 

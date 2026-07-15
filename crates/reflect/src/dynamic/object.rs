@@ -4,10 +4,18 @@
 /// the values of their individual fields (`field`, `Undefined`
 /// if absent), and invoke their methods (`call`).
 pub trait Object: std::fmt::Debug + Send + Sync + crate::ToType {
-    fn field(&self, name: &str) -> crate::Value<'_>;
+    fn field(&self, name: &str) -> crate::ValueRef<'_>;
 
-    fn call(&self, name: &str, _args: &[crate::Value]) -> Result<crate::Value<'_>, String> {
+    fn call(&self, name: &str, _args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         Err(format!("no method '{}'", name))
+    }
+
+    fn entries(&self) -> Option<crate::Map> {
+        None
+    }
+
+    fn entries_by_ref(&self) -> Option<Vec<(crate::ValueRef<'_>, crate::ValueRef<'_>)>> {
+        None
     }
 }
 
@@ -33,7 +41,7 @@ impl std::fmt::Display for dyn Object {
 /// priority over trait methods), so a type without a reflected `impl` simply
 /// has no callable methods.
 pub trait Methods {
-    fn call_method(&self, name: &str, _args: &[crate::Value]) -> Result<crate::Value<'static>, String> {
+    fn call_method(&self, name: &str, _args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         Err(format!("no method '{}'", name))
     }
 }

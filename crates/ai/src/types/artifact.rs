@@ -1,4 +1,4 @@
-use nova_reflect::{Dynamic, Object, ToType, ToValue, Type, Value};
+use nova_reflect::{DynamicRef, Object, ToType, ToValue, Type, ValueRef};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Artifact {
@@ -14,22 +14,25 @@ impl ToType for Artifact {
 }
 
 impl Object for Artifact {
-    fn field(&self, name: &str) -> Value<'_> {
+    fn field(&self, name: &str) -> ValueRef<'_> {
         match name {
-            "name" => Value::from(self.name.clone()),
-            "value" => Value::from(self.value.to_string()),
-            "vector" => match &self.vector {
-                Some(v) => v.to_value(),
-                None => Value::Null,
+            "name" => ValueRef::Str(&self.name),
+            "value" => match self.value.as_str() {
+                Some(text) => ValueRef::Str(text),
+                None => ValueRef::Undefined,
             },
-            _ => Value::Undefined,
+            "vector" => match &self.vector {
+                Some(v) => v.to_value_ref(),
+                None => ValueRef::Null,
+            },
+            _ => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for Artifact {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_object(self))
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Dynamic(DynamicRef::from_object(self))
     }
 }
 
@@ -59,6 +62,13 @@ impl ArtifactContent {
         match self {
             Self::Text { text } => Some(text),
             _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::Text { text } => Some(text),
+            Self::File { path } => path.to_str(),
         }
     }
 

@@ -1,4 +1,4 @@
-use nova_reflect::{Dynamic, Object, ToType, ToValue, Type, Value};
+use nova_reflect::{DynamicRef, Object, ToType, ToValue, Type, ValueRef};
 
 use super::Offset;
 
@@ -18,21 +18,21 @@ impl ToType for Annotation {
 }
 
 impl Object for Annotation {
-    fn field(&self, name: &str) -> Value<'_> {
+    fn field(&self, name: &str) -> ValueRef<'_> {
         match name {
-            "name" => Value::from(self.name.clone()),
-            "label" => Value::from(self.label.clone()),
-            "text" => Value::from(self.text.clone()),
-            "score" => Value::from(self.score),
-            "spans" => self.spans.to_value(),
-            _ => Value::Undefined,
+            "name" => ValueRef::Str(&self.name),
+            "label" => ValueRef::Str(&self.label),
+            "text" => ValueRef::Str(&self.text),
+            "score" => ValueRef::from(self.score),
+            "spans" => self.spans.to_value_ref(),
+            _ => ValueRef::Undefined,
         }
     }
 }
 
 impl ToValue for Annotation {
-    fn to_value(&self) -> Value<'_> {
-        Value::Dynamic(Dynamic::from_object(self))
+    fn to_value_ref(&self) -> ValueRef<'_> {
+        ValueRef::Dynamic(DynamicRef::from_object(self))
     }
 }
 

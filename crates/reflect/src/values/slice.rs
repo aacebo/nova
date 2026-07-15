@@ -1,4 +1,4 @@
-impl<'a> crate::ToType for &'a [crate::Value<'a>] {
+impl<'a> crate::ToType for &'a [crate::ValueRef<'a>] {
     fn to_type(&self) -> crate::Type {
         let elem = self.first().map(crate::ToType::to_type).unwrap_or(crate::Type::Any);
 
@@ -9,20 +9,14 @@ impl<'a> crate::ToType for &'a [crate::Value<'a>] {
     }
 }
 
-impl<'a> crate::ToValue for &'a [crate::Value<'a>] {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Dynamic(crate::Dynamic::from_sequence(self))
-    }
-}
-
-impl<'a> crate::Sequence for &'a [crate::Value<'a>] {
+impl<'a> crate::Sequence for &'a [crate::ValueRef<'a>] {
     fn len(&self) -> usize {
-        <[crate::Value<'a>]>::len(self)
+        <[crate::ValueRef<'a>]>::len(self)
     }
 
-    fn index(&self, i: usize) -> crate::Value<'_> {
+    fn index(&self, i: usize) -> crate::ValueRef<'_> {
         match self.get(i) {
-            None => crate::Value::Null,
+            None => crate::ValueRef::Null,
             Some(v) => v.clone(),
         }
     }
@@ -34,16 +28,13 @@ mod test {
 
     #[test]
     pub fn value_slice_to_value() {
-        let values: [Value<'_>; 3] = [value_of!(1_i32), value_of!(2_i32), value_of!(3_i32)];
-        let slice: &[Value<'_>] = &values;
-        let value = slice.to_value();
+        let values: [ValueRef<'_>; 3] = [value_of!(&1_i32), value_of!(&2_i32), value_of!(&3_i32)];
+        let slice: &[ValueRef<'_>] = &values;
 
-        assert!(value.is_dynamic());
-        assert_eq!(value.len(), 3);
+        assert_eq!(<&[ValueRef<'_>] as Sequence>::len(&slice), 3);
 
-        let seq = value.as_dynamic().unwrap().as_sequence().unwrap();
-        for i in 0..seq.len() {
-            let v = seq.index(i);
+        for i in 0..Sequence::len(&slice) {
+            let v = Sequence::index(&slice, i);
             assert!(v.is_i32());
             assert_eq!(i + 1, v.to_i32().unwrap() as usize);
         }

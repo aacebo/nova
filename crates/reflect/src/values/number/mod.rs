@@ -129,7 +129,49 @@ impl Number {
     }
 }
 
-impl crate::Value<'_> {
+impl crate::ValueRef<'_> {
+    pub fn to_i8(&self) -> Option<i8> {
+        self.as_number().map(|v| v.to_i8())
+    }
+
+    pub fn to_i16(&self) -> Option<i16> {
+        self.as_number().map(|v| v.to_i16())
+    }
+
+    pub fn to_i32(&self) -> Option<i32> {
+        self.as_number().map(|v| v.to_i32())
+    }
+
+    pub fn to_i64(&self) -> Option<i64> {
+        self.as_number().map(|v| v.to_i64())
+    }
+
+    pub fn to_u8(&self) -> Option<u8> {
+        self.as_number().map(|v| v.to_u8())
+    }
+
+    pub fn to_u16(&self) -> Option<u16> {
+        self.as_number().map(|v| v.to_u16())
+    }
+
+    pub fn to_u32(&self) -> Option<u32> {
+        self.as_number().map(|v| v.to_u32())
+    }
+
+    pub fn to_u64(&self) -> Option<u64> {
+        self.as_number().map(|v| v.to_u64())
+    }
+
+    pub fn to_f32(&self) -> Option<f32> {
+        self.as_number().map(|v| v.to_f32())
+    }
+
+    pub fn to_f64(&self) -> Option<f64> {
+        self.as_number().map(|v| v.to_f64())
+    }
+}
+
+impl crate::Value {
     pub fn to_i8(&self) -> Option<i8> {
         self.as_number().map(|v| v.to_i8())
     }
@@ -172,13 +214,25 @@ impl crate::Value<'_> {
 }
 
 impl crate::ToValue for Number {
-    fn to_value(&self) -> crate::Value<'static> {
-        crate::Value::Number(*self)
+    fn to_value_ref(&self) -> crate::ValueRef<'static> {
+        crate::ValueRef::Number(*self)
     }
 }
 
-impl PartialEq<crate::Value<'_>> for Number {
-    fn eq(&self, other: &crate::Value<'_>) -> bool {
+impl From<Number> for crate::Value {
+    fn from(value: Number) -> Self {
+        crate::Value::Number(value)
+    }
+}
+
+impl PartialEq<crate::ValueRef<'_>> for Number {
+    fn eq(&self, other: &crate::ValueRef<'_>) -> bool {
+        other.as_number() == Some(self)
+    }
+}
+
+impl PartialEq<crate::Value> for Number {
+    fn eq(&self, other: &crate::Value) -> bool {
         other.as_number() == Some(self)
     }
 }

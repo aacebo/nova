@@ -190,7 +190,7 @@ impl Args {
         self.args.is_empty() && self.kargs.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (nova_reflect::Value<'_>, nova_reflect::Value<'_>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (nova_reflect::Value, nova_reflect::ValueRef<'_>)> {
         use nova_reflect::{Int, Number, Str, Value};
 
         let positional = self
@@ -199,10 +199,7 @@ impl Args {
             .enumerate()
             .map(|(i, v)| (Value::Number(Number::Int(Int::U64(i as u64))), v.value()));
 
-        let keyword = self
-            .kargs
-            .iter()
-            .map(|(k, v)| (Value::Str(Str(std::borrow::Cow::Borrowed(k.as_str()))), v.value()));
+        let keyword = self.kargs.iter().map(|(k, v)| (Value::Str(Str::from(k.as_str())), v.value()));
 
         positional.chain(keyword)
     }

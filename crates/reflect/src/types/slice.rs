@@ -120,7 +120,7 @@ mod test {
 
     #[test]
     pub fn ok() {
-        let value = value_of!([1, 2, 3]);
+        let value = value_of!(&[1, 2, 3]);
 
         assert!(value.is_dynamic());
         assert_eq!(value.to_type().len(), 3);

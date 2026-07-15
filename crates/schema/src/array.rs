@@ -53,7 +53,7 @@ impl Validate for ArraySchema {
             let mut list = error::list();
 
             for i in 0..len {
-                if let Err(err) = items.validate(&sequence.index(i)) {
+                if let Err(err) = items.validate(&sequence.index(i).to_owned()) {
                     list = list.index(i, err);
                 }
             }

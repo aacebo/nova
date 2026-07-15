@@ -42,19 +42,19 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
 
             if variant_fields.is_empty() {
                 return quote! {
-                    Self::#variant_ident => ::nova_reflect::Value::Undefined
+                    Self::#variant_ident => ::nova_reflect::ValueRef::Undefined
                 };
             }
 
             if variant_fields.len() == 1 {
                 return quote! {
-                    Self::#variant_ident(v) => ::nova_reflect::ToValue::to_value(v)
+                    Self::#variant_ident(v) => ::nova_reflect::ToValue::to_value_ref(v)
                 };
             }
 
             quote! {
                 Self::#variant_ident(#(#variant_fields,)*) => {
-                    ::nova_reflect::value_of!((#(#variant_fields.clone(),)*))
+                    ::nova_reflect::value_of!(&(#(#variant_fields.clone(),)*))
                 }
             }
         })
@@ -87,7 +87,7 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &str) -> ::nova_reflect::Value<'_> {
+            fn field(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
                 let _ = name;
 
                 match self {
@@ -97,8 +97,8 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
         }
 
         impl ::nova_reflect::ToValue for #name {
-            fn to_value(&self) -> ::nova_reflect::Value<'_> {
-                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(self))
+            fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
+                ::nova_reflect::ValueRef::Dynamic(::nova_reflect::DynamicRef::from_object(self))
             }
         }
 
@@ -136,19 +136,19 @@ pub fn attr(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
 
             if variant_fields.is_empty() {
                 return quote! {
-                    Self::#variant_ident => ::nova_reflect::Value::Undefined
+                    Self::#variant_ident => ::nova_reflect::ValueRef::Undefined
                 };
             }
 
             if variant_fields.len() == 1 {
                 return quote! {
-                    Self::#variant_ident(v) => ::nova_reflect::ToValue::to_value(v)
+                    Self::#variant_ident(v) => ::nova_reflect::ToValue::to_value_ref(v)
                 };
             }
 
             quote! {
                 Self::#variant_ident(#(#variant_fields,)*) => {
-                    ::nova_reflect::value_of!((#(#variant_fields.clone(),)*))
+                    ::nova_reflect::value_of!(&(#(#variant_fields.clone(),)*))
                 }
             }
         })
@@ -181,7 +181,7 @@ pub fn attr(item: &syn::ItemEnum) -> proc_macro2::TokenStream {
         }
 
         impl ::nova_reflect::ToValue for #name {
-            fn to_value(&self) -> ::nova_reflect::Value<'_> {
+            fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
                 match self {
                     #(#variants,)*
                 }

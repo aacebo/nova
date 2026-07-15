@@ -107,7 +107,7 @@ fn bench_to_value_vec_string(v: &Vec<String>) {
 
 #[inline(never)]
 fn bench_serialize_object_json(user: &User) -> String {
-    let dynamic = nova_reflect::Dynamic::from_object(user);
+    let dynamic = nova_reflect::DynamicRef::from_object(user);
     serde_json::to_string(&dynamic).expect("serialize")
 }
 

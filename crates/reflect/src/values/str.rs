@@ -1,7 +1,11 @@
-#[derive(Debug, Clone, PartialEq)]
-pub struct Str<'a>(pub std::borrow::Cow<'a, str>);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Str(pub std::sync::Arc<str>);
 
-impl<'a> Str<'a> {
+impl Str {
+    pub fn new(value: impl Into<std::sync::Arc<str>>) -> Self {
+        Self(value.into())
+    }
+
     pub fn to_type(&self) -> crate::Type {
         crate::Type::Str(crate::StrType)
     }
@@ -15,13 +19,13 @@ impl<'a> Str<'a> {
     }
 }
 
-impl<'a> AsRef<str> for Str<'a> {
+impl AsRef<str> for Str {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'a> std::ops::Deref for Str<'a> {
+impl std::ops::Deref for Str {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -29,46 +33,70 @@ impl<'a> std::ops::Deref for Str<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for Str<'a> {
+impl std::fmt::Display for Str {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'a> serde::Serialize for Str<'a> {
+impl serde::Serialize for Str {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         self.0.serialize(s)
     }
 }
 
-impl<'a> PartialEq<std::string::String> for Str<'a> {
+impl PartialEq<std::string::String> for Str {
     fn eq(&self, other: &std::string::String) -> bool {
-        self.0 == other.as_str()
+        self.0.as_ref() == other.as_str()
     }
 }
 
-impl From<std::string::String> for crate::Value<'static> {
+impl PartialEq<str> for Str {
+    fn eq(&self, other: &str) -> bool {
+        self.0.as_ref() == other
+    }
+}
+
+impl From<std::string::String> for Str {
     fn from(value: std::string::String) -> Self {
-        crate::Value::Str(Str(std::borrow::Cow::Owned(value)))
+        Self(std::sync::Arc::from(value))
+    }
+}
+
+impl From<&str> for Str {
+    fn from(value: &str) -> Self {
+        Self(std::sync::Arc::from(value))
+    }
+}
+
+impl From<std::string::String> for crate::Value {
+    fn from(value: std::string::String) -> Self {
+        crate::Value::Str(Str::from(value))
+    }
+}
+
+impl From<&str> for crate::Value {
+    fn from(value: &str) -> Self {
+        crate::Value::Str(Str::from(value))
     }
 }
 
 impl crate::ToValue for std::string::String {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Str(Str(std::borrow::Cow::Borrowed(self.as_str())))
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Str(self.as_str())
     }
 }
 
 impl crate::ToValue for &'static str {
-    fn to_value(&self) -> crate::Value<'static> {
-        crate::Value::Str(Str(std::borrow::Cow::Borrowed(self)))
+    fn to_value_ref(&self) -> crate::ValueRef<'static> {
+        crate::ValueRef::Str(self)
     }
 }
 
 impl crate::ToValue for str {
-    fn to_value(&self) -> crate::Value<'_> {
-        crate::Value::Str(Str(std::borrow::Cow::Borrowed(self)))
+    fn to_value_ref(&self) -> crate::ValueRef<'_> {
+        crate::ValueRef::Str(self)
     }
 }
 
