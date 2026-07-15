@@ -47,12 +47,17 @@ impl Action for Step {
 
         match &self.body {
             StepBody::Call { call, args, with } => {
-                let resolve = |value: &Pointer| match value.value().as_str() {
-                    Some(source) => scope.eval(source).unwrap_or_else(|_| value.clone()),
-                    None => value.clone(),
+                let resolve = |value: &Pointer| -> nova_reflect::Value {
+                    match value.value().as_str() {
+                        Some(source) => scope
+                            .eval(source)
+                            .map(Pointer::into_value)
+                            .unwrap_or_else(|_| value.clone().into_value()),
+                        None => value.clone().into_value(),
+                    }
                 };
 
-                let positional: Vec<Pointer> = args.iter().map(&resolve).collect();
+                let positional: Vec<nova_reflect::Value> = args.iter().map(&resolve).collect();
                 let mut kargs = KArgs::new();
 
                 for (key, value) in with {

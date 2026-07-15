@@ -12,32 +12,25 @@ impl FromArgs for EnvArgs {
     type Error = Box<dyn std::error::Error>;
 
     fn from_args(args: &Args) -> Result<Self, Self::Error> {
-        let name = args
-            .at(0)
-            .value()
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or(Error::message("name must be a string"))?;
+        let name = args.str(0).ok_or(Error::message("name must be a string"))?;
 
         Ok(Self {
             name,
-            default: args.key("default"),
+            default: Pointer::Value(args.key("default")),
         })
     }
 }
 
 pub struct FormatArgs {
-    pub message: Pointer,
+    pub message: Value,
 }
 
 impl FormatArgs {
     pub fn text(&self) -> String {
-        let value = self.message.value();
-
-        if value.is_undefined() || value.is_null() {
+        if self.message.is_undefined() || self.message.is_null() {
             String::new()
         } else {
-            value.to_string()
+            self.message.to_string()
         }
     }
 }
@@ -49,7 +42,7 @@ impl FromArgs for FormatArgs {
         let primary = args.at(0);
 
         Ok(Self {
-            message: if primary.value().is_undefined() {
+            message: if primary.is_undefined() {
                 args.key("message")
             } else {
                 primary

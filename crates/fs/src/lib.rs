@@ -56,7 +56,8 @@ impl FromArgs for WriteArgs {
 
     fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
         let path = args.str(0).ok_or(nova_core::Error::message("path must be a string"))?;
-        let data = to_bytes(&args.at(1).value()).ok_or(nova_core::Error::message("invalid data type"))?;
+        let value = args.at(1);
+        let data = to_bytes(&value.as_ref()).ok_or(nova_core::Error::message("invalid data type"))?;
         Ok(Self { path, data })
     }
 }

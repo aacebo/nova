@@ -17,7 +17,7 @@ impl ToType for Scope {
 }
 
 impl nova_reflect::Object for Scope {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
             "name" => ValueRef::Str(&self.name),
             _ => ValueRef::Undefined,
@@ -28,6 +28,10 @@ impl nova_reflect::Object for Scope {
 impl ToValue for Scope {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }
 
@@ -84,9 +88,9 @@ impl Call for Echo {
             .map(|s| s.name.clone())
             .unwrap_or_else(|| "<no caller>".to_string());
 
-        let positional: Vec<String> = args.args().iter().map(|a| a.value().to_string()).collect();
+        let positional: Vec<String> = args.args().iter().map(|a| a.to_string()).collect();
 
-        let mut kw: Vec<String> = args.kargs().iter().map(|(k, v)| format!("{k}={}", v.value())).collect();
+        let mut kw: Vec<String> = args.kargs().iter().map(|(k, v)| format!("{k}={v}")).collect();
         kw.sort();
 
         Ok(Pointer::new(Value::Str(Str::from(format!(
@@ -180,7 +184,7 @@ impl ToType for Inner {
 }
 
 impl nova_reflect::Object for Inner {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
             "city" => ValueRef::Str(&self.city),
             _ => ValueRef::Undefined,
@@ -191,6 +195,10 @@ impl nova_reflect::Object for Inner {
 impl ToValue for Inner {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }
 
@@ -206,11 +214,17 @@ impl ToType for Outer {
 }
 
 impl nova_reflect::Object for Outer {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
-            // a field that is ITSELF a dynamic object
             "inner" => self.inner.to_value_ref(),
             _ => ValueRef::Undefined,
+        }
+    }
+
+    fn field(&self, name: &str) -> Value {
+        match name {
+            "inner" => self.inner.to_value(),
+            _ => Value::Undefined,
         }
     }
 }
@@ -218,6 +232,10 @@ impl nova_reflect::Object for Outer {
 impl ToValue for Outer {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }
 
@@ -261,7 +279,7 @@ impl ToType for WithVec {
 }
 
 impl nova_reflect::Object for WithVec {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
             "vector" => self.vector.to_value_ref(),
             _ => ValueRef::Undefined,
@@ -272,6 +290,10 @@ impl nova_reflect::Object for WithVec {
 impl ToValue for WithVec {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }
 

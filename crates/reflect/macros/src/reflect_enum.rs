@@ -87,7 +87,7 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
+            fn field_by_ref(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
                 let _ = name;
 
                 match self {
@@ -99,6 +99,10 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataEnum) -> proc_macro2::To
         impl ::nova_reflect::ToValue for #name {
             fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
                 ::nova_reflect::ValueRef::Dynamic(::nova_reflect::DynamicRef::from_object(self))
+            }
+
+            fn to_value(&self) -> ::nova_reflect::Value {
+                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(::std::sync::Arc::new(self.clone())))
             }
         }
 

@@ -60,7 +60,7 @@ impl Namespace for Yaml {
 }
 
 pub struct EncodeArgs {
-    pub value: Pointer,
+    pub value: nova_reflect::Value,
 }
 
 impl FromArgs for EncodeArgs {

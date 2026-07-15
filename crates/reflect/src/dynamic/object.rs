@@ -4,7 +4,11 @@
 /// the values of their individual fields (`field`, `Undefined`
 /// if absent), and invoke their methods (`call`).
 pub trait Object: std::fmt::Debug + Send + Sync + crate::ToType {
-    fn field(&self, name: &str) -> crate::ValueRef<'_>;
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_>;
+
+    fn field(&self, name: &str) -> crate::Value {
+        self.field_by_ref(name).to_owned()
+    }
 
     fn call(&self, name: &str, _args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         Err(format!("no method '{}'", name))

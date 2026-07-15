@@ -26,6 +26,68 @@ impl Value {
         }
     }
 
+    pub fn cast<T: TryFrom<Value>>(self) -> Option<T> {
+        T::try_from(self).ok()
+    }
+
+    pub fn is<T: TryFrom<Value>>(&self) -> bool {
+        T::try_from(self.clone()).is_ok()
+    }
+
+    pub fn is_truthy(&self) -> bool {
+        self.as_ref().is_truthy()
+    }
+
+    pub fn field(&self, name: &str) -> Result<Value, String> {
+        let object = self
+            .as_dynamic()
+            .and_then(|d| d.as_object())
+            .ok_or_else(|| format!("'{}' is not an object", self.to_type()))?;
+        Ok(object.field(name))
+    }
+
+    pub fn field_by_ref(&self, name: &str) -> Result<ValueRef<'_>, String> {
+        let object = self
+            .as_dynamic()
+            .and_then(|d| d.as_object())
+            .ok_or_else(|| format!("'{}' is not an object", self.to_type()))?;
+        Ok(object.field_by_ref(name))
+    }
+
+    pub fn index(&self, i: usize) -> Result<Value, String> {
+        let seq = self
+            .as_dynamic()
+            .and_then(|d| d.as_sequence())
+            .ok_or_else(|| format!("'{}' is not a sequence", self.to_type()))?;
+
+        if i >= seq.len() {
+            return Err(format!("index {} out of bounds", i));
+        }
+
+        Ok(seq.index(i))
+    }
+
+    pub fn index_by_ref(&self, i: usize) -> Result<ValueRef<'_>, String> {
+        let seq = self
+            .as_dynamic()
+            .and_then(|d| d.as_sequence())
+            .ok_or_else(|| format!("'{}' is not a sequence", self.to_type()))?;
+
+        if i >= seq.len() {
+            return Err(format!("index {} out of bounds", i));
+        }
+
+        Ok(seq.index_by_ref(i))
+    }
+
+    pub fn call(&self, name: &str, args: &[ValueRef]) -> Result<Value, String> {
+        let object = self
+            .as_dynamic()
+            .and_then(|d| d.as_object())
+            .ok_or_else(|| format!("'{}' is not an object", self.to_type()))?;
+        crate::Object::call(object, name, args)
+    }
+
     pub fn to_type(&self) -> crate::Type {
         match self {
             Self::Bool(v) => v.to_type(),
@@ -161,6 +223,10 @@ impl crate::ToType for Value {
 impl crate::ToValue for Value {
     fn to_value_ref(&self) -> crate::ValueRef<'_> {
         self.as_ref()
+    }
+
+    fn to_value(&self) -> Value {
+        self.clone()
     }
 }
 
@@ -303,6 +369,57 @@ impl<'a> ValueRef<'a> {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub fn cast<T: for<'b> TryFrom<ValueRef<'b>>>(self) -> Option<T> {
+        T::try_from(self).ok()
+    }
+
+    pub fn is<T: for<'b> TryFrom<ValueRef<'b>>>(&self) -> bool {
+        T::try_from(self.clone()).is_ok()
+    }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Self::Bool(v) => *v,
+            Self::Number(v) => v.to_f64() != 0.0,
+            Self::Str(v) => !v.is_empty(),
+            Self::Map(v) => !v.is_empty(),
+            Self::Dynamic(v) if v.is_sequence() => !v.is_empty(),
+            Self::Dynamic(_) => true,
+            Self::Null | Self::Undefined => false,
+        }
+    }
+
+    pub fn field(&self, name: &str) -> Result<ValueRef<'a>, String> {
+        let object = self
+            .as_dynamic()
+            .and_then(|d| d.as_object())
+            .ok_or_else(|| format!("'{}' is not an object", self.to_type()))?;
+        Ok(object.field_by_ref(name))
+    }
+
+    pub fn index(&self, i: usize) -> Result<ValueRef<'a>, String> {
+        let dynamic = self
+            .as_dynamic()
+            .ok_or_else(|| format!("'{}' is not a sequence", self.to_type()))?;
+        let seq = dynamic
+            .as_sequence()
+            .ok_or_else(|| format!("'{}' is not a sequence", self.to_type()))?;
+
+        if i >= seq.len() {
+            return Err(format!("index {} out of bounds", i));
+        }
+
+        Ok(seq.index_by_ref(i))
+    }
+
+    pub fn call(&self, name: &str, args: &[ValueRef]) -> Result<Value, String> {
+        let object = self
+            .as_dynamic()
+            .and_then(|d| d.as_object())
+            .ok_or_else(|| format!("'{}' is not an object", self.to_type()))?;
+        crate::Object::call(object, name, args)
     }
 
     pub fn is_bool(&self) -> bool {

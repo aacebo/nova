@@ -15,6 +15,7 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
     });
 
     let arms = field_arms(&data.fields);
+    let owned_arms = field_arms_owned(&data.fields);
 
     quote! {
         impl ::nova_reflect::TypeOf for #name {
@@ -43,13 +44,23 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
             fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
                 ::nova_reflect::ValueRef::Dynamic(::nova_reflect::DynamicRef::from_object(self))
             }
+
+            fn to_value(&self) -> ::nova_reflect::Value {
+                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(::std::sync::Arc::new(self.clone())))
+            }
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
+            fn field_by_ref(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
                 #(#arms)*
 
                 ::nova_reflect::ValueRef::Undefined
+            }
+
+            fn field(&self, name: &str) -> ::nova_reflect::Value {
+                #(#owned_arms)*
+
+                ::nova_reflect::Value::Undefined
             }
 
             fn call(
@@ -67,6 +78,14 @@ pub fn derive(input: &syn::DeriveInput, data: &syn::DataStruct) -> proc_macro2::
 }
 
 fn field_arms(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
+    field_arms_with(fields, quote!(::nova_reflect::ToValue::to_value_ref))
+}
+
+fn field_arms_owned(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
+    field_arms_with(fields, quote!(::nova_reflect::ToValue::to_value))
+}
+
+fn field_arms_with(fields: &syn::Fields, method: proc_macro2::TokenStream) -> Vec<proc_macro2::TokenStream> {
     match fields {
         syn::Fields::Named(named) => named
             .named
@@ -78,12 +97,12 @@ fn field_arms(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
                     parse::FieldAttr::Ignore => None,
                     parse::FieldAttr::Alias(alias) => Some(quote! {
                         if name == #alias {
-                            return ::nova_reflect::ToValue::to_value_ref(&self.#ident);
+                            return #method(&self.#ident);
                         }
                     }),
                     parse::FieldAttr::Default => Some(quote! {
                         if name == stringify!(#ident) {
-                            return ::nova_reflect::ToValue::to_value_ref(&self.#ident);
+                            return #method(&self.#ident);
                         }
                     }),
                 }
@@ -103,7 +122,7 @@ fn field_arms(fields: &syn::Fields) -> Vec<proc_macro2::TokenStream> {
 
                 Some(quote! {
                     if name == #key {
-                        return ::nova_reflect::ToValue::to_value_ref(&self.#index);
+                        return #method(&self.#index);
                     }
                 })
             })
@@ -116,6 +135,7 @@ pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
     let name = &item.ident;
     let ty = build(item);
     let arms = field_arms(&item.fields);
+    let owned_arms = field_arms_owned(&item.fields);
 
     quote! {
         impl ::nova_reflect::TypeOf for #name {
@@ -144,13 +164,23 @@ pub fn attr(item: &syn::ItemStruct) -> proc_macro2::TokenStream {
             fn to_value_ref(&self) -> ::nova_reflect::ValueRef<'_> {
                 ::nova_reflect::ValueRef::Dynamic(::nova_reflect::DynamicRef::from_object(self))
             }
+
+            fn to_value(&self) -> ::nova_reflect::Value {
+                ::nova_reflect::Value::Dynamic(::nova_reflect::Dynamic::from_object(::std::sync::Arc::new(self.clone())))
+            }
         }
 
         impl ::nova_reflect::Object for #name {
-            fn field(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
+            fn field_by_ref(&self, name: &str) -> ::nova_reflect::ValueRef<'_> {
                 #(#arms)*
 
                 ::nova_reflect::ValueRef::Undefined
+            }
+
+            fn field(&self, name: &str) -> ::nova_reflect::Value {
+                #(#owned_arms)*
+
+                ::nova_reflect::Value::Undefined
             }
 
             fn call(

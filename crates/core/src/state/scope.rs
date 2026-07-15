@@ -16,7 +16,7 @@ struct _Scope {
     engine: Arc<dyn Engine>,
     symbols: Mutex<HashMap<String, ulid::Ulid>>,
     arena: Arc<Mutex<Arena>>,
-    args: Vec<Pointer>,
+    args: Vec<Value>,
     kargs: KArgs,
     events: crossbeam::Sender<Event>,
 }
@@ -54,7 +54,7 @@ impl Scope {
         &self.0.engine
     }
 
-    pub fn args(&self) -> &[Pointer] {
+    pub fn args(&self) -> &[Value] {
         &self.0.args
     }
 
@@ -83,7 +83,7 @@ impl Scope {
         self.len() == 0
     }
 
-    pub fn fork(&self, name: impl Into<String>, args: impl IntoIterator<Item = Pointer>, kargs: impl Into<KArgs>) -> Self {
+    pub fn fork(&self, name: impl Into<String>, args: impl IntoIterator<Item = Value>, kargs: impl Into<KArgs>) -> Self {
         Self(Arc::new(_Scope {
             trace_id: self.0.trace_id,
             name: name.into(),
@@ -284,17 +284,18 @@ impl ToType for Scope {
 impl nova_template::Context for Scope {
     fn resolve(&self, name: &str) -> Option<Pointer> {
         if name == "args" {
-            return Some(Pointer::new(self.args().to_vec()));
+            return Some(Pointer::from(self.args().to_vec()));
         }
 
         if let Some(value) = self.kargs().get(name) {
-            return Some(value.clone());
+            return Some(Pointer::Value(value.clone()));
         }
 
         let slot = self.get(name)?;
 
         match &*slot {
-            Binding::Value(value) => Some(value.clone()),
+            Binding::Value(value) => Some(Pointer::Value(value.clone())),
+            Binding::Pointer(ptr) => Some(ptr.clone()),
             Binding::Func(func) => Some(Pointer::callable(func.clone())),
             Binding::Routine(rt) => Some(Pointer::callable_namespace(rt.clone())),
         }

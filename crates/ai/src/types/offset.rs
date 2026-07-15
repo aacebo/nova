@@ -29,7 +29,7 @@ impl nova_reflect::ToType for Offset {
 }
 
 impl nova_reflect::Object for Offset {
-    fn field(&self, name: &str) -> nova_reflect::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> nova_reflect::ValueRef<'_> {
         match name {
             "begin" => nova_reflect::ValueRef::from(self.begin),
             "end" => nova_reflect::ValueRef::from(self.end),
@@ -41,5 +41,9 @@ impl nova_reflect::Object for Offset {
 impl nova_reflect::ToValue for Offset {
     fn to_value_ref(&self) -> nova_reflect::ValueRef<'_> {
         nova_reflect::ValueRef::Dynamic(nova_reflect::DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(*self)))
     }
 }

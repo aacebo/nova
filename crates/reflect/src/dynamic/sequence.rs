@@ -4,46 +4,18 @@
 /// and the values of their individual elements
 pub trait Sequence: std::fmt::Debug + Send + Sync + crate::ToType {
     fn len(&self) -> usize;
-    fn index(&self, i: usize) -> crate::ValueRef<'_>;
+    fn index_by_ref(&self, i: usize) -> crate::ValueRef<'_>;
+
+    fn index(&self, i: usize) -> crate::Value {
+        self.index_by_ref(i).to_owned()
+    }
+
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct OwnedSequence {
-    ty: crate::Type,
-    data: Vec<crate::Value>,
-}
-
-impl OwnedSequence {
-    pub fn new(data: Vec<crate::Value>) -> Self {
-        let elem = data.first().map(crate::ToType::to_type).unwrap_or(crate::Type::Any);
-        let ty = crate::Type::Slice(crate::SliceType {
-            ty: std::sync::Arc::new(elem),
-            capacity: None,
-        });
-
-        Self { ty, data }
-    }
-}
-
-impl crate::ToType for OwnedSequence {
-    fn to_type(&self) -> crate::Type {
-        self.ty.clone()
-    }
-}
-
-impl Sequence for OwnedSequence {
-    fn len(&self) -> usize {
-        self.data.len()
-    }
-
-    fn index(&self, i: usize) -> crate::ValueRef<'_> {
-        match self.data.get(i) {
-            Some(v) => v.as_ref(),
-            None => crate::ValueRef::Null,
-        }
+    fn iter(&self) -> Box<dyn Iterator<Item = crate::Value> + '_> {
+        Box::new((0..self.len()).map(move |i| self.index(i)))
     }
 }
 
@@ -51,8 +23,8 @@ impl std::fmt::Display for dyn Sequence {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[")?;
 
-        for i in 0..self.len() {
-            write!(f, "\n\t{}", self.index(i))?;
+        for value in self.iter() {
+            write!(f, "\n\t{}", value)?;
         }
 
         write!(f, "\n]")
@@ -97,10 +69,17 @@ where
         self.len()
     }
 
-    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+    fn index_by_ref(&self, i: usize) -> crate::ValueRef<'_> {
         match self.get(i) {
             None => crate::ValueRef::Null,
             Some(v) => v.to_value_ref(),
+        }
+    }
+
+    fn index(&self, i: usize) -> crate::Value {
+        match self.get(i) {
+            None => crate::Value::Null,
+            Some(v) => v.to_value(),
         }
     }
 }
@@ -113,10 +92,17 @@ where
         N
     }
 
-    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+    fn index_by_ref(&self, i: usize) -> crate::ValueRef<'_> {
         match self.get(i) {
             None => crate::ValueRef::Null,
             Some(v) => v.to_value_ref(),
+        }
+    }
+
+    fn index(&self, i: usize) -> crate::Value {
+        match self.get(i) {
+            None => crate::Value::Null,
+            Some(v) => v.to_value(),
         }
     }
 }

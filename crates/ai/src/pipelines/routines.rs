@@ -167,5 +167,12 @@ fn objects<T>(items: Vec<T>) -> Pointer
 where
     T: nova_reflect::Object + nova_reflect::ToValue + Send + Sync + std::fmt::Debug + 'static,
 {
-    Pointer::new(items.into_iter().map(Pointer::new).collect::<Vec<Pointer>>())
+    let values: Vec<nova_reflect::Value> = items
+        .into_iter()
+        .map(|item| nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(item))))
+        .collect();
+
+    Pointer::Value(nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_sequence(
+        std::sync::Arc::new(values),
+    )))
 }

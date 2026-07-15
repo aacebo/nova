@@ -16,7 +16,7 @@ doctest = false
 workspace = true
 
 [dependencies]
-nova-reflect = { workspace = true, features = ["serde"] }
+nova-reflect = { workspace = true, features = ["serde", "minijinja"] }
 minijinja = { version = "2", features = ["serde"] }
 serde = { version = "1", features = ["derive", "rc"] }
 

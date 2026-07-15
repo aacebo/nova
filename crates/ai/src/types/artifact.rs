@@ -14,7 +14,7 @@ impl ToType for Artifact {
 }
 
 impl Object for Artifact {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
             "name" => ValueRef::Str(&self.name),
             "value" => match self.value.as_str() {
@@ -33,6 +33,10 @@ impl Object for Artifact {
 impl ToValue for Artifact {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }
 

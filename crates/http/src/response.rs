@@ -32,7 +32,7 @@ impl ToType for Response {
 }
 
 impl Object for Response {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
             "status" => ValueRef::from(self.status),
             "headers" => self.headers.to_value_ref(),
@@ -44,10 +44,27 @@ impl Object for Response {
             _ => ValueRef::Undefined,
         }
     }
+
+    fn field(&self, name: &str) -> nova_reflect::Value {
+        match name {
+            "status" => nova_reflect::Value::from(self.status),
+            "headers" => self.headers.to_value(),
+            "data" => self.data.to_value(),
+            "text" => match std::str::from_utf8(&self.data) {
+                Ok(text) => nova_reflect::Value::from(text),
+                Err(_) => nova_reflect::Value::Undefined,
+            },
+            _ => nova_reflect::Value::Undefined,
+        }
+    }
 }
 
 impl ToValue for Response {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }

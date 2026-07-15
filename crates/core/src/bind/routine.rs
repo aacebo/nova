@@ -44,7 +44,8 @@ impl Routine {
         let slot = self.scope.get(key)?;
 
         match &*slot {
-            Binding::Value(value) => Some(value.clone()),
+            Binding::Value(value) => Some(Pointer::Value(value.clone())),
+            Binding::Pointer(ptr) => Some(ptr.clone()),
             Binding::Func(func) => Some(Pointer::callable(func.clone())),
             Binding::Routine(rt) => Some(Pointer::callable_namespace(rt.clone())),
         }

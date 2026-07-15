@@ -75,7 +75,7 @@ pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let stmts: Vec<_> = args.iter().map(args::Arg::stmt).collect();
     let invoke = zyn! {
         {
-            let mut __args: ::std::vec::Vec<::nova::template::Pointer> = ::std::vec::Vec::new();
+            let mut __args: ::std::vec::Vec<::nova::reflect::Value> = ::std::vec::Vec::new();
             let mut __kargs = ::nova::template::KArgs::new();
             @for (stmt in stmts.iter()) {
                 {{ stmt }}

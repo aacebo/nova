@@ -3,19 +3,9 @@ use std::sync::Arc;
 
 use nova_reflect::{ToValue, Value, ValueRef};
 
-pub trait Valueable: ToValue + Send + Sync + std::fmt::Debug + 'static {
-    fn as_any(&self) -> &dyn Any;
-}
-
-impl<T: ToValue + Send + Sync + std::fmt::Debug + 'static> Valueable for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
 #[derive(Clone)]
 pub enum Pointer {
-    Value(Arc<dyn Valueable>),
+    Value(Value),
     Call(Arc<dyn Call>),
     Namespace(Arc<dyn Namespace>),
     Bound {
@@ -25,8 +15,12 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub fn new<T: Valueable>(value: T) -> Self {
-        Self::Value(Arc::new(value))
+    pub fn new<T: ToValue>(value: T) -> Self {
+        Self::Value(value.to_value())
+    }
+
+    pub fn value_of(value: Value) -> Self {
+        Self::Value(value)
     }
 
     pub fn callable<T: Call>(value: T) -> Self {
@@ -68,14 +62,28 @@ impl Pointer {
 
     pub fn value(&self) -> ValueRef<'_> {
         match self {
-            Self::Value(v) => v.to_value_ref(),
+            Self::Value(v) => v.as_ref(),
             _ => ValueRef::Undefined,
+        }
+    }
+
+    pub fn as_value(&self) -> Option<&Value> {
+        match self {
+            Self::Value(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn into_value(self) -> Value {
+        match self {
+            Self::Value(v) => v,
+            _ => Value::Undefined,
         }
     }
 
     pub fn as_any(&self) -> &dyn Any {
         match self {
-            Self::Value(v) => v.as_any(),
+            Self::Value(_) => self,
             Self::Call(v) => v.as_any(),
             Self::Namespace(v) => v.as_any(),
             Self::Bound { call, .. } => call.as_any(),
@@ -94,109 +102,45 @@ impl Pointer {
         is_truthy(&self.value())
     }
 
-    pub fn valueable(&self) -> Option<&Arc<dyn Valueable>> {
-        match self {
-            Self::Value(v) => Some(v),
-            _ => None,
-        }
-    }
-
     pub fn field(&self, name: &str) -> Option<Pointer> {
         if let Some(namespace) = self.as_namespace() {
             return namespace.member(name);
         }
 
-        let parent = self.valueable()?;
         let value = self.value();
-        value.as_dynamic()?.as_object()?;
-
-        Some(Pointer::new(Field {
-            parent: parent.clone(),
-            name: name.to_string(),
-        }))
+        let object = value.as_dynamic()?.as_object()?;
+        Some(Pointer::Value(object.field(name).to_owned()))
     }
 
     pub fn index(&self, i: usize) -> Option<Pointer> {
-        let parent = self.valueable()?;
         let value = self.value();
-        let seq = value.as_dynamic()?.as_sequence()?;
+        let dynamic = value.as_dynamic()?;
+        let seq = dynamic.as_sequence()?;
 
         if i >= seq.len() {
             return None;
         }
 
-        Some(Pointer::new(Index {
-            parent: parent.clone(),
-            index: i,
-        }))
+        Some(Pointer::Value(seq.index(i).to_owned()))
     }
 
     pub fn key(&self, key: Value) -> Option<Pointer> {
-        let parent = self.valueable()?;
         let value = self.value();
-        value.as_map()?.get(&key)?;
-
-        Some(Pointer::new(Key {
-            parent: parent.clone(),
-            key,
-        }))
-    }
-}
-
-#[derive(Debug)]
-struct Key {
-    parent: Arc<dyn Valueable>,
-    key: Value,
-}
-
-impl ToValue for Key {
-    fn to_value_ref(&self) -> ValueRef<'_> {
-        let parent = self.parent.to_value_ref();
-
-        match parent.as_map().and_then(|m| m.get(&self.key)) {
-            Some(value) => value.as_ref(),
-            None => ValueRef::Undefined,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Index {
-    parent: Arc<dyn Valueable>,
-    index: usize,
-}
-
-impl ToValue for Index {
-    fn to_value_ref(&self) -> ValueRef<'_> {
-        let parent = self.parent.to_value_ref();
-
-        match parent.as_dynamic().and_then(|d| d.as_sequence()) {
-            Some(seq) => seq.index(self.index),
-            None => ValueRef::Undefined,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Field {
-    parent: Arc<dyn Valueable>,
-    name: String,
-}
-
-impl ToValue for Field {
-    fn to_value_ref(&self) -> ValueRef<'_> {
-        let parent = self.parent.to_value_ref();
-
-        match parent.as_dynamic().and_then(|d| d.as_object()) {
-            Some(object) => object.field(&self.name),
-            None => ValueRef::Undefined,
-        }
+        let entry = value.as_map()?.get(&key)?.clone();
+        Some(Pointer::Value(entry))
     }
 }
 
 impl ToValue for Pointer {
     fn to_value_ref(&self) -> ValueRef<'_> {
         self.value()
+    }
+
+    fn to_value(&self) -> Value {
+        match self {
+            Self::Value(v) => v.clone(),
+            _ => Value::Undefined,
+        }
     }
 }
 
@@ -280,7 +224,7 @@ macro_rules! try_from_pointer {
                 type Error = crate::Error;
 
                 fn try_from(value: Pointer) -> Result<Self, Self::Error> {
-                    <$ty>::try_from(value.value()).map_err(crate::Error::message)
+                    <$ty>::try_from(value.into_value()).map_err(crate::Error::message)
                 }
             }
 
@@ -338,37 +282,37 @@ impl<'de> serde::de::Visitor<'de> for PointerVisitor {
     }
 
     fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Bool(v)))
+        Ok(Pointer::Value(Value::Bool(v)))
     }
 
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Number(nova_reflect::Number::Int(
+        Ok(Pointer::Value(Value::Number(nova_reflect::Number::Int(
             nova_reflect::Int::I64(v),
         ))))
     }
 
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Number(nova_reflect::Number::Int(
+        Ok(Pointer::Value(Value::Number(nova_reflect::Number::Int(
             nova_reflect::Int::U64(v),
         ))))
     }
 
     fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Number(nova_reflect::Number::Float(
+        Ok(Pointer::Value(Value::Number(nova_reflect::Number::Float(
             nova_reflect::Float::F64(v),
         ))))
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Str(nova_reflect::Str::from(v))))
+        Ok(Pointer::Value(Value::Str(nova_reflect::Str::from(v))))
     }
 
     fn visit_unit<E>(self) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Null))
+        Ok(Pointer::Value(Value::Null))
     }
 
     fn visit_none<E>(self) -> Result<Self::Value, E> {
-        Ok(Pointer::new(Value::Null))
+        Ok(Pointer::Value(Value::Null))
     }
 
     fn visit_some<D: serde::Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
@@ -376,13 +320,13 @@ impl<'de> serde::de::Visitor<'de> for PointerVisitor {
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let mut items: Vec<Pointer> = Vec::new();
+        let mut items: Vec<Value> = Vec::new();
 
         while let Some(item) = seq.next_element::<Pointer>()? {
-            items.push(item);
+            items.push(item.into_value());
         }
 
-        Ok(Pointer::new(items))
+        Ok(Pointer::Value(nova_reflect::value_of!(items)))
     }
 
     fn visit_map<A: serde::de::MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
@@ -390,34 +334,34 @@ impl<'de> serde::de::Visitor<'de> for PointerVisitor {
         let mut map = nova_reflect::Map::new(&ty);
 
         while let Some((key, value)) = access.next_entry::<Pointer, Pointer>()? {
-            map.insert(key.value().to_owned(), value.value().to_owned());
+            map.insert(key.into_value(), value.into_value());
         }
 
-        Ok(Pointer::new(Value::Map(map)))
+        Ok(Pointer::Value(Value::Map(map)))
     }
 }
 
 impl From<Value> for Pointer {
     fn from(value: Value) -> Self {
-        Pointer::new(value)
+        Pointer::Value(value)
     }
 }
 
 impl From<&Value> for Pointer {
     fn from(value: &Value) -> Self {
-        Pointer::new(value.clone())
+        Pointer::Value(value.clone())
     }
 }
 
 impl From<ValueRef<'_>> for Pointer {
     fn from(value: ValueRef<'_>) -> Self {
-        Pointer::new(value.to_owned())
+        Pointer::Value(value.to_owned())
     }
 }
 
 impl From<&ValueRef<'_>> for Pointer {
     fn from(value: &ValueRef<'_>) -> Self {
-        Pointer::new(value.to_owned())
+        Pointer::Value(value.to_owned())
     }
 }
 
@@ -432,7 +376,7 @@ macro_rules! from_primitive {
         $(
             impl From<$ty> for Pointer {
                 fn from(value: $ty) -> Self {
-                    Pointer::new(Value::from(value))
+                    Pointer::Value(Value::from(value))
                 }
             }
         )*
@@ -443,13 +387,13 @@ from_primitive!(bool, i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, String);
 
 impl From<&str> for Pointer {
     fn from(value: &str) -> Self {
-        Pointer::new(Value::from(value.to_string()))
+        Pointer::Value(Value::from(value))
     }
 }
 
 impl From<&String> for Pointer {
     fn from(value: &String) -> Self {
-        Pointer::new(Value::from(value.clone()))
+        Pointer::Value(Value::from(value.clone()))
     }
 }
 
@@ -458,7 +402,8 @@ where
     T: Into<Pointer>,
 {
     fn from(value: Vec<T>) -> Self {
-        Pointer::new(value.into_iter().map(Into::into).collect::<Vec<Pointer>>())
+        let items: Vec<Value> = value.into_iter().map(|v| v.into().into_value()).collect();
+        Pointer::Value(nova_reflect::value_of!(items))
     }
 }
 
@@ -479,13 +424,5 @@ pub trait Namespace: Send + Sync + std::fmt::Debug + 'static {
 }
 
 pub fn is_truthy(value: &ValueRef<'_>) -> bool {
-    match value {
-        ValueRef::Bool(v) => *v,
-        ValueRef::Number(v) => v.to_f64() != 0.0,
-        ValueRef::Str(v) => !v.is_empty(),
-        ValueRef::Map(v) => !v.is_empty(),
-        ValueRef::Dynamic(v) if v.is_sequence() => !v.is_empty(),
-        ValueRef::Dynamic(_) => true,
-        ValueRef::Null | ValueRef::Undefined => false,
-    }
+    value.is_truthy()
 }

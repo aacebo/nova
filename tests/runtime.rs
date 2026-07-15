@@ -217,7 +217,7 @@ fn eval_predicate_and_call_isolation_across_a_chain() {
     runtime.call("caller", args!(n = 1)).unwrap();
     let recorded = seen.lock().unwrap();
     assert_eq!(recorded.len(), 1);
-    assert_eq!(recorded[0].get("n").map(|v| v.value().to_owned()), Some(Value::from(2)));
+    assert_eq!(recorded[0].get("n").cloned(), Some(Value::from(2)));
 }
 
 #[test]
@@ -297,7 +297,7 @@ fn manifest_hydrates_into_a_runnable_runtime() {
 
 #[test]
 fn call_step_passes_positional_and_named_args() {
-    let seen = Arc::new(Mutex::new(Vec::<(Pointer, Pointer)>::new()));
+    let seen = Arc::new(Mutex::new(Vec::<(Value, Value)>::new()));
     let sink = seen.clone();
     let recorder = Recorder::new();
 
@@ -320,12 +320,12 @@ fn call_step_passes_positional_and_named_args() {
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 1, "record should have run once");
     assert_eq!(
-        seen[0].0.value().as_str().map(|s| s.to_string()),
+        seen[0].0.as_str().map(|s| s.to_string()),
         Some("hello".to_string()),
         "positional arg resolves via var"
     );
     assert_eq!(
-        seen[0].1.value().as_str().map(|s| s.to_string()),
+        seen[0].1.as_str().map(|s| s.to_string()),
         Some("literal".to_string()),
         "named arg resolves as expression"
     );
@@ -336,8 +336,8 @@ fn call_step_passes_positional_and_named_args() {
 fn args_macro_routes_positional_kwargs_and_empty() {
     let runtime = nova::new()
         .func("echo", |args: &Args, _scope: &Scope| -> FuncResult {
-            let pos = args.at(0).value().to_string();
-            let tag = args.key("tag").value().to_string();
+            let pos = args.at(0).to_string();
+            let tag = args.key("tag").to_string();
             Ok(Value::from(format!("{pos}|{tag}")).into())
         })
         .build()

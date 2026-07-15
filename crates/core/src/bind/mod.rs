@@ -2,7 +2,7 @@ mod function;
 mod routine;
 
 pub use function::*;
-use nova_template::Pointer;
+use nova_reflect::Value;
 pub use routine::*;
 
 use crate::{Action, Call, Predicate};
@@ -11,7 +11,8 @@ use crate::{Action, Call, Predicate};
 pub enum Binding {
     Func(Function),
     Routine(Routine),
-    Value(Pointer),
+    Value(Value),
+    Pointer(nova_template::Pointer),
 }
 
 impl Binding {
@@ -31,8 +32,11 @@ impl Binding {
         Self::Routine(routine)
     }
 
-    pub fn value(value: Pointer) -> Self {
-        Self::Value(value)
+    pub fn value(value: impl Into<nova_template::Pointer>) -> Self {
+        match value.into() {
+            nova_template::Pointer::Value(v) => Self::Value(v),
+            other => Self::Pointer(other),
+        }
     }
 
     pub fn is_func(&self) -> bool {
@@ -61,14 +65,14 @@ impl Binding {
         }
     }
 
-    pub fn as_value(&self) -> Option<&Pointer> {
+    pub fn as_value(&self) -> Option<&Value> {
         match self {
             Self::Value(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_value_mut(&mut self) -> Option<&mut Pointer> {
+    pub fn as_value_mut(&mut self) -> Option<&mut Value> {
         match self {
             Self::Value(v) => Some(v),
             _ => None,
@@ -88,7 +92,7 @@ impl From<Routine> for Binding {
     }
 }
 
-impl<T: Into<Pointer>> From<T> for Binding {
+impl<T: Into<Value>> From<T> for Binding {
     fn from(value: T) -> Self {
         Self::Value(value.into())
     }
@@ -107,22 +111,20 @@ impl PartialEq for Binding {
     }
 }
 
-impl PartialEq<Pointer> for Binding {
-    fn eq(&self, other: &Pointer) -> bool {
-        if let Some(value) = self.as_value() {
-            *value == *other
-        } else {
-            false
+impl PartialEq<nova_template::Pointer> for Binding {
+    fn eq(&self, other: &nova_template::Pointer) -> bool {
+        match self.as_value() {
+            Some(value) => *other == *value,
+            None => false,
         }
     }
 }
 
-impl PartialEq<&Pointer> for Binding {
-    fn eq(&self, other: &&Pointer) -> bool {
-        if let Some(value) = self.as_value() {
-            *value == **other
-        } else {
-            false
+impl PartialEq<&nova_template::Pointer> for Binding {
+    fn eq(&self, other: &&nova_template::Pointer) -> bool {
+        match self.as_value() {
+            Some(value) => **other == *value,
+            None => false,
         }
     }
 }
@@ -130,7 +132,7 @@ impl PartialEq<&Pointer> for Binding {
 impl PartialEq<nova_reflect::ValueRef<'_>> for Binding {
     fn eq(&self, other: &nova_reflect::ValueRef<'_>) -> bool {
         match self.as_value() {
-            Some(value) => value.value() == *other,
+            Some(value) => value.as_ref() == *other,
             None => false,
         }
     }
@@ -139,7 +141,7 @@ impl PartialEq<nova_reflect::ValueRef<'_>> for Binding {
 impl PartialEq<nova_reflect::Value> for Binding {
     fn eq(&self, other: &nova_reflect::Value) -> bool {
         match self.as_value() {
-            Some(value) => value.value() == other.as_ref(),
+            Some(value) => value == other,
             None => false,
         }
     }
@@ -152,6 +154,7 @@ impl serde::Serialize for Binding {
     {
         match self {
             Self::Value(v) => v.serialize(serializer),
+            Self::Pointer(v) => v.serialize(serializer),
             Self::Routine(v) => v.name().serialize(serializer),
             Self::Func(v) => v.name().serialize(serializer),
         }

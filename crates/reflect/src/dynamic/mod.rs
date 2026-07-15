@@ -119,10 +119,17 @@ impl crate::ToValue for Dynamic {
 }
 
 impl Object for Dynamic {
-    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
+        match self {
+            Self::Object(v) => v.field_by_ref(name),
+            _ => crate::ValueRef::Undefined,
+        }
+    }
+
+    fn field(&self, name: &str) -> crate::Value {
         match self {
             Self::Object(v) => v.field(name),
-            _ => crate::ValueRef::Undefined,
+            _ => crate::Value::Undefined,
         }
     }
 
@@ -142,10 +149,17 @@ impl Sequence for Dynamic {
         }
     }
 
-    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+    fn index_by_ref(&self, i: usize) -> crate::ValueRef<'_> {
+        match self {
+            Self::Sequence(v) => v.index_by_ref(i),
+            _ => crate::ValueRef::Undefined,
+        }
+    }
+
+    fn index(&self, i: usize) -> crate::Value {
         match self {
             Self::Sequence(v) => v.index(i),
-            _ => crate::ValueRef::Undefined,
+            _ => crate::Value::Undefined,
         }
     }
 }
@@ -249,15 +263,15 @@ impl<'a> DynamicRef<'a> {
                 if let Some(st) = v.to_type().to_struct() {
                     for field in st.fields().iter() {
                         let name = field.name().to_string();
-                        map.insert(crate::Value::Str(crate::Str::from(name.as_str())), v.field(&name).to_owned());
+                        map.insert(crate::Value::Str(crate::Str::from(name.as_str())), v.field(&name));
                     }
                 }
 
                 crate::Value::Map(map)
             }
             Self::Sequence(v) => {
-                let data = (0..v.len()).map(|i| v.index(i).to_owned()).collect::<Vec<_>>();
-                crate::Value::Dynamic(Dynamic::from_sequence(Arc::new(OwnedSequence::new(data))))
+                let data: Vec<crate::Value> = v.iter().collect();
+                crate::Value::Dynamic(Dynamic::from_sequence(Arc::new(data)))
             }
         }
     }
@@ -307,10 +321,17 @@ impl<'a> crate::ToValue for DynamicRef<'a> {
 }
 
 impl<'a> Object for DynamicRef<'a> {
-    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
+        match self {
+            Self::Object(v) => v.field_by_ref(name),
+            _ => crate::ValueRef::Undefined,
+        }
+    }
+
+    fn field(&self, name: &str) -> crate::Value {
         match self {
             Self::Object(v) => v.field(name),
-            _ => crate::ValueRef::Undefined,
+            _ => crate::Value::Undefined,
         }
     }
 
@@ -330,10 +351,17 @@ impl<'a> Sequence for DynamicRef<'a> {
         }
     }
 
-    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+    fn index_by_ref(&self, i: usize) -> crate::ValueRef<'_> {
+        match self {
+            Self::Sequence(v) => v.index_by_ref(i),
+            _ => crate::ValueRef::Undefined,
+        }
+    }
+
+    fn index(&self, i: usize) -> crate::Value {
         match self {
             Self::Sequence(v) => v.index(i),
-            _ => crate::ValueRef::Undefined,
+            _ => crate::Value::Undefined,
         }
     }
 }

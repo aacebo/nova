@@ -99,7 +99,7 @@ impl crate::ToValue for MetaData {
 }
 
 impl crate::Object for MetaData {
-    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
         self.get(name).map(crate::Value::as_ref).unwrap_or(crate::ValueRef::Undefined)
     }
 }

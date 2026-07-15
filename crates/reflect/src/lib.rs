@@ -51,5 +51,5 @@ pub mod values;
 pub use nova_reflect_macros::*;
 pub use values::*;
 
-#[cfg(feature = "json")]
+#[cfg(any(feature = "json", feature = "minijinja"))]
 mod compat;

@@ -159,7 +159,7 @@ where
     K: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
     V: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
-    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
         for (k, v) in self {
             if k.to_value_ref().to_string() == name {
                 return v.to_value_ref();
@@ -198,7 +198,7 @@ where
     K: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
     V: std::fmt::Debug + Send + Sync + crate::TypeOf + crate::ToValue + 'static,
 {
-    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
         for (k, v) in self {
             if k.to_value_ref().to_string() == name {
                 return v.to_value_ref();

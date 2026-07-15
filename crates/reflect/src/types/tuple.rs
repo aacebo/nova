@@ -195,7 +195,7 @@ where
     A: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
     B: Clone + std::fmt::Debug + Send + Sync + crate::ToType + crate::ToValue + 'static,
 {
-    fn field(&self, name: &str) -> crate::ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
         match name {
             "0" => self.0.to_value_ref(),
             "1" => self.1.to_value_ref(),

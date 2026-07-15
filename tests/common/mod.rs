@@ -12,7 +12,7 @@ pub struct Recorder(Arc<Inner>);
 #[derive(Default)]
 struct Inner {
     calls: Mutex<Vec<String>>,
-    updates: Mutex<Vec<(String, Pointer, Pointer)>>,
+    updates: Mutex<Vec<(String, nova::reflect::Value, nova::reflect::Value)>>,
     errors: Mutex<Vec<String>>,
     diagnostics: Mutex<Vec<Diagnostic>>,
     events: Mutex<usize>,
@@ -29,7 +29,7 @@ impl Recorder {
         self.0.calls.lock().unwrap().clone()
     }
 
-    pub fn updates(&self) -> Vec<(String, Pointer, Pointer)> {
+    pub fn updates(&self) -> Vec<(String, nova::reflect::Value, nova::reflect::Value)> {
         self.0.updates.lock().unwrap().clone()
     }
 
@@ -104,5 +104,5 @@ impl Recorder {
 }
 
 pub fn to_pointer<T: nova::reflect::ToValue>(value: T) -> Pointer {
-    Pointer::new(value.to_value().to_owned())
+    Pointer::Value(value.to_value())
 }

@@ -14,7 +14,7 @@ impl<'a> crate::Sequence for &'a [crate::ValueRef<'a>] {
         <[crate::ValueRef<'a>]>::len(self)
     }
 
-    fn index(&self, i: usize) -> crate::ValueRef<'_> {
+    fn index_by_ref(&self, i: usize) -> crate::ValueRef<'_> {
         match self.get(i) {
             None => crate::ValueRef::Null,
             Some(v) => v.clone(),

@@ -70,13 +70,13 @@ impl FromArgs for RequestArgs {
     fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
         let uri = args.str(0).ok_or(nova_core::Error::message("uri must be a string"))?;
 
-        let body = args.at(1).value().as_str().map(|s| Body::Text(s.to_string()));
+        let body = args.str(1).map(Body::Text);
 
         let mut headers = Vec::new();
 
         let headers_value = args.key("headers");
 
-        if let Some(map) = headers_value.value().as_map() {
+        if let Some(map) = headers_value.as_map() {
             for (key, header) in map.iter() {
                 let key = key
                     .as_str()

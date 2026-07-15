@@ -18,7 +18,7 @@ impl ToType for Annotation {
 }
 
 impl Object for Annotation {
-    fn field(&self, name: &str) -> ValueRef<'_> {
+    fn field_by_ref(&self, name: &str) -> ValueRef<'_> {
         match name {
             "name" => ValueRef::Str(&self.name),
             "label" => ValueRef::Str(&self.label),
@@ -28,11 +28,30 @@ impl Object for Annotation {
             _ => ValueRef::Undefined,
         }
     }
+
+    fn field(&self, name: &str) -> nova_reflect::Value {
+        match name {
+            "spans" => {
+                let spans: Vec<nova_reflect::Value> = self
+                    .spans
+                    .iter()
+                    .map(|s| nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(*s))))
+                    .collect();
+
+                nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_sequence(std::sync::Arc::new(spans)))
+            }
+            _ => self.field_by_ref(name).to_owned(),
+        }
+    }
 }
 
 impl ToValue for Annotation {
     fn to_value_ref(&self) -> ValueRef<'_> {
         ValueRef::Dynamic(DynamicRef::from_object(self))
+    }
+
+    fn to_value(&self) -> nova_reflect::Value {
+        nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(self.clone())))
     }
 }
 

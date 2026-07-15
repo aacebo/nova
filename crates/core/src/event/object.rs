@@ -1,11 +1,12 @@
-use nova_template::{KArgs, Pointer};
+use nova_reflect::Value;
+use nova_template::KArgs;
 
 use super::Source;
 
 pub fn call(
     name: impl Into<String>,
-    args: impl IntoIterator<Item = impl Into<Pointer>>,
-    kargs: impl IntoIterator<Item = (impl Into<String>, impl Into<Pointer>)>,
+    args: impl IntoIterator<Item = impl Into<Value>>,
+    kargs: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>,
 ) -> ObjectEvent {
     ObjectEvent::Call(CallEvent {
         name: name.into(),
@@ -14,7 +15,7 @@ pub fn call(
     })
 }
 
-pub fn update(name: impl Into<String>, from: impl Into<Pointer>, to: impl Into<Pointer>) -> ObjectEvent {
+pub fn update(name: impl Into<String>, from: impl Into<Value>, to: impl Into<Value>) -> ObjectEvent {
     ObjectEvent::Update(UpdateEvent {
         name: name.into(),
         from: from.into(),
@@ -32,7 +33,7 @@ pub enum ObjectEvent {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CallEvent {
     pub name: String,
-    pub args: Vec<Pointer>,
+    pub args: Vec<Value>,
     pub kargs: KArgs,
 }
 
@@ -51,8 +52,8 @@ impl From<CallEvent> for ObjectEvent {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct UpdateEvent {
     pub name: String,
-    pub from: Pointer,
-    pub to: Pointer,
+    pub from: Value,
+    pub to: Value,
 }
 
 impl From<UpdateEvent> for Source {

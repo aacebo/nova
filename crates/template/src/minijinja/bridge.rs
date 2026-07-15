@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use minijinja::value::{Enumerator, Object, ObjectRepr, ValueKind};
 use minijinja::{Error, ErrorKind, State};
-use nova_reflect::{Int, Number, Value, ValueRef};
+use nova_reflect::{Int, Number, Value};
 
 use crate::{Args, Context, KArgs, Pointer};
 
@@ -13,31 +13,44 @@ pub(crate) fn from_minijinja(value: &minijinja::Value) -> Pointer {
         return pointer.clone();
     }
 
+    if let Some(reflected) = value.downcast_object_ref::<Value>() {
+        return Pointer::Value(reflected.clone());
+    }
+
+    Pointer::Value(value_from_minijinja(value))
+}
+
+fn value_from_minijinja(value: &minijinja::Value) -> Value {
+    if let Some(reflected) = value.downcast_object_ref::<Value>() {
+        return reflected.clone();
+    }
+
     match value.kind() {
         ValueKind::Map => {
-            let mut entries: std::collections::BTreeMap<Pointer, Pointer> = std::collections::BTreeMap::new();
+            let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
+            let mut map = nova_reflect::Map::new(&ty);
 
             if let Ok(keys) = value.try_iter() {
                 for key in keys {
                     let item = value.get_item(&key).unwrap_or_default();
-                    entries.insert(from_minijinja(&key), from_minijinja(&item));
+                    map.insert(value_from_minijinja(&key), value_from_minijinja(&item));
                 }
             }
 
-            Pointer::new(entries)
+            Value::Map(map)
         }
         ValueKind::Seq | ValueKind::Iterable => {
-            let mut items: Vec<Pointer> = Vec::new();
+            let mut items: Vec<Value> = Vec::new();
 
             if let Ok(values) = value.try_iter() {
                 for item in values {
-                    items.push(from_minijinja(&item));
+                    items.push(value_from_minijinja(&item));
                 }
             }
 
-            Pointer::new(items)
+            nova_reflect::value_of!(items)
         }
-        _ => Pointer::new(scalar_from_minijinja(value)),
+        _ => scalar_from_minijinja(value),
     }
 }
 
@@ -61,33 +74,27 @@ fn scalar_from_minijinja(value: &minijinja::Value) -> Value {
     }
 }
 
-pub(crate) fn to_minijinja(value: ValueRef<'_>) -> minijinja::Value {
+pub(crate) fn value_to_minijinja(value: Value) -> minijinja::Value {
     match value {
-        ValueRef::Bool(v) => minijinja::Value::from(v),
-        ValueRef::Number(v) => match v {
+        Value::Map(_) | Value::Dynamic(_) => minijinja::Value::from_object(value),
+        Value::Bool(v) => minijinja::Value::from(v),
+        Value::Number(v) => match v {
             Number::Int(Int::U64(n)) => minijinja::Value::from(n),
             Number::Int(i) => minijinja::Value::from(i.to_i128() as i64),
             Number::Float(f) => minijinja::Value::from(f.to_f64_raw()),
         },
-        ValueRef::Str(v) => minijinja::Value::from(v.to_string()),
-        ValueRef::Null => minijinja::Value::from(()),
-        ValueRef::Undefined => minijinja::Value::UNDEFINED,
-        ValueRef::Dynamic(_) => minijinja::Value::UNDEFINED,
-        other => minijinja::Value::from_object(Pointer::new(other.to_owned())),
+        Value::Str(v) => minijinja::Value::from(v.to_string()),
+        Value::Null => minijinja::Value::from(()),
+        Value::Undefined => minijinja::Value::UNDEFINED,
     }
 }
 
 pub(crate) fn pointer_to_minijinja(pointer: Pointer) -> minijinja::Value {
-    let composite = {
-        let value = pointer.value();
-        value.is_dynamic() || value.is_map()
-    };
-
-    if composite || pointer.is_callable() || pointer.as_namespace().is_some() {
+    if pointer.is_callable() || pointer.as_namespace().is_some() {
         return minijinja::Value::from_object(pointer);
     }
 
-    to_minijinja(pointer.value())
+    value_to_minijinja(pointer.into_value())
 }
 
 fn kwargs_to_kargs(kwargs: minijinja::value::Kwargs) -> Result<KArgs, Error> {
@@ -95,7 +102,7 @@ fn kwargs_to_kargs(kwargs: minijinja::value::Kwargs) -> Result<KArgs, Error> {
 
     for key in kwargs.args() {
         let value: minijinja::Value = kwargs.get(key)?;
-        kargs.set(key, from_minijinja(&value));
+        kargs.set(key, value_from_minijinja(&value));
     }
 
     kwargs.assert_all_used()?;
@@ -106,7 +113,7 @@ fn to_args(state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<Args, Err
     let (positional, kwargs): (&[minijinja::Value], minijinja::value::Kwargs) = minijinja::value::from_args(args)?;
 
     let args = Args::new(
-        positional.iter().map(from_minijinja).collect::<Vec<_>>(),
+        positional.iter().map(value_from_minijinja).collect::<Vec<_>>(),
         kwargs_to_kargs(kwargs)?,
     );
 
@@ -124,12 +131,7 @@ impl Object for Pointer {
             return ObjectRepr::Map;
         }
 
-        match self.value() {
-            ValueRef::Map(_) => ObjectRepr::Map,
-            ValueRef::Dynamic(d) if d.is_sequence() => ObjectRepr::Seq,
-            ValueRef::Dynamic(d) if d.is_object() => ObjectRepr::Map,
-            _ => ObjectRepr::Plain,
-        }
+        ObjectRepr::Plain
     }
 
     fn get_value(self: &Arc<Self>, key: &minijinja::Value) -> Option<minijinja::Value> {
@@ -137,73 +139,7 @@ impl Object for Pointer {
             return self.field(key.as_str()?).map(pointer_to_minijinja);
         }
 
-        let value = self.value();
-
-        if value.is_map() {
-            return self.key(scalar_from_minijinja(key)).map(pointer_to_minijinja);
-        }
-
-        let dynamic = value.as_dynamic()?;
-
-        if dynamic.is_object() {
-            let name = match key.as_str() {
-                Some(v) => v.to_string(),
-                None => key.as_usize()?.to_string(),
-            };
-
-            return self.field(&name).map(pointer_to_minijinja);
-        }
-
-        if dynamic.is_sequence() {
-            return self.index(key.as_usize()?).map(pointer_to_minijinja);
-        }
-
         None
-    }
-
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        let value = self.value();
-
-        if let ValueRef::Map(map) = &value {
-            let keys: Vec<minijinja::Value> = map.keys().map(|k| to_minijinja(k.as_ref())).collect();
-            return Enumerator::Values(keys);
-        }
-
-        let Some(dynamic) = value.as_dynamic() else {
-            return Enumerator::NonEnumerable;
-        };
-
-        if dynamic.is_sequence() {
-            return Enumerator::Seq(dynamic.len());
-        }
-
-        if dynamic.is_object() {
-            let keys: Vec<minijinja::Value> = dynamic
-                .to_type()
-                .to_struct()
-                .map(|ty| {
-                    ty.fields()
-                        .iter()
-                        .map(|f| minijinja::Value::from(f.name().to_string()))
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            return Enumerator::Values(keys);
-        }
-
-        Enumerator::NonEnumerable
-    }
-
-    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
-        let value = self.value();
-
-        match &value {
-            ValueRef::Map(map) => Some(map.len()),
-            ValueRef::Dynamic(d) if d.is_sequence() => Some(d.len()),
-            ValueRef::Dynamic(d) if d.is_object() => d.to_type().to_struct().map(|t| t.len()),
-            _ => None,
-        }
     }
 
     fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -239,18 +175,7 @@ impl Object for Pointer {
                 .map_err(|e| Error::new(ErrorKind::InvalidOperation, e.to_string()));
         }
 
-        let value = self.value();
-        let object = value
-            .as_dynamic()
-            .and_then(|d| d.as_object())
-            .ok_or_else(|| Error::new(ErrorKind::UnknownMethod, format!("no method '{name}'")))?;
-
-        let owned: Vec<Pointer> = args.iter().map(from_minijinja).collect();
-        let values: Vec<ValueRef> = owned.iter().map(|p| p.value()).collect();
-
-        nova_reflect::Object::call(object, name, &values)
-            .map(|v| to_minijinja(v.as_ref()))
-            .map_err(|e| Error::new(ErrorKind::InvalidOperation, e))
+        Err(Error::new(ErrorKind::UnknownMethod, format!("no method '{name}'")))
     }
 }
 

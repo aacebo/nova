@@ -99,7 +99,6 @@ pub fn borrow(text: &[String]) -> Vec<&str> {
 
 fn text(args: &Args) -> RoutineResult<Vec<String>> {
     let value = args.at(0);
-    let value = value.value();
 
     if let Some(text) = value.as_str() {
         return Ok(vec![text.to_string()]);
@@ -124,7 +123,6 @@ fn text(args: &Args) -> RoutineResult<Vec<String>> {
 
 fn min_score(args: &Args) -> RoutineResult<f64> {
     let value = args.key("min_score");
-    let value = value.value();
 
     if value.is_null() || value.is_undefined() {
         return Ok(0.0);
@@ -143,7 +141,6 @@ fn is_uri(model: &str) -> bool {
 
 fn string(args: &Args, key: &str) -> RoutineResult<Option<String>> {
     let value = args.key(key);
-    let value = value.value();
 
     if value.is_null() || value.is_undefined() {
         return Ok(None);
