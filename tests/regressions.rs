@@ -2,7 +2,7 @@ mod common;
 
 use common::Recorder;
 use nova::reflect::Value;
-use nova::{Args, Binding, Scope, args};
+use nova::{Binding, Scope, args};
 
 fn recorder_runtime(recorder: &Recorder) -> nova::Builder {
     nova::new().observe(recorder.clone())
@@ -12,9 +12,8 @@ fn recorder_runtime(recorder: &Recorder) -> nova::Builder {
 fn scope_args_resolve_in_a_template() {
     let recorder = Recorder::new();
     let runtime = recorder_runtime(&recorder)
-        .action("show", |_args: &Args, scope: &dyn nova::Context| {
-            let scope = scope.cast::<Scope>().unwrap();
-            let out = scope.render_str("{{ args[0] }}-{{ args[1] }}-{{ args | length }}")?;
+        .action("show", |scope: &dyn nova::Context| {
+            let out = scope.render("{{ args[0] }}-{{ args[1] }}-{{ args | length }}")?;
             nova::info!("{}", out).emit(scope);
             Ok(())
         })
@@ -35,10 +34,9 @@ fn json_arrays_round_trip_as_arrays() {
     let recorder = Recorder::new();
     let runtime = recorder_runtime(&recorder)
         .json()
-        .action("go", |_args: &Args, scope: &dyn nova::Context| {
-            let scope = scope.cast::<Scope>().unwrap();
+        .action("go", |scope: &dyn nova::Context| {
             for src in ["[1,2,3]", "{\"a\":{\"b\":[1,2,3]}}", "[[1,2],[3]]", "[{\"x\":1},{\"x\":2}]"] {
-                let out = scope.render_str(&format!("{{{{ json.encode(json.decode('{src}')) }}}}"))?;
+                let out = scope.render(&format!("{{{{ json.encode(json.decode('{src}')) }}}}"))?;
                 nova::info!("{}", out).emit(scope);
             }
 
@@ -65,9 +63,8 @@ fn decoded_arrays_are_sequences_not_index_keyed_maps() {
     let recorder = Recorder::new();
     let runtime = recorder_runtime(&recorder)
         .json()
-        .action("go", |_args: &Args, scope: &dyn nova::Context| {
-            let scope = scope.cast::<Scope>().unwrap();
-            let out = scope.render_str(
+        .action("go", |scope: &dyn nova::Context| {
+            let out = scope.render(
                 "{% set xs = json.decode('[10,20,30]') %}{{ xs | length }}:{{ xs[1] }}:{% for x in xs %}{{ x }},{% endfor %}",
             )?;
             nova::info!("{}", out).emit(scope);
@@ -91,9 +88,8 @@ fn a_list_var_iterates_and_indexes() {
     let recorder = Recorder::new();
     let runtime = recorder_runtime(&recorder)
         .var("xs", vec!["a", "b", "c"])
-        .action("go", |_args: &Args, scope: &dyn nova::Context| {
-            let scope = scope.cast::<Scope>().unwrap();
-            let out = scope.render_str("{{ xs | length }}:{{ xs[2] }}")?;
+        .action("go", |scope: &dyn nova::Context| {
+            let out = scope.render("{{ xs | length }}:{{ xs[2] }}")?;
             nova::info!("{}", out).emit(scope);
             Ok(())
         })
@@ -122,9 +118,8 @@ fn fs_write_round_trips_binary_bytes() {
         .fs()
         .var("path", path.to_string_lossy().to_string())
         .var("blob", bytes)
-        .action("go", |_args: &Args, scope: &dyn nova::Context| {
-            let scope = scope.cast::<Scope>().unwrap();
-            scope.render_str("{{ fs.write(path, blob) }}")?;
+        .action("go", |scope: &dyn nova::Context| {
+            scope.render("{{ fs.write(path, blob) }}")?;
             Ok(())
         })
         .build()
@@ -143,7 +138,8 @@ fn fs_write_round_trips_binary_bytes() {
 fn karg_helpers_are_available() {
     let recorder = Recorder::new();
     let runtime = recorder_runtime(&recorder)
-        .func("f", |args: &Args, _scope: &dyn nova::Context| {
+        .func("f", |scope: &dyn nova::Context| {
+            let args = scope.args();
             let n: u64 = args.kargs().get_required("n")?;
             let missing: u64 = args.kargs().get_or_default("nope");
             Ok(Binding::from(Value::from(n + missing)))
@@ -156,40 +152,25 @@ fn karg_helpers_are_available() {
 }
 
 #[derive(Debug, Default)]
-struct UpperEngine {
-    templates: std::collections::BTreeMap<String, String>,
-}
+struct UpperEngine;
 
-impl nova::Engine for UpperEngine {
-    fn add_template(&mut self, name: &str, source: &str) -> Result<(), nova::Error> {
-        self.templates.insert(name.to_string(), source.to_string());
-        Ok(())
-    }
+impl nova::TemplateEngine for UpperEngine {
+    type Context = Scope;
 
-    fn render(&self, name: &str, ctx: &std::sync::Arc<dyn nova::Context>) -> Result<String, nova::Error> {
-        let src = self
-            .templates
-            .get(name)
-            .ok_or_else(|| nova::Error::message(format!("no template '{name}'")))?
-            .clone();
+    fn render(&self, src: &str, ctx: &Scope) -> Result<String, nova::Error> {
+        let mut out = src.to_string();
 
-        self.render_str(&src, ctx)
-    }
-
-    fn render_str(&self, source: &str, ctx: &std::sync::Arc<dyn nova::Context>) -> Result<String, nova::Error> {
-        let mut out = source.to_string();
-
-        for key in ctx.names() {
-            if let Some(v) = ctx.resolve(&key) {
-                out = out.replace(&format!("{{{key}}}"), &v.value().to_string());
+        for (key, value) in ctx.iter() {
+            if let Some(key) = key.as_str() {
+                out = out.replace(&format!("{{{key}}}"), &value.to_string());
             }
         }
 
         Ok(out.to_uppercase())
     }
 
-    fn eval(&self, expr: &str, ctx: &std::sync::Arc<dyn nova::Context>) -> Result<Binding, nova::Error> {
-        Ok(ctx.resolve(expr).unwrap_or_else(|| Binding::new(Value::Null)))
+    fn eval(&self, src: &str, ctx: &Scope) -> Result<Value, nova::Error> {
+        Ok(nova::Context::get(ctx, src).map(|v| v.into_value()).unwrap_or(Value::Null))
     }
 }
 
@@ -197,11 +178,10 @@ impl nova::Engine for UpperEngine {
 fn a_custom_engine_can_replace_minijinja() {
     let recorder = Recorder::new();
     let runtime = recorder_runtime(&recorder)
-        .engine(UpperEngine::default)
+        .engine(UpperEngine)
         .var("who", "world")
-        .action("go", |_args: &Args, scope: &dyn nova::Context| {
-            let scope = scope.cast::<Scope>().unwrap();
-            let out = scope.render_str("hello {who}")?;
+        .action("go", |scope: &dyn nova::Context| {
+            let out = scope.render("hello {who}")?;
             nova::info!("{}", out).emit(scope);
             Ok(())
         })

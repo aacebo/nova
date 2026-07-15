@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use nova_reflect::Value;
 
-use crate::{Action, Args, Binding, Call, Context, Error, Predicate};
+use crate::{Action, Binding, Call, Context, Error, Func, Predicate};
 
 #[derive(Clone)]
 pub struct Function {
@@ -26,7 +26,7 @@ impl Function {
         Self::new(name, Callback::predicate(predicate))
     }
 
-    pub fn func(name: impl Into<String>, func: impl crate::Func + 'static) -> Self {
+    pub fn func(name: impl Into<String>, func: impl Func + 'static) -> Self {
         Self::new(name, Callback::func(func))
     }
 
@@ -42,8 +42,8 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-        self.callback.invoke(args, ctx)
+    pub fn invoke(&self, ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+        self.callback.invoke(ctx)
     }
 }
 
@@ -54,13 +54,8 @@ impl std::fmt::Debug for Function {
 }
 
 impl Call for Function {
-    fn call(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Error> {
-        let child = ctx.fork(&self.name, args.args().to_vec(), args.kargs().clone());
-        let child_args = Args::new(child.args().to_vec(), child.kargs().clone());
-
-        self.callback
-            .invoke(&child_args, child.as_ref())
-            .map_err(|err| Error::message(err.to_string()))
+    fn call(&self, ctx: &dyn Context) -> Result<Binding, Error> {
+        self.callback.invoke(ctx).map_err(|err| Error::message(err.to_string()))
     }
 }
 
@@ -74,7 +69,7 @@ impl From<Function> for Binding {
 pub enum Callback {
     Action(Arc<dyn Action>),
     Predicate(Arc<dyn Predicate>),
-    Func(Arc<dyn crate::Func>),
+    Func(Arc<dyn Func>),
 }
 
 impl Callback {
@@ -86,18 +81,18 @@ impl Callback {
         Self::Predicate(Arc::new(predicate))
     }
 
-    pub fn func(func: impl crate::Func + 'static) -> Self {
+    pub fn func(func: impl Func + 'static) -> Self {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
-                action.invoke(args, ctx)?;
+                action.invoke(ctx)?;
                 Ok(Binding::new(Value::Null))
             }
-            Self::Predicate(predicate) => Ok(Binding::new(Value::Bool(predicate.invoke(args, ctx)?))),
-            Self::Func(func) => func.invoke(args, ctx),
+            Self::Predicate(predicate) => Ok(Binding::new(Value::Bool(predicate.invoke(ctx)?))),
+            Self::Func(func) => func.invoke(ctx),
         }
     }
 }

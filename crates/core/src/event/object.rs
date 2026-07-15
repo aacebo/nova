@@ -1,17 +1,12 @@
 use nova_reflect::Value;
 
 use super::Source;
-use crate::KArgs;
+use crate::Args;
 
-pub fn call(
-    name: impl Into<String>,
-    args: impl IntoIterator<Item = impl Into<Value>>,
-    kargs: impl IntoIterator<Item = (impl Into<String>, impl Into<Value>)>,
-) -> ObjectEvent {
+pub fn call(name: impl Into<String>, args: impl Into<Args>) -> ObjectEvent {
     ObjectEvent::Call(CallEvent {
         name: name.into(),
-        args: args.into_iter().map(|v| v.into()).collect(),
-        kargs: kargs.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
+        args: args.into(),
     })
 }
 
@@ -33,8 +28,7 @@ pub enum ObjectEvent {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CallEvent {
     pub name: String,
-    pub args: Vec<Value>,
-    pub kargs: KArgs,
+    pub args: Args,
 }
 
 impl From<CallEvent> for Source {

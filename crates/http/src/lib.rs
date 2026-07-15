@@ -22,20 +22,20 @@ impl Namespace for Client {
     }
 }
 
-pub fn get(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    send(reqwest::Method::GET, args)
+pub fn get(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    send(reqwest::Method::GET, ctx.args())
 }
 
-pub fn post(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    send(reqwest::Method::POST, args)
+pub fn post(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    send(reqwest::Method::POST, ctx.args())
 }
 
-pub fn put(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    send(reqwest::Method::PUT, args)
+pub fn put(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    send(reqwest::Method::PUT, ctx.args())
 }
 
-pub fn patch(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    send(reqwest::Method::PATCH, args)
+pub fn patch(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    send(reqwest::Method::PATCH, ctx.args())
 }
 
 pub enum Body {

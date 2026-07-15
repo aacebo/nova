@@ -2,22 +2,36 @@ use std::sync::Arc;
 
 use nova_reflect::Value;
 
-use crate::{Args, Binding, Diagnostic, Error, KArgs, Severity, event};
+use crate::{Args, Binding, Diagnostic, Error, Severity, event};
 
-pub trait Context: Send + Sync + std::fmt::Debug {
+pub trait Context: Send + Sync + std::fmt::Debug + 'static {
     fn trace_id(&self) -> ulid::Ulid;
     fn name(&self) -> &str;
-    fn args(&self) -> &[Value];
-    fn kargs(&self) -> &KArgs;
-    fn resolve(&self, name: &str) -> Option<Binding>;
-    fn names(&self) -> Vec<String>;
-    fn call(&self, name: &str, args: Args) -> Result<Binding, Error>;
-    fn eval(&self, expr: &str) -> Result<Binding, Error>;
-    fn render(&self, name: &str) -> Result<String, Error>;
-    fn render_str(&self, source: &str) -> Result<String, Error>;
+    fn args(&self) -> &Args;
     fn dispatch(&self, source: event::Source);
-    fn fork(&self, name: &str, args: Vec<Value>, kargs: KArgs) -> Arc<dyn Context>;
-    fn as_any(&self) -> &dyn std::any::Any;
+    fn next(&self, name: &str, args: Args) -> Arc<dyn Context>;
+
+    fn has(&self, key: &str) -> bool;
+    fn get(&self, key: &str) -> Option<Binding>;
+    fn declare(&self, key: &str, value: Value);
+    fn set(&self, key: &str, value: Value) -> Result<(), Error>;
+    fn del(&self, key: &str);
+
+    fn render(&self, src: &str) -> Result<String, Error>;
+    fn eval(&self, src: &str) -> Result<Value, Error>;
+
+    fn call(&self, name: &str, args: Args) -> Result<Binding, Error> {
+        let binding = self
+            .get(name)
+            .ok_or_else(|| Error::action(self.trace_id(), name, "not found"))?;
+
+        let call = binding
+            .as_call()
+            .ok_or_else(|| Error::action(self.trace_id(), name, "not callable"))?;
+
+        self.dispatch(event::object::call(name, args.clone()).into());
+        call.call(self.next(name, args).as_ref())
+    }
 
     fn emit(&self, diagnostic: Diagnostic) {
         self.dispatch(diagnostic.into());
@@ -25,15 +39,5 @@ pub trait Context: Send + Sync + std::fmt::Debug {
 
     fn error(&self, message: &str) {
         self.emit(Diagnostic::new(self.trace_id()).sev(Severity::Error).message(message));
-    }
-}
-
-impl dyn Context + '_ {
-    pub fn cast<T: 'static>(&self) -> Option<&T> {
-        self.as_any().downcast_ref::<T>()
-    }
-
-    pub fn is<T: 'static>(&self) -> bool {
-        self.as_any().is::<T>()
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use nova_core::{Action, Args, Binding, Call, Context, Error, Namespace, Step, event};
+use nova_core::{Action, Binding, Call, Context, Error, Namespace, Step, event};
 use nova_reflect::Value;
 
 use crate::Scope;
@@ -45,7 +45,7 @@ impl Routine {
         Some((*slot).clone())
     }
 
-    fn validate(&self, args: &Args, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
+    fn validate(&self, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
         let Some(validator) = &self.validator else {
             return Ok(());
         };
@@ -53,7 +53,7 @@ impl Routine {
         let ty = nova_reflect::MapType::new(nova_reflect::Type::Any, nova_reflect::Type::Any, nova_reflect::Type::Any);
         let mut instance = nova_reflect::Map::new(&ty);
 
-        for (key, value) in args.iter() {
+        for (key, value) in ctx.args().iter() {
             instance.insert(key, value.to_owned());
         }
 
@@ -80,22 +80,25 @@ impl Namespace for Routine {
     }
 
     fn members(&self) -> Vec<String> {
-        Context::names(&self.scope)
+        self.scope
+            .iter()
+            .filter_map(|(key, _)| key.as_str().map(|s| s.to_string()))
+            .collect()
     }
 }
 
 impl Call for Routine {
-    fn call(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Error> {
-        self.invoke(args, ctx).map_err(|err| Error::message(err.to_string()))?;
+    fn call(&self, ctx: &dyn Context) -> Result<Binding, Error> {
+        self.invoke(ctx).map_err(|err| Error::message(err.to_string()))?;
         Ok(Binding::new(Value::Null))
     }
 }
 
 impl Action for Routine {
-    fn invoke(&self, args: &Args, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
-        self.validate(args, ctx)?;
+    fn invoke(&self, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
+        self.validate(ctx)?;
 
-        let child = self.scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
+        let child = self.scope.next(&self.name, ctx.args().clone());
         let total = self.steps.len();
 
         for (index, step) in self.steps.iter().enumerate() {

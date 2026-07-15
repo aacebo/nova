@@ -2,9 +2,11 @@ use std::sync::Arc;
 
 use minijinja::value::{Enumerator, Object, ObjectRepr};
 use minijinja::{ErrorKind, State};
-use nova_core::{Args, Binding, Context, Engine, Error, KArgs};
+use nova_core::{Args, Binding, Context, Error, KArgs, TemplateEngine};
 use nova_reflect::ToValue;
 use nova_reflect::compat::minijinja::value_to_minijinja;
+
+use crate::Scope;
 
 const CONTEXT_KEY: &str = "__$ctx__";
 
@@ -25,8 +27,8 @@ impl Minijinja {
         }
     }
 
-    fn root(ctx: &Arc<dyn Context>) -> minijinja::Value {
-        minijinja::Value::from_object(ContextObject::new(ctx.clone()))
+    fn root(ctx: &Scope) -> minijinja::Value {
+        minijinja::Value::from_object(ContextObject(ctx.clone()))
     }
 }
 
@@ -36,25 +38,15 @@ impl std::fmt::Debug for Minijinja {
     }
 }
 
-impl Engine for Minijinja {
-    fn add_template(&mut self, name: &str, source: &str) -> Result<(), Error> {
-        self.env
-            .add_template_owned(name.to_string(), source.to_string())
-            .map_err(into_error)?;
-        Ok(())
+impl TemplateEngine for Minijinja {
+    type Context = Scope;
+
+    fn render(&self, src: &str, ctx: &Self::Context) -> Result<String, Error> {
+        self.env.render_str(src, Self::root(ctx)).map_err(into_error)
     }
 
-    fn render(&self, name: &str, ctx: &Arc<dyn Context>) -> Result<String, Error> {
-        let template = self.env.get_template(name).map_err(into_error)?;
-        template.render(Self::root(ctx)).map_err(into_error)
-    }
-
-    fn render_str(&self, source: &str, ctx: &Arc<dyn Context>) -> Result<String, Error> {
-        self.env.render_str(source, Self::root(ctx)).map_err(into_error)
-    }
-
-    fn eval(&self, expr: &str, ctx: &Arc<dyn Context>) -> Result<Binding, Error> {
-        let expr = self.env.compile_expression(expr).map_err(into_error)?;
+    fn eval(&self, src: &str, ctx: &Self::Context) -> Result<nova_reflect::Value, Error> {
+        let expr = self.env.compile_expression(src).map_err(into_error)?;
         let value = expr.eval(Self::root(ctx)).map_err(into_error)?;
         Ok(from_minijinja(&value))
     }
@@ -67,21 +59,24 @@ fn into_error(value: minijinja::Error) -> Error {
     }
 }
 
-pub fn from_minijinja(value: &minijinja::Value) -> Binding {
+pub fn from_minijinja(value: &minijinja::Value) -> nova_reflect::Value {
     if let Some(binding) = value.downcast_object_ref::<BindingObject>() {
-        return binding.0.clone();
+        return binding.binding.to_dynamic_value();
     }
 
     if let Some(reflected) = value.downcast_object_ref::<nova_reflect::Value>() {
-        return Binding::Value(reflected.clone());
+        return reflected.clone();
     }
 
-    Binding::Value(value.to_value())
+    value.to_value()
 }
 
-pub fn binding_to_minijinja(binding: Binding) -> minijinja::Value {
+pub fn binding_to_minijinja(name: &str, binding: Binding) -> minijinja::Value {
     if binding.is_callable() || binding.as_namespace().is_some() {
-        return minijinja::Value::from_object(BindingObject(binding));
+        return minijinja::Value::from_object(BindingObject {
+            name: name.to_string(),
+            binding,
+        });
     }
 
     value_to_minijinja(binding.into_value())
@@ -92,7 +87,7 @@ fn kwargs_to_kargs(kwargs: minijinja::value::Kwargs) -> Result<KArgs, minijinja:
 
     for key in kwargs.args() {
         let value: minijinja::Value = kwargs.get(key)?;
-        kargs.set(key, value.to_value());
+        kargs.set(key, from_minijinja(&value));
     }
 
     kwargs.assert_all_used()?;
@@ -103,12 +98,12 @@ fn to_args(args: &[minijinja::Value]) -> Result<Args, minijinja::Error> {
     let (positional, kwargs): (&[minijinja::Value], minijinja::value::Kwargs) = minijinja::value::from_args(args)?;
 
     Ok(Args::new(
-        positional.iter().map(|v| v.to_value()).collect::<Vec<_>>(),
+        positional.iter().map(from_minijinja).collect::<Vec<_>>(),
         kwargs_to_kargs(kwargs)?,
     ))
 }
 
-fn state_context(state: &State<'_, '_>) -> Result<Arc<dyn Context>, minijinja::Error> {
+fn state_scope(state: &State<'_, '_>) -> Result<Scope, minijinja::Error> {
     state
         .lookup(CONTEXT_KEY)
         .and_then(|v| v.downcast_object::<ContextObject>())
@@ -117,11 +112,31 @@ fn state_context(state: &State<'_, '_>) -> Result<Arc<dyn Context>, minijinja::E
 }
 
 #[derive(Debug)]
-struct BindingObject(Binding);
+struct BindingObject {
+    name: String,
+    binding: Binding,
+}
+
+impl BindingObject {
+    fn invoke(&self, state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, minijinja::Error> {
+        let call = self
+            .binding
+            .as_call()
+            .ok_or_else(|| minijinja::Error::new(ErrorKind::InvalidOperation, "object is not callable"))?;
+
+        let args = to_args(args)?;
+        let scope = state_scope(state)?;
+        let next = scope.next(&self.name, args);
+
+        call.call(&next)
+            .map(|out| binding_to_minijinja(&self.name, out))
+            .map_err(|e| minijinja::Error::new(ErrorKind::InvalidOperation, e.to_string()))
+    }
+}
 
 impl Object for BindingObject {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
-        if self.0.as_namespace().is_some() {
+        if self.binding.as_namespace().is_some() {
             return ObjectRepr::Map;
         }
 
@@ -129,29 +144,20 @@ impl Object for BindingObject {
     }
 
     fn get_value(self: &Arc<Self>, key: &minijinja::Value) -> Option<minijinja::Value> {
-        if self.0.as_namespace().is_some() {
-            return self.0.field(key.as_str()?).map(binding_to_minijinja);
+        if self.binding.as_namespace().is_some() {
+            let name = key.as_str()?;
+            return self.binding.field(name).map(|member| binding_to_minijinja(name, member));
         }
 
         None
     }
 
     fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.value())
+        write!(f, "{}", self.binding.value())
     }
 
     fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[minijinja::Value]) -> Result<minijinja::Value, minijinja::Error> {
-        let call = self
-            .0
-            .as_call()
-            .ok_or_else(|| minijinja::Error::new(ErrorKind::InvalidOperation, "object is not callable"))?;
-
-        let args = to_args(args)?;
-        let ctx = state_context(state)?;
-
-        call.call(&args, ctx.as_ref())
-            .map(binding_to_minijinja)
-            .map_err(|e| minijinja::Error::new(ErrorKind::InvalidOperation, e.to_string()))
+        self.invoke(state, args)
     }
 
     fn call_method(
@@ -160,16 +166,15 @@ impl Object for BindingObject {
         name: &str,
         args: &[minijinja::Value],
     ) -> Result<minijinja::Value, minijinja::Error> {
-        if let Some(member) = self.0.field(name)
-            && let Some(call) = member.as_call()
+        if let Some(member) = self.binding.field(name)
+            && member.is_callable()
         {
-            let args = to_args(args)?;
-            let ctx = state_context(state)?;
+            let member = BindingObject {
+                name: name.to_string(),
+                binding: member,
+            };
 
-            return call
-                .call(&args, ctx.as_ref())
-                .map(binding_to_minijinja)
-                .map_err(|e| minijinja::Error::new(ErrorKind::InvalidOperation, e.to_string()));
+            return member.invoke(state, args);
         }
 
         Err(minijinja::Error::new(ErrorKind::UnknownMethod, format!("no method '{name}'")))
@@ -177,13 +182,7 @@ impl Object for BindingObject {
 }
 
 #[derive(Debug)]
-struct ContextObject(Arc<dyn Context>);
-
-impl ContextObject {
-    fn new(ctx: Arc<dyn Context>) -> Self {
-        Self(ctx)
-    }
-}
+struct ContextObject(Scope);
 
 impl Object for ContextObject {
     fn get_value(self: &Arc<Self>, key: &minijinja::Value) -> Option<minijinja::Value> {
@@ -193,10 +192,10 @@ impl Object for ContextObject {
             return Some(minijinja::Value::from_dyn_object(self.clone()));
         }
 
-        self.0.resolve(name).map(binding_to_minijinja)
+        Context::get(&self.0, name).map(|binding| binding_to_minijinja(name, binding))
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Values(self.0.names().into_iter().map(minijinja::Value::from).collect())
+        Enumerator::Values(self.0.iter().map(|(key, _)| value_to_minijinja(key)).collect())
     }
 }

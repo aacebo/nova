@@ -15,7 +15,7 @@ impl Diagnostic {
         let Self { fmt, fmt_args, children } = self;
 
         let base = zyn! {
-            ::nova::Diagnostic::new(*scope.trace_id())
+            ::nova::Diagnostic::new(scope.trace_id())
                 .sev({{ severity }})
                 .message(::std::format!({{ fmt }} @for (arg in fmt_args.iter()) { , {{ arg }} }))
         };

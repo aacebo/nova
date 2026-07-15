@@ -41,14 +41,15 @@ pub fn get(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 #[proc_macro]
-pub fn get_mut(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    lookup(input, zyn! { get_mut })
+pub fn set(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let KeyValue { key, value } = parse_macro_input!(input as KeyValue);
+    zyn! { scope.set({{ key }}, ::nova::reflect::Value::from({{ value }}))? }.into()
 }
 
 #[proc_macro]
-pub fn set(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn declare(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let KeyValue { key, value } = parse_macro_input!(input as KeyValue);
-    zyn! { scope.set({{ key }}, {{ value }}) }.into()
+    zyn! { scope.declare({{ key }}, ::nova::reflect::Value::from({{ value }})) }.into()
 }
 
 #[proc_macro]

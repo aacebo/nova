@@ -8,8 +8,8 @@ use crate::types::{Annotation, Artifact, ArtifactContent, Entity, Offset};
 /// Each routine is the same four steps: parse args, load the model, ask it for the capability the
 /// routine needs, and present the result. Asking is where the capability matrix bites -- a model
 /// that cannot do the job fails here, by name, instead of part-way through inference.
-pub fn embeddings(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
-    let TextArgs { text, model, api_key } = TextArgs::from_args(args)?;
+pub fn embeddings(ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
+    let TextArgs { text, model, api_key } = TextArgs::from_args(ctx.args())?;
     let model = load(&model.resolve(defaults::embed())?, &api_key)?;
     let capable = model.as_embed().ok_or_else(|| model.cannot("embed"))?;
     let out = tasks::embed(capable, &model.context(), &borrow(&text))?;
@@ -26,13 +26,13 @@ pub fn embeddings(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<n
     Ok(objects(artifacts))
 }
 
-pub fn keywords(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
+pub fn keywords(ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let ScoredArgs {
         text,
         min_score,
         model,
         api_key,
-    } = ScoredArgs::from_args(args)?;
+    } = ScoredArgs::from_args(ctx.args())?;
 
     let model = load(&model.resolve(defaults::keywords())?, &api_key)?;
     let capable = model.as_embed().ok_or_else(|| model.cannot("embed"))?;
@@ -55,13 +55,13 @@ pub fn keywords(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nov
     Ok(objects(annotations))
 }
 
-pub fn sentiment(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
+pub fn sentiment(ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let ScoredArgs {
         text,
         min_score,
         model,
         api_key,
-    } = ScoredArgs::from_args(args)?;
+    } = ScoredArgs::from_args(ctx.args())?;
 
     let model = load(&model.resolve(defaults::classify())?, &api_key)?;
     let capable = model.as_classify().ok_or_else(|| model.cannot("classify"))?;
@@ -88,8 +88,8 @@ pub fn sentiment(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<no
     Ok(objects(annotations))
 }
 
-pub fn entities(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
-    let (text, min_score, model) = token_args(args)?;
+pub fn entities(ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
+    let (text, min_score, model) = token_args(ctx.args())?;
     let capable = model.as_token_classify().ok_or_else(|| model.cannot("token-classify"))?;
     let out = tasks::entities(capable, &model.context(), &borrow(&text))?;
 
@@ -103,8 +103,8 @@ pub fn entities(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nov
     }))
 }
 
-pub fn pii(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
-    let (text, min_score, model) = token_args(args)?;
+pub fn pii(ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
+    let (text, min_score, model) = token_args(ctx.args())?;
     let capable = model.as_token_classify().ok_or_else(|| model.cannot("token-classify"))?;
     let out = tasks::pii(capable, &model.context(), &borrow(&text), min_score)?;
 
@@ -112,8 +112,8 @@ pub fn pii(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_cor
     Ok(annotate(out, "pii", 0.0, |entity| entity.label.clone()))
 }
 
-pub fn summarize(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
-    let TextArgs { text, model, api_key } = TextArgs::from_args(args)?;
+pub fn summarize(ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
+    let TextArgs { text, model, api_key } = TextArgs::from_args(ctx.args())?;
     let model = load(&model.resolve(defaults::generate())?, &api_key)?;
     let capable = model.as_generate().ok_or_else(|| model.cannot("generate"))?;
     let out = tasks::summarize(capable, &model.context(), &borrow(&text))?;

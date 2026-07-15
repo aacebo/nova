@@ -61,20 +61,20 @@ impl FromArgs for DecodeArgs {
     }
 }
 
-pub fn json_encode(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    let encoded = serde_json::to_string(&EncodeArgs::from_args(args)?.value)?;
+pub fn json_encode(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    let encoded = serde_json::to_string(&EncodeArgs::from_args(ctx.args())?.value)?;
     Ok(Binding::new(Value::from(encoded)))
 }
 
-pub fn json_decode(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    Ok(serde_json::from_str::<Binding>(&DecodeArgs::from_args(args)?.source)?)
+pub fn json_decode(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_str::<Binding>(&DecodeArgs::from_args(ctx.args())?.source)?)
 }
 
-pub fn yaml_encode(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    let encoded = serde_norway::to_string(&EncodeArgs::from_args(args)?.value)?;
+pub fn yaml_encode(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    let encoded = serde_norway::to_string(&EncodeArgs::from_args(ctx.args())?.value)?;
     Ok(Binding::new(Value::from(encoded)))
 }
 
-pub fn yaml_decode(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    Ok(serde_norway::from_str::<Binding>(&DecodeArgs::from_args(args)?.source)?)
+pub fn yaml_decode(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    Ok(serde_norway::from_str::<Binding>(&DecodeArgs::from_args(ctx.args())?.source)?)
 }

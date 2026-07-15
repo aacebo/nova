@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use nova_reflect::{Dynamic, ToValue, Value, ValueRef};
 
-use crate::{Args, Context};
+use crate::Context;
 
 pub trait Call: Send + Sync + std::fmt::Debug + 'static {
-    fn call(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, crate::Error>;
+    fn call(&self, ctx: &dyn Context) -> Result<Binding, crate::Error>;
 }
 
 pub trait Namespace: Send + Sync + std::fmt::Debug + 'static {
@@ -110,11 +110,11 @@ impl Binding {
         }
     }
 
-    pub fn cast<T: TryFrom<Binding>>(self) -> Option<T> {
+    pub fn cast<T: TryFrom<Self>>(self) -> Option<T> {
         T::try_from(self).ok()
     }
 
-    pub fn is<T: TryFrom<Binding>>(&self) -> bool {
+    pub fn is<T: TryFrom<Self>>(&self) -> bool {
         T::try_from(self.clone()).is_ok()
     }
 
@@ -122,17 +122,17 @@ impl Binding {
         self.value().is_truthy()
     }
 
-    pub fn field(&self, name: &str) -> Option<Binding> {
+    pub fn field(&self, name: &str) -> Option<Self> {
         if let Some(namespace) = self.as_namespace() {
             return namespace.member(name);
         }
 
         let value = self.value();
         let object = value.as_dynamic()?.as_object()?;
-        Some(Binding::Value(object.field(name).to_owned()))
+        Some(Self::Value(object.field(name).to_owned()))
     }
 
-    pub fn index(&self, i: usize) -> Option<Binding> {
+    pub fn index(&self, i: usize) -> Option<Self> {
         let value = self.value();
         let dynamic = value.as_dynamic()?;
         let seq = dynamic.as_sequence()?;
@@ -141,13 +141,13 @@ impl Binding {
             return None;
         }
 
-        Some(Binding::Value(seq.index(i).to_owned()))
+        Some(Self::Value(seq.index(i).to_owned()))
     }
 
-    pub fn key(&self, key: Value) -> Option<Binding> {
+    pub fn key(&self, key: Value) -> Option<Self> {
         let value = self.value();
         let entry = value.as_map()?.get(&key)?.clone();
-        Some(Binding::Value(entry))
+        Some(Self::Value(entry))
     }
 }
 
@@ -188,7 +188,7 @@ impl nova_reflect::Object for Binding {
     }
 
     fn field(&self, name: &str) -> Value {
-        match Binding::field(self, name) {
+        match Self::field(self, name) {
             Some(member) => member.to_dynamic_value(),
             None => Value::Undefined,
         }
@@ -417,30 +417,30 @@ impl<'de> serde::de::Visitor<'de> for BindingVisitor {
 
 impl From<Value> for Binding {
     fn from(value: Value) -> Self {
-        Binding::Value(value)
+        Self::Value(value)
     }
 }
 
 impl From<&Value> for Binding {
     fn from(value: &Value) -> Self {
-        Binding::Value(value.clone())
+        Self::Value(value.clone())
     }
 }
 
 impl From<ValueRef<'_>> for Binding {
     fn from(value: ValueRef<'_>) -> Self {
-        Binding::Value(value.to_owned())
+        Self::Value(value.to_owned())
     }
 }
 
 impl From<&ValueRef<'_>> for Binding {
     fn from(value: &ValueRef<'_>) -> Self {
-        Binding::Value(value.to_owned())
+        Self::Value(value.to_owned())
     }
 }
 
-impl From<&Binding> for Binding {
-    fn from(value: &Binding) -> Self {
+impl From<&Self> for Binding {
+    fn from(value: &Self) -> Self {
         value.clone()
     }
 }
@@ -461,22 +461,32 @@ from_primitive!(bool, i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, String);
 
 impl From<&str> for Binding {
     fn from(value: &str) -> Self {
-        Binding::Value(Value::from(value))
+        Self::Value(Value::from(value))
     }
 }
 
 impl From<&String> for Binding {
     fn from(value: &String) -> Self {
-        Binding::Value(Value::from(value.clone()))
+        Self::Value(Value::from(value.clone()))
     }
 }
 
 impl<T> From<Vec<T>> for Binding
 where
-    T: Into<Binding>,
+    T: Into<Self>,
 {
     fn from(value: Vec<T>) -> Self {
         let items: Vec<Value> = value.into_iter().map(|v| v.into().into_value()).collect();
-        Binding::Value(nova_reflect::value_of!(items))
+        Self::Value(nova_reflect::value_of!(items))
+    }
+}
+
+impl Call for Binding {
+    fn call(&self, ctx: &dyn Context) -> Result<Binding, crate::Error> {
+        if let Some(v) = self.as_call() {
+            v.call(ctx)
+        } else {
+            Err(crate::Error::message(format!("\"{}\" is not callable", ctx.name())))
+        }
     }
 }

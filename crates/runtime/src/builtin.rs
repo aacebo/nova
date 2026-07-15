@@ -53,38 +53,38 @@ impl FromArgs for FormatArgs {
 
 pub fn register(builder: Builder) -> Builder {
     builder
-        .func("env", |args: &Args, _ctx: &dyn Context| {
-            let args = EnvArgs::from_args(args)?;
+        .func("env", |ctx: &dyn Context| {
+            let args = EnvArgs::from_args(ctx.args())?;
 
             match std::env::var(&args.name) {
                 Ok(value) => Ok(Binding::new(Value::from(value))),
                 Err(_) => Ok(args.default),
             }
         })
-        .func("info", |args: &Args, ctx: &dyn Context| {
-            emit(Severity::Info, args, ctx)?;
+        .func("info", |ctx: &dyn Context| {
+            emit(Severity::Info, ctx)?;
             Ok(Binding::new(Value::Null))
         })
-        .func("warn", |args: &Args, ctx: &dyn Context| {
-            emit(Severity::Warn, args, ctx)?;
+        .func("warn", |ctx: &dyn Context| {
+            emit(Severity::Warn, ctx)?;
             Ok(Binding::new(Value::Null))
         })
-        .func("error", |args: &Args, ctx: &dyn Context| {
-            emit(Severity::Error, args, ctx)?;
+        .func("error", |ctx: &dyn Context| {
+            emit(Severity::Error, ctx)?;
             Ok(Binding::new(Value::Null))
         })
-        .func("print", |args: &Args, _ctx: &dyn Context| {
-            print!("{}", FormatArgs::from_args(args)?.text());
+        .func("print", |ctx: &dyn Context| {
+            print!("{}", FormatArgs::from_args(ctx.args())?.text());
             Ok(Binding::new(Value::Null))
         })
-        .func("println", |args: &Args, _ctx: &dyn Context| {
-            println!("{}", FormatArgs::from_args(args)?.text());
+        .func("println", |ctx: &dyn Context| {
+            println!("{}", FormatArgs::from_args(ctx.args())?.text());
             Ok(Binding::new(Value::Null))
         })
 }
 
-fn emit(severity: Severity, args: &Args, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
-    let args = FormatArgs::from_args(args)?;
+fn emit(severity: Severity, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
+    let args = FormatArgs::from_args(ctx.args())?;
     ctx.emit(Diagnostic::new(ctx.trace_id()).sev(severity).message(args.text()));
     Ok(())
 }

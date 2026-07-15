@@ -32,9 +32,6 @@ pub struct Manifest {
     pub env: BTreeMap<String, String>,
 
     #[serde(default)]
-    pub templates: BTreeMap<String, String>,
-
-    #[serde(default)]
     pub steps: Vec<Step>,
 }
 
@@ -43,7 +40,6 @@ impl Manifest {
         self.on.extend(other.on);
         self.vars.extend(other.vars);
         self.env.extend(other.env);
-        self.templates.extend(other.templates);
         self.steps.extend(other.steps);
         self.args = match (self.args.take(), other.args) {
             (Some(base), Some(next)) => Some(nova_schema::oneof!(base, next).into()),
@@ -68,7 +64,6 @@ pub mod build {
         args: Option<nova_schema::Schema>,
         vars: BTreeMap<String, Binding>,
         env: BTreeMap<String, String>,
-        templates: BTreeMap<String, String>,
         steps: Vec<Step>,
     }
 
@@ -117,16 +112,6 @@ pub mod build {
             self
         }
 
-        pub fn template(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-            self.templates.insert(name.into(), value.into());
-            self
-        }
-
-        pub fn templates(mut self, value: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>) -> Self {
-            self.templates.extend(value.into_iter().map(|(k, v)| (k.into(), v.into())));
-            self
-        }
-
         pub fn step(mut self, value: impl Into<Step>) -> Self {
             self.steps.push(value.into());
             self
@@ -145,7 +130,6 @@ pub mod build {
                 args: self.args,
                 vars: self.vars,
                 env: self.env,
-                templates: self.templates,
                 steps: self.steps,
             }
         }

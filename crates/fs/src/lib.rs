@@ -62,15 +62,15 @@ fn to_bytes(value: &ValueRef<'_>) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-pub fn read(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
-    let args = ReadArgs::from_args(args)?;
+pub fn read(ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+    let args = ReadArgs::from_args(ctx.args())?;
     let base = std::env::current_dir()?;
     let data = std::fs::read_to_string(base.join(args.path))?;
     Ok(Binding::new(Value::from(data)))
 }
 
-pub fn write(args: &Args, _ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
-    let args = WriteArgs::from_args(args)?;
+pub fn write(ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
+    let args = WriteArgs::from_args(ctx.args())?;
     let base = std::env::current_dir()?;
     Ok(std::fs::write(base.join(args.path), args.data)?)
 }
