@@ -13,5 +13,18 @@
   "terminal.integrated.cursorBlinking": true,
   "terminal.integrated.defaultProfile.windows": "Git Bash",
   "editor.fontSize": 12,
-  "yaml.schemaStore.enable": false
+  "yaml.schemaStore.enable": false,
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.cache/**": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "**/.cache": true
+  },
+  "files.exclude": {
+    "**/target": true
+  }
 }
