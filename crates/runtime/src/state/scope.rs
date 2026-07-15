@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use nova_core::{Args, Binding, Context, Diagnostic, Engine, Event, KArgs, Traced, event};
+use nova_core::{Args, Binding, Context, Diagnostic, Engine, Event, KArgs, event};
 use nova_reflect::Value;
 
 use super::{Arena, Entry, Slot, SlotMut};
@@ -250,12 +250,6 @@ impl Scope {
 
     fn as_context(&self) -> Arc<dyn Context> {
         Arc::new(self.clone())
-    }
-}
-
-impl Traced for Scope {
-    fn trace_id(&self) -> ulid::Ulid {
-        self.0.trace_id
     }
 }
 

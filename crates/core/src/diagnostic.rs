@@ -89,21 +89,3 @@ impl Diagnostic {
             .unwrap_or(own)
     }
 }
-
-/// Anything that carries a `trace_id`, so the `info!`/`warn!`/`error!` macros can
-/// thread it into the diagnostics they build. Implemented for `Scope` and `Ulid`.
-pub trait Traced {
-    fn trace_id(&self) -> ulid::Ulid;
-}
-
-impl Traced for ulid::Ulid {
-    fn trace_id(&self) -> ulid::Ulid {
-        *self
-    }
-}
-
-impl<T: Traced + ?Sized> Traced for &T {
-    fn trace_id(&self) -> ulid::Ulid {
-        (**self).trace_id()
-    }
-}

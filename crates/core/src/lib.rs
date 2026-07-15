@@ -56,7 +56,3 @@ where
         self(args, ctx)
     }
 }
-
-pub fn is_truthy(value: &nova_reflect::ValueRef<'_>) -> bool {
-    value.is_truthy()
-}

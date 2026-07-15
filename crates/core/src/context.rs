@@ -37,9 +37,3 @@ impl dyn Context + '_ {
         self.as_any().is::<T>()
     }
 }
-
-impl crate::Traced for dyn Context + '_ {
-    fn trace_id(&self) -> ulid::Ulid {
-        Context::trace_id(self)
-    }
-}
