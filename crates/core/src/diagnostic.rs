@@ -75,8 +75,8 @@ impl Diagnostic {
         self
     }
 
-    pub fn emit(self, scope: &crate::Scope) {
-        scope.emit(self);
+    pub fn emit(self, ctx: &dyn crate::Context) {
+        ctx.emit(self);
     }
 
     pub fn severity(&self) -> Severity {

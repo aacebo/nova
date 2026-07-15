@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use crate::Binding;
+use nova_core::Binding;
 
 #[derive(Clone)]
 pub struct Entry {

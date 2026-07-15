@@ -3,10 +3,7 @@ use std::time::Duration;
 
 use figment::Figment;
 use figment::providers::{Format, Yaml};
-use nova::ai::AI;
-use nova::codec::Codec;
-use nova::fs::FileSystem;
-use nova::http::Http;
+use nova::{AI, Codec, FileSystem, Http};
 
 use crate::widgets::board::{Board, Widget};
 use crate::{Error, widgets};

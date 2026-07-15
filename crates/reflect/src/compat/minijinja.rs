@@ -11,24 +11,66 @@ impl ToValue for minijinja::Value {
     }
 
     fn to_value(&self) -> Value {
+        if let Some(reflected) = self.downcast_object_ref::<Value>() {
+            return reflected.clone();
+        }
+
         match self.kind() {
+            ValueKind::Map => {
+                let ty = crate::MapType::new(crate::Type::Any, crate::Type::Any, crate::Type::Any);
+                let mut map = crate::Map::new(&ty);
+
+                if let Ok(keys) = self.try_iter() {
+                    for key in keys {
+                        let item = self.get_item(&key).unwrap_or_default();
+                        map.insert(key.to_value(), item.to_value());
+                    }
+                }
+
+                Value::Map(map)
+            }
+            ValueKind::Seq | ValueKind::Iterable => {
+                let mut items: Vec<Value> = Vec::new();
+
+                if let Ok(values) = self.try_iter() {
+                    for item in values {
+                        items.push(item.to_value());
+                    }
+                }
+
+                Value::Dynamic(Dynamic::from_sequence(Arc::new(items)))
+            }
             ValueKind::None | ValueKind::Undefined => Value::Null,
             ValueKind::Bool => Value::Bool(self.is_true()),
             ValueKind::Number => {
-                if let Some(v) = self.as_i64() {
+                if let Ok(v) = u64::try_from(self.clone()) {
+                    Value::Number(crate::Number::Int(crate::Int::U64(v)))
+                } else if let Ok(v) = i64::try_from(self.clone()) {
                     Value::Number(crate::Number::Int(crate::Int::I64(v)))
-                } else if let Some(v) = self.as_usize() {
-                    Value::Number(crate::Number::Int(crate::Int::U64(v as u64)))
+                } else if let Ok(v) = f64::try_from(self.clone()) {
+                    Value::Number(crate::Number::Float(crate::Float::F64(v)))
                 } else {
-                    self.to_string()
-                        .parse::<f64>()
-                        .map(|v| Value::Number(crate::Number::Float(crate::Float::F64(v))))
-                        .unwrap_or(Value::Null)
+                    Value::Null
                 }
             }
             ValueKind::String => Value::Str(crate::Str::from(self.to_string())),
             _ => Value::Null,
         }
+    }
+}
+
+pub fn value_to_minijinja(value: Value) -> minijinja::Value {
+    match value {
+        Value::Map(_) | Value::Dynamic(_) => minijinja::Value::from_object(value),
+        Value::Bool(v) => minijinja::Value::from(v),
+        Value::Number(v) => match v {
+            crate::Number::Int(crate::Int::U64(n)) => minijinja::Value::from(n),
+            crate::Number::Int(i) => minijinja::Value::from(i.to_i128() as i64),
+            crate::Number::Float(f) => minijinja::Value::from(f.to_f64_raw()),
+        },
+        Value::Str(v) => minijinja::Value::from(v.to_string()),
+        Value::Null => minijinja::Value::from(()),
+        Value::Undefined => minijinja::Value::UNDEFINED,
     }
 }
 

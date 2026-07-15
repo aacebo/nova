@@ -4,8 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::Recorder;
-use nova::template::Args;
-use nova::{Scope, Severity, args, error, info, warn};
+use nova::{Args, Scope, Severity, args, error, info, warn};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -14,7 +13,8 @@ fn nested_diagnostics_thread_trace_id_and_roll_up_severity() {
     let ran = Arc::new(AtomicBool::new(false));
     let flag = ran.clone();
     let runtime = nova::new()
-        .action("run", move |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             let trace_id = *scope.trace_id();
 
             let d = info!("request {}", 7 ; [
@@ -45,7 +45,8 @@ fn fluent_builders_and_emit_stream_each_diagnostic() {
     let recorder = Recorder::new();
     let runtime = nova::new()
         .observe(recorder.clone())
-        .action("run", |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("run", |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             warn!("job").warn("step a").error("step b").emit(scope);
             info!("done").emit(scope);
             Ok(())

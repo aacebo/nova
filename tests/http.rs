@@ -3,9 +3,9 @@
 mod common;
 use std::collections::BTreeMap;
 
-use common::{Recorder, to_pointer};
+use common::{Recorder, to_binding};
 use httpmock::prelude::*;
-use nova::http::Http;
+use nova::Http;
 
 fn run(recorder: &Recorder, manifest: nova::Manifest) {
     let runtime = nova::new()
@@ -182,7 +182,7 @@ fn get_sends_custom_headers() {
             .var("url", server.url("/headers"))
             .var(
                 "headers",
-                to_pointer(BTreeMap::from([("X-Custom".to_string(), "nova-value".to_string())])),
+                to_binding(BTreeMap::from([("X-Custom".to_string(), "nova-value".to_string())])),
             )
             .step(nova::step().run("{{ info(http.get(url, headers=headers).status) }}"))
             .build(),

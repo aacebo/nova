@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use nova_reflect::Value;
-use nova_template::{Args, Pointer};
 
-use crate::{Action, Call, Predicate, Scope};
+use crate::{Action, Args, Binding, Call, Context, Error, Predicate};
 
 #[derive(Clone)]
 pub struct Function {
@@ -27,7 +26,7 @@ impl Function {
         Self::new(name, Callback::predicate(predicate))
     }
 
-    pub fn func(name: impl Into<String>, func: impl Call + 'static) -> Self {
+    pub fn func(name: impl Into<String>, func: impl crate::Func + 'static) -> Self {
         Self::new(name, Callback::func(func))
     }
 
@@ -43,8 +42,8 @@ impl Function {
         &mut self.callback
     }
 
-    pub fn invoke(&self, args: &Args, scope: &Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
-        self.callback.invoke(args, scope)
+    pub fn invoke(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
+        self.callback.invoke(args, ctx)
     }
 }
 
@@ -54,22 +53,20 @@ impl std::fmt::Debug for Function {
     }
 }
 
-impl nova_template::Call for Function {
-    fn call(&self, args: &Args) -> Result<Pointer, nova_template::Error> {
-        let scope = args
-            .caller_as::<Scope>()
-            .ok_or_else(|| nova_template::Error::message("no scope bound to template render"))?;
-
-        let child = scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
+impl Call for Function {
+    fn call(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Error> {
+        let child = ctx.fork(&self.name, args.args().to_vec(), args.kargs().clone());
         let child_args = Args::new(child.args().to_vec(), child.kargs().clone());
 
         self.callback
-            .invoke(&child_args, &child)
-            .map_err(|err| nova_template::Error::message(err.to_string()))
+            .invoke(&child_args, child.as_ref())
+            .map_err(|err| Error::message(err.to_string()))
     }
+}
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+impl From<Function> for Binding {
+    fn from(value: Function) -> Self {
+        Binding::callable(value)
     }
 }
 
@@ -77,7 +74,7 @@ impl nova_template::Call for Function {
 pub enum Callback {
     Action(Arc<dyn Action>),
     Predicate(Arc<dyn Predicate>),
-    Func(Arc<dyn Call>),
+    Func(Arc<dyn crate::Func>),
 }
 
 impl Callback {
@@ -89,18 +86,18 @@ impl Callback {
         Self::Predicate(Arc::new(predicate))
     }
 
-    pub fn func(func: impl Call + 'static) -> Self {
+    pub fn func(func: impl crate::Func + 'static) -> Self {
         Self::Func(Arc::new(func))
     }
 
-    pub fn invoke(&self, args: &Args, scope: &Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+    pub fn invoke(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
         match self {
             Self::Action(action) => {
-                action.invoke(args, scope)?;
-                Ok(Pointer::new(Value::Null))
+                action.invoke(args, ctx)?;
+                Ok(Binding::new(Value::Null))
             }
-            Self::Predicate(predicate) => Ok(Pointer::new(Value::Bool(predicate.invoke(args, scope)?))),
-            Self::Func(func) => func.invoke(args, scope),
+            Self::Predicate(predicate) => Ok(Binding::new(Value::Bool(predicate.invoke(args, ctx)?))),
+            Self::Func(func) => func.invoke(args, ctx),
         }
     }
 }

@@ -2376,8 +2376,8 @@ dependencies = [
  "nova-http",
  "nova-macros",
  "nova-reflect",
+ "nova-runtime",
  "nova-schema",
- "nova-template",
  "serde_json",
  "tempfile",
 ]
@@ -2392,7 +2392,6 @@ dependencies = [
  "hf-hub",
  "nova-core",
  "nova-reflect",
- "nova-template",
  "reqwest 0.13.4",
  "serde",
  "serde_json",
@@ -2417,7 +2416,6 @@ version = "0.0.0"
 dependencies = [
  "nova-core",
  "nova-reflect",
- "nova-template",
  "serde_json",
  "serde_norway",
 ]
@@ -2426,10 +2424,8 @@ dependencies = [
 name = "nova-core"
 version = "0.0.0"
 dependencies = [
- "crossbeam-channel",
  "nova-reflect",
  "nova-schema",
- "nova-template",
  "serde",
  "ulid",
 ]
@@ -2440,7 +2436,6 @@ version = "0.0.0"
 dependencies = [
  "nova-core",
  "nova-reflect",
- "nova-template",
 ]
 
 [[package]]
@@ -2449,7 +2444,6 @@ version = "0.0.0"
 dependencies = [
  "nova-core",
  "nova-reflect",
- "nova-template",
  "reqwest 0.13.4",
 ]
 
@@ -2483,21 +2477,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "nova-runtime"
+version = "0.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "minijinja",
+ "nova-core",
+ "nova-reflect",
+ "nova-schema",
+ "ulid",
+]
+
+[[package]]
 name = "nova-schema"
 version = "0.0.0"
 dependencies = [
  "nova-reflect",
  "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "nova-template"
-version = "0.0.0"
-dependencies = [
- "minijinja",
- "nova-reflect",
  "serde",
  "serde_json",
 ]

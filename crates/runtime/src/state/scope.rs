@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use nova_reflect::{ToType, Type, Value};
-use nova_template::{Args, Engine, KArgs, Minijinja, Pointer};
+use nova_core::{Args, Binding, Context, Diagnostic, Engine, Event, KArgs, Traced, event};
+use nova_reflect::Value;
 
-use crate::{Action, Arena, Binding, Diagnostic, Entry, Event, Slot, SlotMut, Traced, event};
+use super::{Arena, Entry, Slot, SlotMut};
 
 #[derive(Clone)]
 pub struct Scope(Arc<_Scope>);
@@ -13,7 +13,7 @@ struct _Scope {
     trace_id: ulid::Ulid,
     name: String,
     parent: Option<Scope>,
-    engine: Arc<dyn Engine>,
+    engine: Option<Arc<dyn Engine>>,
     symbols: Mutex<HashMap<String, ulid::Ulid>>,
     arena: Arc<Mutex<Arena>>,
     args: Vec<Value>,
@@ -27,7 +27,7 @@ impl Scope {
             trace_id: ulid::Ulid::new(),
             name: name.into(),
             parent: None,
-            engine: Arc::new(Minijinja::new()),
+            engine: None,
             symbols: Default::default(),
             arena,
             args: Default::default(),
@@ -38,7 +38,7 @@ impl Scope {
 
     pub(crate) fn with_engine(self, engine: Box<dyn Engine>) -> Self {
         let mut inner = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("with_engine on a shared scope"));
-        inner.engine = Arc::from(engine);
+        inner.engine = Some(Arc::from(engine));
         Self(Arc::new(inner))
     }
 
@@ -50,8 +50,8 @@ impl Scope {
         &self.0.name
     }
 
-    pub fn engine(&self) -> &Arc<dyn Engine> {
-        &self.0.engine
+    pub fn engine(&self) -> Option<&Arc<dyn Engine>> {
+        self.0.engine.as_ref()
     }
 
     pub fn args(&self) -> &[Value] {
@@ -68,7 +68,11 @@ impl Scope {
     }
 
     pub fn error(&self, message: impl Into<String>) -> &Self {
-        self.emit(Diagnostic::new(self.0.trace_id).sev(crate::Severity::Error).message(message))
+        self.emit(
+            Diagnostic::new(self.0.trace_id)
+                .sev(nova_core::Severity::Error)
+                .message(message),
+        )
     }
 
     pub fn len(&self) -> usize {
@@ -129,17 +133,6 @@ impl Scope {
 
     pub fn get_mut(&self, key: impl AsRef<str>) -> Option<SlotMut> {
         self.entry(key).map(SlotMut::new)
-    }
-
-    pub fn get_func(&self, name: &str) -> Result<crate::Function, Box<dyn std::error::Error>> {
-        let slot = self
-            .get(name)
-            .ok_or_else(|| crate::Error::action(self.0.trace_id, name, "not found"))?;
-
-        match slot.as_func() {
-            Some(func) => Ok(func.clone()),
-            None => Err(Box::new(crate::Error::action(self.0.trace_id, name, "not callable"))),
-        }
     }
 
     pub fn set(&self, key: impl Into<String>, object: impl Into<Binding>) -> &Self {
@@ -211,52 +204,51 @@ impl Scope {
         self
     }
 
-    pub fn call(&self, name: impl AsRef<str>, args: Args) -> Result<Pointer, Box<dyn std::error::Error>> {
+    pub fn call(&self, name: impl AsRef<str>, args: Args) -> Result<Binding, Box<dyn std::error::Error>> {
         let name = name.as_ref();
+        let slot = self
+            .get(name)
+            .ok_or_else(|| nova_core::Error::action(self.0.trace_id, name, "not found"))?;
+        let binding = (*slot).clone();
+        drop(slot);
 
-        if let Some(slot) = self.get(name)
-            && let Some(routine) = slot.as_routine()
-        {
-            self.dispatch(event::object::call(
-                name.to_string(),
-                args.args().to_vec(),
-                args.kargs().clone().into_inner(),
-            ));
-
-            routine.invoke(&args, self)?;
-            return Ok(Pointer::new(Value::Null));
-        }
-
-        let func = self.get_func(name)?;
-        let child = self.fork(name, args.args().to_vec(), args.kargs().clone());
+        let call = binding
+            .as_call()
+            .ok_or_else(|| nova_core::Error::action(self.0.trace_id, name, "not callable"))?;
 
         self.dispatch(event::object::call(
             name.to_string(),
-            child.args().to_vec(),
-            child.kargs().clone().into_inner(),
+            args.args().to_vec(),
+            args.kargs().clone().into_inner(),
         ));
 
-        let child_args = Args::new(child.args().to_vec(), child.kargs().clone());
-        func.invoke(&child_args, &child)
+        Ok(call.call(&args, self)?)
     }
 
-    pub fn eval(&self, src: &str) -> Result<Pointer, Box<dyn std::error::Error>> {
-        Ok(self.0.engine.eval(src, &self.as_context())?)
+    pub fn eval(&self, src: &str) -> Result<Binding, Box<dyn std::error::Error>> {
+        Ok(self.try_engine()?.eval(src, &self.as_context())?)
     }
 
     pub fn render(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(self.0.engine.render(name, &self.as_context())?)
+        Ok(self.try_engine()?.render(name, &self.as_context())?)
     }
 
     pub fn render_str(&self, source: &str) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(self.0.engine.render_str(source, &self.as_context())?)
+        Ok(self.try_engine()?.render_str(source, &self.as_context())?)
     }
 
     pub fn dispatch(&self, source: impl Into<event::Source>) {
         let _ = self.0.events.send(event::new(self.0.trace_id, self.0.name.clone(), source));
     }
 
-    fn as_context(&self) -> Arc<dyn nova_template::Context> {
+    fn try_engine(&self) -> Result<&Arc<dyn Engine>, nova_core::Error> {
+        self.0
+            .engine
+            .as_ref()
+            .ok_or_else(|| nova_core::Error::message("no template engine configured"))
+    }
+
+    fn as_context(&self) -> Arc<dyn Context> {
         Arc::new(self.clone())
     }
 }
@@ -275,37 +267,41 @@ impl std::fmt::Debug for Scope {
     }
 }
 
-impl ToType for Scope {
-    fn to_type(&self) -> Type {
-        Type::Any
+impl Context for Scope {
+    fn trace_id(&self) -> ulid::Ulid {
+        self.0.trace_id
     }
-}
 
-impl nova_template::Context for Scope {
-    fn resolve(&self, name: &str) -> Option<Pointer> {
+    fn name(&self) -> &str {
+        &self.0.name
+    }
+
+    fn args(&self) -> &[Value] {
+        &self.0.args
+    }
+
+    fn kargs(&self) -> &KArgs {
+        &self.0.kargs
+    }
+
+    fn resolve(&self, name: &str) -> Option<Binding> {
         if name == "args" {
-            return Some(Pointer::from(self.args().to_vec()));
+            return Some(Binding::from(self.args().to_vec()));
         }
 
         if let Some(value) = self.kargs().get(name) {
-            return Some(Pointer::Value(value.clone()));
+            return Some(Binding::Value(value.clone()));
         }
 
         let slot = self.get(name)?;
-
-        match &*slot {
-            Binding::Value(value) => Some(Pointer::Value(value.clone())),
-            Binding::Pointer(ptr) => Some(ptr.clone()),
-            Binding::Func(func) => Some(Pointer::callable(func.clone())),
-            Binding::Routine(rt) => Some(Pointer::callable_namespace(rt.clone())),
-        }
+        Some((*slot).clone())
     }
 
     fn names(&self) -> Vec<String> {
         let mut names: Vec<String> = self.0.symbols.lock().unwrap().keys().cloned().collect();
 
         if let Some(parent) = &self.0.parent {
-            names.extend(nova_template::Context::names(parent));
+            names.extend(Context::names(parent));
         }
 
         names.sort();
@@ -313,7 +309,38 @@ impl nova_template::Context for Scope {
         names
     }
 
+    fn call(&self, name: &str, args: Args) -> Result<Binding, nova_core::Error> {
+        Scope::call(self, name, args).map_err(into_core_error)
+    }
+
+    fn eval(&self, expr: &str) -> Result<Binding, nova_core::Error> {
+        Scope::eval(self, expr).map_err(into_core_error)
+    }
+
+    fn render(&self, name: &str) -> Result<String, nova_core::Error> {
+        Scope::render(self, name).map_err(into_core_error)
+    }
+
+    fn render_str(&self, source: &str) -> Result<String, nova_core::Error> {
+        Scope::render_str(self, source).map_err(into_core_error)
+    }
+
+    fn dispatch(&self, source: event::Source) {
+        Scope::dispatch(self, source);
+    }
+
+    fn fork(&self, name: &str, args: Vec<Value>, kargs: KArgs) -> Arc<dyn Context> {
+        Arc::new(Scope::fork(self, name, args, kargs))
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+fn into_core_error(err: Box<dyn std::error::Error>) -> nova_core::Error {
+    match err.downcast::<nova_core::Error>() {
+        Ok(err) => *err,
+        Err(err) => nova_core::Error::message(err.to_string()),
     }
 }

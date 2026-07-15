@@ -15,5 +15,4 @@ workspace = true
 [dependencies]
 nova-core = { workspace = true }
 nova-reflect = { workspace = true, features = ["serde"] }
-nova-template = { workspace = true }
 reqwest = { version = "0.13", features = ["json", "blocking"] }

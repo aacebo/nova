@@ -1,29 +1,18 @@
 mod response;
 
-use nova_core::Function;
-use nova_template::{FromArgs, Namespace, Pointer};
+use nova_core::{Args, Binding, Context, FromArgs, Function, Namespace};
 pub use response::*;
-
-pub trait Http {
-    fn http(self) -> Self;
-}
-
-impl Http for nova_core::Builder {
-    fn http(self) -> Self {
-        self.var("http", Pointer::namespace(Client))
-    }
-}
 
 #[derive(Debug)]
 pub struct Client;
 
 impl Namespace for Client {
-    fn member(&self, name: &str) -> Option<Pointer> {
+    fn member(&self, name: &str) -> Option<Binding> {
         match name {
-            "get" => Some(Pointer::callable(Function::func("http.get", get))),
-            "post" => Some(Pointer::callable(Function::func("http.post", post))),
-            "put" => Some(Pointer::callable(Function::func("http.put", put))),
-            "patch" => Some(Pointer::callable(Function::func("http.patch", patch))),
+            "get" => Some(Binding::callable(Function::func("http.get", get))),
+            "post" => Some(Binding::callable(Function::func("http.post", post))),
+            "put" => Some(Binding::callable(Function::func("http.put", put))),
+            "patch" => Some(Binding::callable(Function::func("http.patch", patch))),
             _ => None,
         }
     }
@@ -31,25 +20,21 @@ impl Namespace for Client {
     fn members(&self) -> Vec<String> {
         ["get", "post", "put", "patch"].iter().map(|s| s.to_string()).collect()
     }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
-pub fn get(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn get(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
     send(reqwest::Method::GET, args)
 }
 
-pub fn post(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn post(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
     send(reqwest::Method::POST, args)
 }
 
-pub fn put(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn put(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
     send(reqwest::Method::PUT, args)
 }
 
-pub fn patch(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn patch(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
     send(reqwest::Method::PATCH, args)
 }
 
@@ -67,7 +52,7 @@ pub struct RequestArgs {
 impl FromArgs for RequestArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
+    fn from_args(args: &Args) -> Result<Self, Self::Error> {
         let uri = args.str(0).ok_or(nova_core::Error::message("uri must be a string"))?;
 
         let body = args.str(1).map(Body::Text);
@@ -93,7 +78,7 @@ impl FromArgs for RequestArgs {
     }
 }
 
-fn send(method: reqwest::Method, args: &nova_template::Args) -> Result<Pointer, Box<dyn std::error::Error>> {
+fn send(method: reqwest::Method, args: &Args) -> Result<Binding, Box<dyn std::error::Error>> {
     let args = RequestArgs::from_args(args)?;
     let mut req = reqwest::blocking::Client::new().request(method, args.uri);
 
@@ -108,5 +93,5 @@ fn send(method: reqwest::Method, args: &nova_template::Args) -> Result<Pointer, 
     };
 
     let res = req.send()?;
-    Ok(Pointer::new(Response::try_from(res)?))
+    Ok(Binding::new(Response::try_from(res)?))
 }

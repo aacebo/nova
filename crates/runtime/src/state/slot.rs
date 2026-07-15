@@ -1,6 +1,8 @@
 use std::time::Instant;
 
-use crate::{Binding, Entry};
+use nova_core::Binding;
+
+use super::Entry;
 
 pub struct Slot {
     entry: Entry,

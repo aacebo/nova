@@ -1,4 +1,4 @@
-use zyn::proc_macro2::{Ident, Span, TokenStream, TokenTree};
+use zyn::proc_macro2::{TokenStream, TokenTree};
 use zyn::syn::Type;
 
 pub fn split_as(input: TokenStream) -> zyn::syn::Result<(TokenStream, Option<Type>)> {
@@ -16,23 +16,19 @@ pub fn split_as(input: TokenStream) -> zyn::syn::Result<(TokenStream, Option<Typ
     }
 }
 
-pub fn variant_accessor(ty: &Type) -> zyn::syn::Result<Ident> {
+pub fn variant_filter(ty: &Type) -> zyn::syn::Result<TokenStream> {
     let segment = match ty {
         Type::Path(path) => path.path.segments.last().map(|s| s.ident.to_string()),
         _ => None,
     };
 
-    let accessor = match segment.as_deref() {
-        Some("Value") => "as_value",
-        Some("Function") => "as_func",
-        Some("Routine") => "as_routine",
-        _ => {
-            return Err(zyn::syn::Error::new_spanned(
-                ty,
-                "expected an Object variant: Value, Function, or Routine",
-            ));
-        }
-    };
-
-    Ok(Ident::new(accessor, Span::call_site()))
+    match segment.as_deref() {
+        Some("Value") => Ok(zyn::zyn! { as_value() }),
+        Some("Function") => Ok(zyn::zyn! { as_call() }),
+        Some("Routine") => Ok(zyn::zyn! { as_namespace() }),
+        _ => Err(zyn::syn::Error::new_spanned(
+            ty,
+            "expected a Binding variant: Value, Function, or Routine",
+        )),
+    }
 }

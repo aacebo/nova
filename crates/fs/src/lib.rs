@@ -1,35 +1,20 @@
-use nova_core::Function;
+use nova_core::{Args, Binding, Context, FromArgs, Function, Namespace};
 use nova_reflect::{Value, ValueRef};
-use nova_template::{FromArgs, Namespace, Pointer};
-
-pub trait FileSystem {
-    fn fs(self) -> Self;
-}
-
-impl FileSystem for nova_core::Builder {
-    fn fs(self) -> Self {
-        self.var("fs", Pointer::namespace(Fs))
-    }
-}
 
 #[derive(Debug)]
 pub struct Fs;
 
 impl Namespace for Fs {
-    fn member(&self, name: &str) -> Option<Pointer> {
+    fn member(&self, name: &str) -> Option<Binding> {
         match name {
-            "read" => Some(Pointer::callable(Function::func("fs.read", read))),
-            "write" => Some(Pointer::callable(Function::action("fs.write", write))),
+            "read" => Some(Binding::callable(Function::func("fs.read", read))),
+            "write" => Some(Binding::callable(Function::action("fs.write", write))),
             _ => None,
         }
     }
 
     fn members(&self) -> Vec<String> {
         vec!["read".to_string(), "write".to_string()]
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 
@@ -40,7 +25,7 @@ pub struct ReadArgs {
 impl FromArgs for ReadArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
+    fn from_args(args: &Args) -> Result<Self, Self::Error> {
         let path = args.str(0).ok_or(nova_core::Error::message("path must be a string"))?;
         Ok(Self { path })
     }
@@ -54,7 +39,7 @@ pub struct WriteArgs {
 impl FromArgs for WriteArgs {
     type Error = Box<dyn std::error::Error>;
 
-    fn from_args(args: &nova_template::Args) -> Result<Self, Self::Error> {
+    fn from_args(args: &Args) -> Result<Self, Self::Error> {
         let path = args.str(0).ok_or(nova_core::Error::message("path must be a string"))?;
         let value = args.at(1);
         let data = to_bytes(&value.as_ref()).ok_or(nova_core::Error::message("invalid data type"))?;
@@ -77,14 +62,14 @@ fn to_bytes(value: &ValueRef<'_>) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-pub fn read(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<Pointer, Box<dyn std::error::Error>> {
+pub fn read(args: &Args, _ctx: &dyn Context) -> Result<Binding, Box<dyn std::error::Error>> {
     let args = ReadArgs::from_args(args)?;
     let base = std::env::current_dir()?;
     let data = std::fs::read_to_string(base.join(args.path))?;
-    Ok(Pointer::new(Value::from(data)))
+    Ok(Binding::new(Value::from(data)))
 }
 
-pub fn write(args: &nova_template::Args, _scope: &nova_core::Scope) -> Result<(), Box<dyn std::error::Error>> {
+pub fn write(args: &Args, _ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
     let args = WriteArgs::from_args(args)?;
     let base = std::env::current_dir()?;
     Ok(std::fs::write(base.join(args.path), args.data)?)

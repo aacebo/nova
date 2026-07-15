@@ -92,10 +92,10 @@ impl Args {
         zyn! {
             {
                 let mut __args: ::std::vec::Vec<::nova::reflect::Value> = ::std::vec::Vec::new();
-                let mut __kwargs = ::nova::template::KArgs::new();
+                let mut __kwargs = ::nova::KArgs::new();
                 @for (stmt in positional.iter()) { {{ stmt }} }
                 @for (stmt in named.iter()) { {{ stmt }} }
-                ::nova::template::Args::new(__args, __kwargs)
+                ::nova::Args::new(__args, __kwargs)
             }
         }
     }

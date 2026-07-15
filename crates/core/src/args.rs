@@ -95,7 +95,6 @@ impl std::ops::Index<&str> for KArgs {
 pub struct Args {
     args: Vec<Value>,
     kargs: KArgs,
-    caller: Option<std::sync::Arc<dyn crate::Context>>,
 }
 
 impl Args {
@@ -103,13 +102,7 @@ impl Args {
         Self {
             args: args.into_iter().collect(),
             kargs,
-            caller: None,
         }
-    }
-
-    pub fn with_caller(mut self, caller: std::sync::Arc<dyn crate::Context>) -> Self {
-        self.caller = Some(caller);
-        self
     }
 
     pub fn args(&self) -> &[Value] {
@@ -118,14 +111,6 @@ impl Args {
 
     pub fn kargs(&self) -> &KArgs {
         &self.kargs
-    }
-
-    pub fn caller(&self) -> Option<&std::sync::Arc<dyn crate::Context>> {
-        self.caller.as_ref()
-    }
-
-    pub fn caller_as<T: 'static>(&self) -> Option<&T> {
-        self.caller.as_ref()?.as_any().downcast_ref::<T>()
     }
 
     pub fn at(&self, index: usize) -> Value {
@@ -165,11 +150,11 @@ impl Args {
     }
 
     pub fn bool(&self, index: usize) -> bool {
-        crate::is_truthy(&self.at(index).as_ref())
+        self.at(index).as_ref().is_truthy()
     }
 
     pub fn key_bool(&self, key: impl AsRef<str>) -> bool {
-        crate::is_truthy(&self.key(key).as_ref())
+        self.key(key).as_ref().is_truthy()
     }
 
     pub fn get_key(&self, key: impl AsRef<str>) -> Option<&Value> {

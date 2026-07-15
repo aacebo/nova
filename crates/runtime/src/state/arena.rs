@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{Binding, Entry};
+use nova_core::Binding;
+
+use super::Entry;
 
 #[derive(Default, Clone)]
 pub struct Arena(HashMap<ulid::Ulid, Entry>);

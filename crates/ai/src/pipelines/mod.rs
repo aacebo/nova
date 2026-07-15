@@ -6,7 +6,7 @@ pub mod generate;
 
 pub use cache::{Cache, Key};
 pub use common::Batch;
-use nova_template::{Args, FromArgs};
+use nova_core::{Args, FromArgs};
 pub use routines::{embeddings, entities, keywords, pii, sentiment, summarize};
 
 use crate::models::ModelRef;

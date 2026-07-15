@@ -13,6 +13,10 @@ pub enum Dynamic {
     Object(Arc<dyn Object>),
     Sequence(Arc<dyn Sequence>),
     Callable(Arc<dyn Callable>),
+    Bound {
+        object: Arc<dyn Object>,
+        callable: Arc<dyn Callable>,
+    },
 }
 
 impl Dynamic {
@@ -28,11 +32,22 @@ impl Dynamic {
         Self::Callable(value)
     }
 
+    pub fn from_bound<T: Object + Callable + 'static>(value: Arc<T>) -> Self {
+        Self::Bound {
+            object: value.clone(),
+            callable: value,
+        }
+    }
+
     pub fn as_ref(&self) -> DynamicRef<'_> {
         match self {
             Self::Object(v) => DynamicRef::Object(v.as_ref()),
             Self::Sequence(v) => DynamicRef::Sequence(v.as_ref()),
             Self::Callable(v) => DynamicRef::Callable(v.as_ref()),
+            Self::Bound { object, callable } => DynamicRef::Bound {
+                object: object.as_ref(),
+                callable: callable.as_ref(),
+            },
         }
     }
 
@@ -41,12 +56,14 @@ impl Dynamic {
             Self::Object(v) => v.to_type(),
             Self::Sequence(v) => v.to_type(),
             Self::Callable(v) => v.to_type(),
+            Self::Bound { object, .. } => object.to_type(),
         }
     }
 
     pub fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Callable(v) => v.call(args),
+            Self::Bound { callable, .. } => callable.call(args),
             v => Err(format!("'{}' is not callable", v.to_type())),
         }
     }
@@ -63,7 +80,7 @@ impl Dynamic {
     }
 
     pub fn is_object(&self) -> bool {
-        matches!(self, Self::Object(_))
+        matches!(self, Self::Object(_) | Self::Bound { .. })
     }
 
     pub fn is_sequence(&self) -> bool {
@@ -71,12 +88,13 @@ impl Dynamic {
     }
 
     pub fn is_callable(&self) -> bool {
-        matches!(self, Self::Callable(_))
+        matches!(self, Self::Callable(_) | Self::Bound { .. })
     }
 
     pub fn as_object(&self) -> Option<&dyn Object> {
         match self {
             Self::Object(v) => Some(v.as_ref()),
+            Self::Bound { object, .. } => Some(object.as_ref()),
             _ => None,
         }
     }
@@ -91,6 +109,7 @@ impl Dynamic {
     pub fn as_callable(&self) -> Option<&dyn Callable> {
         match self {
             Self::Callable(v) => Some(v.as_ref()),
+            Self::Bound { callable, .. } => Some(callable.as_ref()),
             _ => None,
         }
     }
@@ -108,6 +127,7 @@ impl crate::ToType for Dynamic {
             Self::Object(v) => v.to_type(),
             Self::Sequence(v) => v.to_type(),
             Self::Callable(v) => v.to_type(),
+            Self::Bound { object, .. } => object.to_type(),
         }
     }
 }
@@ -122,6 +142,7 @@ impl Object for Dynamic {
     fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
         match self {
             Self::Object(v) => v.field_by_ref(name),
+            Self::Bound { object, .. } => object.field_by_ref(name),
             _ => crate::ValueRef::Undefined,
         }
     }
@@ -129,6 +150,7 @@ impl Object for Dynamic {
     fn field(&self, name: &str) -> crate::Value {
         match self {
             Self::Object(v) => v.field(name),
+            Self::Bound { object, .. } => object.field(name),
             _ => crate::Value::Undefined,
         }
     }
@@ -136,6 +158,7 @@ impl Object for Dynamic {
     fn call(&self, name: &str, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Object(v) => v.call(name, args),
+            Self::Bound { object, .. } => object.call(name, args),
             _ => Err(format!("no method '{}'", name)),
         }
     }
@@ -168,6 +191,7 @@ impl Callable for Dynamic {
     fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Callable(v) => v.call(args),
+            Self::Bound { callable, .. } => callable.call(args),
             v => Err(format!("'{}' is not callable", v.to_type())),
         }
     }
@@ -195,6 +219,10 @@ pub enum DynamicRef<'a> {
     Object(&'a (dyn Object + 'a)),
     Sequence(&'a (dyn Sequence + 'a)),
     Callable(&'a (dyn Callable + 'a)),
+    Bound {
+        object: &'a (dyn Object + 'a),
+        callable: &'a (dyn Callable + 'a),
+    },
 }
 
 impl<'a> DynamicRef<'a> {
@@ -210,17 +238,26 @@ impl<'a> DynamicRef<'a> {
         Self::Callable(value)
     }
 
+    pub fn from_bound<T: Object + Callable + 'a>(value: &'a T) -> Self {
+        Self::Bound {
+            object: value,
+            callable: value,
+        }
+    }
+
     pub fn to_type(&self) -> crate::Type {
         match self {
             Self::Object(v) => v.to_type(),
             Self::Sequence(v) => v.to_type(),
             Self::Callable(v) => v.to_type(),
+            Self::Bound { object, .. } => object.to_type(),
         }
     }
 
     pub fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Callable(v) => v.call(args),
+            Self::Bound { callable, .. } => callable.call(args),
             v => Err(format!("'{}' is not callable", v.to_type())),
         }
     }
@@ -237,7 +274,7 @@ impl<'a> DynamicRef<'a> {
     }
 
     pub fn is_object(&self) -> bool {
-        matches!(self, Self::Object(_))
+        matches!(self, Self::Object(_) | Self::Bound { .. })
     }
 
     pub fn is_sequence(&self) -> bool {
@@ -245,7 +282,7 @@ impl<'a> DynamicRef<'a> {
     }
 
     pub fn is_callable(&self) -> bool {
-        matches!(self, Self::Callable(_))
+        matches!(self, Self::Callable(_) | Self::Bound { .. })
     }
 
     pub fn materialize(&self) -> crate::Value {
@@ -253,7 +290,7 @@ impl<'a> DynamicRef<'a> {
 
         match self {
             Self::Callable(_) => crate::Value::Undefined,
-            Self::Object(v) => {
+            Self::Object(v) | Self::Bound { object: v, .. } => {
                 if let Some(entries) = v.entries() {
                     return crate::Value::Map(entries);
                 }
@@ -279,6 +316,7 @@ impl<'a> DynamicRef<'a> {
     pub fn as_object(&self) -> Option<&'a (dyn Object + 'a)> {
         match self {
             Self::Object(v) => Some(*v),
+            Self::Bound { object, .. } => Some(*object),
             _ => None,
         }
     }
@@ -293,6 +331,7 @@ impl<'a> DynamicRef<'a> {
     pub fn as_callable(&self) -> Option<&'a (dyn Callable + 'a)> {
         match self {
             Self::Callable(v) => Some(*v),
+            Self::Bound { callable, .. } => Some(*callable),
             _ => None,
         }
     }
@@ -310,6 +349,7 @@ impl<'a> crate::ToType for DynamicRef<'a> {
             Self::Object(v) => v.to_type(),
             Self::Sequence(v) => v.to_type(),
             Self::Callable(v) => v.to_type(),
+            Self::Bound { object, .. } => object.to_type(),
         }
     }
 }
@@ -324,6 +364,7 @@ impl<'a> Object for DynamicRef<'a> {
     fn field_by_ref(&self, name: &str) -> crate::ValueRef<'_> {
         match self {
             Self::Object(v) => v.field_by_ref(name),
+            Self::Bound { object, .. } => object.field_by_ref(name),
             _ => crate::ValueRef::Undefined,
         }
     }
@@ -331,6 +372,7 @@ impl<'a> Object for DynamicRef<'a> {
     fn field(&self, name: &str) -> crate::Value {
         match self {
             Self::Object(v) => v.field(name),
+            Self::Bound { object, .. } => object.field(name),
             _ => crate::Value::Undefined,
         }
     }
@@ -338,6 +380,7 @@ impl<'a> Object for DynamicRef<'a> {
     fn call(&self, name: &str, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Object(v) => v.call(name, args),
+            Self::Bound { object, .. } => object.call(name, args),
             _ => Err(format!("no method '{}'", name)),
         }
     }
@@ -370,6 +413,7 @@ impl<'a> Callable for DynamicRef<'a> {
     fn call(&self, args: &[crate::ValueRef]) -> Result<crate::Value, String> {
         match self {
             Self::Callable(v) => v.call(args),
+            Self::Bound { callable, .. } => callable.call(args),
             v => Err(format!("'{}' is not callable", v.to_type())),
         }
     }
@@ -392,7 +436,7 @@ impl<'a> serde::Serialize for DynamicRef<'a> {
 
         match self {
             Self::Callable(_) => serializer.serialize_none(),
-            Self::Object(v) if v.entries_by_ref().is_some() => {
+            Self::Object(v) | Self::Bound { object: v, .. } if v.entries_by_ref().is_some() => {
                 let entries = v.entries_by_ref().unwrap();
                 let mut ser = serializer.serialize_map(Some(entries.len()))?;
 
@@ -402,7 +446,7 @@ impl<'a> serde::Serialize for DynamicRef<'a> {
 
                 ser.end()
             }
-            Self::Object(v) => {
+            Self::Object(v) | Self::Bound { object: v, .. } => {
                 let ty = v.to_type().to_struct();
                 let fields = ty.as_ref().map(|t| t.fields());
                 let len = fields.map(|f| f.len()).unwrap_or(0);

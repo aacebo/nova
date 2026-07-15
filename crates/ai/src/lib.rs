@@ -6,27 +6,16 @@ pub mod tasks;
 
 mod types;
 
-use nova_core::Function;
-use nova_template::{Namespace, Pointer};
+use nova_core::{Binding, Function, Namespace};
 pub use types::*;
 
 use crate::pipelines::{embeddings, entities, keywords, pii, sentiment, summarize};
-
-pub trait AI {
-    fn ai(self) -> Self;
-}
-
-impl AI for nova_core::Builder {
-    fn ai(self) -> Self {
-        self.var("ai", Pointer::namespace(Ai))
-    }
-}
 
 #[derive(Debug)]
 pub struct Ai;
 
 impl Namespace for Ai {
-    fn member(&self, name: &str) -> Option<Pointer> {
+    fn member(&self, name: &str) -> Option<Binding> {
         let func = match name {
             "embeddings" => Function::func("ai.embeddings", embeddings),
             "entities" => Function::func("ai.entities", entities),
@@ -37,7 +26,7 @@ impl Namespace for Ai {
             _ => return None,
         };
 
-        Some(Pointer::callable(func))
+        Some(Binding::callable(func))
     }
 
     fn members(&self) -> Vec<String> {
@@ -45,9 +34,5 @@ impl Namespace for Ai {
             .iter()
             .map(|s| s.to_string())
             .collect()
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

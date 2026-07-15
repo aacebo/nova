@@ -76,17 +76,17 @@ pub fn call(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let invoke = zyn! {
         {
             let mut __args: ::std::vec::Vec<::nova::reflect::Value> = ::std::vec::Vec::new();
-            let mut __kargs = ::nova::template::KArgs::new();
+            let mut __kargs = ::nova::KArgs::new();
             @for (stmt in stmts.iter()) {
                 {{ stmt }}
             }
-            scope.call({{ name }}, ::nova::template::Args::new(__args, __kargs))?
+            scope.call({{ name }}, ::nova::Args::new(__args, __kargs))?
         }
     };
 
     let expanded = match coerce {
         Some(ty) => zyn! {
-            <{{ ty }} as ::std::convert::TryFrom<::nova::template::Pointer>>::try_from({{ invoke }})?
+            <{{ ty }} as ::std::convert::TryFrom<::nova::Binding>>::try_from({{ invoke }})?
         },
         None => invoke,
     };
@@ -107,8 +107,8 @@ fn lookup(input: proc_macro::TokenStream, method: TokenStream) -> proc_macro::To
 
     match ty {
         None => zyn! { scope.{{ method }}({{ key }}) }.into(),
-        Some(ty) => match coerce::variant_accessor(&ty) {
-            Ok(accessor) => zyn! { scope.{{ method }}({{ key }}).filter(|__slot| __slot.{{ accessor }}().is_some()) }.into(),
+        Some(ty) => match coerce::variant_filter(&ty) {
+            Ok(filter) => zyn! { scope.{{ method }}({{ key }}).filter(|__slot| __slot.{{ filter }}.is_some()) }.into(),
             Err(err) => err.to_compile_error().into(),
         },
     }

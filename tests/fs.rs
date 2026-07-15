@@ -3,7 +3,7 @@
 mod common;
 
 use common::Recorder;
-use nova::fs::FileSystem;
+use nova::FileSystem;
 
 fn run(recorder: &Recorder, manifest: nova::Manifest) {
     let runtime = nova::new().observe(recorder.clone()).fs().routine(manifest).build().unwrap();

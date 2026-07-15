@@ -1,4 +1,4 @@
-use nova_template::{FromArgs, Pointer};
+use nova_core::{Context, FromArgs};
 
 use super::{RoutineResult, ScoredArgs, TextArgs, borrow, defaults, load};
 use crate::models::Loaded;
@@ -8,7 +8,7 @@ use crate::types::{Annotation, Artifact, ArtifactContent, Entity, Offset};
 /// Each routine is the same four steps: parse args, load the model, ask it for the capability the
 /// routine needs, and present the result. Asking is where the capability matrix bites -- a model
 /// that cannot do the job fails here, by name, instead of part-way through inference.
-pub fn embeddings(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResult<Pointer> {
+pub fn embeddings(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let TextArgs { text, model, api_key } = TextArgs::from_args(args)?;
     let model = load(&model.resolve(defaults::embed())?, &api_key)?;
     let capable = model.as_embed().ok_or_else(|| model.cannot("embed"))?;
@@ -26,7 +26,7 @@ pub fn embeddings(args: &nova_template::Args, _scope: &nova_core::Scope) -> Rout
     Ok(objects(artifacts))
 }
 
-pub fn keywords(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResult<Pointer> {
+pub fn keywords(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let ScoredArgs {
         text,
         min_score,
@@ -55,7 +55,7 @@ pub fn keywords(args: &nova_template::Args, _scope: &nova_core::Scope) -> Routin
     Ok(objects(annotations))
 }
 
-pub fn sentiment(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResult<Pointer> {
+pub fn sentiment(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let ScoredArgs {
         text,
         min_score,
@@ -88,7 +88,7 @@ pub fn sentiment(args: &nova_template::Args, _scope: &nova_core::Scope) -> Routi
     Ok(objects(annotations))
 }
 
-pub fn entities(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResult<Pointer> {
+pub fn entities(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let (text, min_score, model) = token_args(args)?;
     let capable = model.as_token_classify().ok_or_else(|| model.cannot("token-classify"))?;
     let out = tasks::entities(capable, &model.context(), &borrow(&text))?;
@@ -103,7 +103,7 @@ pub fn entities(args: &nova_template::Args, _scope: &nova_core::Scope) -> Routin
     }))
 }
 
-pub fn pii(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResult<Pointer> {
+pub fn pii(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let (text, min_score, model) = token_args(args)?;
     let capable = model.as_token_classify().ok_or_else(|| model.cannot("token-classify"))?;
     let out = tasks::pii(capable, &model.context(), &borrow(&text), min_score)?;
@@ -112,7 +112,7 @@ pub fn pii(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResu
     Ok(annotate(out, "pii", 0.0, |entity| entity.label.clone()))
 }
 
-pub fn summarize(args: &nova_template::Args, _scope: &nova_core::Scope) -> RoutineResult<Pointer> {
+pub fn summarize(args: &nova_core::Args, _ctx: &dyn Context) -> RoutineResult<nova_core::Binding> {
     let TextArgs { text, model, api_key } = TextArgs::from_args(args)?;
     let model = load(&model.resolve(defaults::generate())?, &api_key)?;
     let capable = model.as_generate().ok_or_else(|| model.cannot("generate"))?;
@@ -133,7 +133,7 @@ const TOP_N: usize = 5;
 
 type TokenArgs = (Vec<String>, f64, std::sync::Arc<Loaded>);
 
-fn token_args(args: &nova_template::Args) -> RoutineResult<TokenArgs> {
+fn token_args(args: &nova_core::Args) -> RoutineResult<TokenArgs> {
     let ScoredArgs {
         text,
         min_score,
@@ -145,7 +145,7 @@ fn token_args(args: &nova_template::Args) -> RoutineResult<TokenArgs> {
     Ok((text, min_score, model))
 }
 
-fn annotate(out: Vec<Vec<Entity>>, name: &str, min_score: f64, label: impl Fn(&Entity) -> String) -> Pointer {
+fn annotate(out: Vec<Vec<Entity>>, name: &str, min_score: f64, label: impl Fn(&Entity) -> String) -> nova_core::Binding {
     let mut annotations: Vec<Annotation> = Vec::new();
 
     for entities in out {
@@ -163,7 +163,7 @@ fn annotate(out: Vec<Vec<Entity>>, name: &str, min_score: f64, label: impl Fn(&E
     objects(annotations)
 }
 
-fn objects<T>(items: Vec<T>) -> Pointer
+fn objects<T>(items: Vec<T>) -> nova_core::Binding
 where
     T: nova_reflect::Object + nova_reflect::ToValue + Send + Sync + std::fmt::Debug + 'static,
 {
@@ -172,7 +172,7 @@ where
         .map(|item| nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_object(std::sync::Arc::new(item))))
         .collect();
 
-    Pointer::Value(nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_sequence(
+    nova_core::Binding::Value(nova_reflect::Value::Dynamic(nova_reflect::Dynamic::from_sequence(
         std::sync::Arc::new(values),
     )))
 }

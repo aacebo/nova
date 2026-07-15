@@ -32,18 +32,6 @@ impl From<ActionError> for Error {
     }
 }
 
-impl From<Error> for nova_template::Error {
-    fn from(value: Error) -> Self {
-        nova_template::Error::message(value.to_string())
-    }
-}
-
-impl From<nova_template::Error> for Error {
-    fn from(value: nova_template::Error) -> Self {
-        Self::other(value)
-    }
-}
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

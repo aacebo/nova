@@ -5,8 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::Recorder;
 use nova::reflect::Value;
-use nova::template::Args;
-use nova::{Scope, args, del, get, get_mut, has, set};
+use nova::{Args, Scope, args, del, get, get_mut, has, set};
 
 type ActionResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -16,7 +15,8 @@ fn scope_bindings_lifecycle_through_macros() {
     let flag = ran.clone();
 
     let runtime = nova::new()
-        .action("run", move |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             let baseline = scope.len();
             assert!(!has!("x"));
 
@@ -55,14 +55,16 @@ fn forked_scopes_resolve_and_write_through_to_ancestors() {
 
     let runtime = nova::new()
         .observe(recorder.clone())
-        .action("child", |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("child", |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             assert_eq!(get!("base").unwrap().clone(), Value::from(1));
 
             set!("base", 2);
             set!("fresh", 7);
             Ok(())
         })
-        .action("parent", move |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("parent", move |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             set!("base", 1);
 
             nova::call!("child");
@@ -90,12 +92,14 @@ fn child_deletion_recurses_to_the_owning_ancestor() {
 
     let runtime = nova::new()
         .observe(recorder.clone())
-        .action("child", |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("child", |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             assert!(has!("x"));
             del!("x");
             Ok(())
         })
-        .action("parent", move |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("parent", move |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             set!("x", 1);
 
             nova::call!("child");
@@ -121,7 +125,8 @@ fn typed_get_filters_by_object_variant() {
     let flag = ran.clone();
 
     let runtime = nova::new()
-        .action("run", move |_args: &Args, scope: &Scope| -> ActionResult {
+        .action("run", move |_args: &Args, scope: &dyn nova::Context| -> ActionResult {
+            let scope = scope.cast::<Scope>().unwrap();
             set!("x", 1);
 
             {

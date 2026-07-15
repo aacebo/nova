@@ -3,13 +3,13 @@
 mod common;
 use std::collections::BTreeMap;
 
-use common::{Recorder, to_pointer};
-use nova::codec::Codec;
+use common::{Recorder, to_binding};
+use nova::Codec;
 #[cfg(feature = "fs")]
-use nova::fs::FileSystem;
+use nova::FileSystem;
 
-fn sample() -> nova::template::Pointer {
-    to_pointer(BTreeMap::from([
+fn sample() -> nova::Binding {
+    to_binding(BTreeMap::from([
         ("name".to_string(), "nova".to_string()),
         ("kind".to_string(), "codec".to_string()),
     ]))
@@ -50,7 +50,7 @@ fn json_encode_produces_expected_shape() {
     run(
         &recorder,
         routine()
-            .var("x", to_pointer(BTreeMap::from([("a".to_string(), 1_i32)])))
+            .var("x", to_binding(BTreeMap::from([("a".to_string(), 1_i32)])))
             .step(nova::step().run("{{ info(json.encode(x)) }}"))
             .build(),
     );

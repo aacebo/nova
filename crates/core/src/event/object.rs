@@ -1,7 +1,7 @@
 use nova_reflect::Value;
-use nova_template::KArgs;
 
 use super::Source;
+use crate::KArgs;
 
 pub fn call(
     name: impl Into<String>,

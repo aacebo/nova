@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 
-use nova_template::{Args, KArgs, Pointer};
-
-use crate::{Action, Scope};
+use crate::Binding;
 
 pub fn step() -> build::StepBuilder {
     build::StepBuilder::new()
@@ -34,77 +32,6 @@ impl std::ops::DerefMut for Step {
     }
 }
 
-impl Action for Step {
-    fn invoke(&self, _args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(cond) = &self.cond
-            && !scope
-                .eval(cond)
-                .map(|v| nova_template::is_truthy(&v.value()))
-                .unwrap_or(false)
-        {
-            return Ok(());
-        }
-
-        match &self.body {
-            StepBody::Call { call, args, with } => {
-                let resolve = |value: &Pointer| -> nova_reflect::Value {
-                    match value.value().as_str() {
-                        Some(source) => scope
-                            .eval(source)
-                            .map(Pointer::into_value)
-                            .unwrap_or_else(|_| value.clone().into_value()),
-                        None => value.clone().into_value(),
-                    }
-                };
-
-                let positional: Vec<nova_reflect::Value> = args.iter().map(&resolve).collect();
-                let mut kargs = KArgs::new();
-
-                for (key, value) in with {
-                    kargs.set(key.clone(), resolve(value));
-                }
-
-                if let Err(err) = scope.call(call, Args::new(positional, kargs)) {
-                    scope.error(err.to_string());
-                }
-            }
-            StepBody::Run { run } => {
-                if let Err(err) = scope.render_str(run) {
-                    scope.error(err.to_string());
-                }
-            }
-            StepBody::Shell { shell } => {
-                let cmd = match scope.render_str(shell) {
-                    Ok(cmd) => cmd,
-                    Err(err) => {
-                        scope.error(err.to_string());
-                        return Ok(());
-                    }
-                };
-
-                let status = std::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
-                    .arg(if cfg!(windows) { "/C" } else { "-c" })
-                    .arg(&cmd)
-                    .stdout(std::process::Stdio::inherit())
-                    .stderr(std::process::Stdio::inherit())
-                    .status();
-
-                match status {
-                    Ok(status) if !status.success() => {
-                        scope.error(format!("shell exited {}", status));
-                    }
-                    Ok(_) => {}
-                    Err(err) => {
-                        scope.error(err.to_string());
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum StepBody {
@@ -112,10 +39,10 @@ pub enum StepBody {
         call: String,
 
         #[serde(default)]
-        args: Vec<Pointer>,
+        args: Vec<Binding>,
 
         #[serde(default)]
-        with: BTreeMap<String, Pointer>,
+        with: BTreeMap<String, Binding>,
     },
     Run {
         run: String,
@@ -164,8 +91,8 @@ pub mod build {
         pub fn call(
             mut self,
             name: impl Into<String>,
-            args: impl IntoIterator<Item = impl Into<Pointer>>,
-            with: impl IntoIterator<Item = (impl Into<String>, impl Into<Pointer>)>,
+            args: impl IntoIterator<Item = impl Into<Binding>>,
+            with: impl IntoIterator<Item = (impl Into<String>, impl Into<Binding>)>,
         ) -> Self {
             self.body = Some(StepBody::Call {
                 call: name.into(),

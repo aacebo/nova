@@ -1,0 +1,29 @@
+[package]
+name = "nova-runtime"
+description = "Runtime orchestration and execution for the Nova workflow runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+doctest = false
+
+[lints]
+workspace = true
+
+[features]
+default = ["minijinja"]
+minijinja = ["dep:minijinja", "nova-reflect/minijinja"]
+
+[dependencies]
+nova-core = { workspace = true }
+nova-reflect = { workspace = true, features = ["serde"] }
+nova-schema = { workspace = true }
+
+ulid = { version = "1", features = ["serde"] }
+crossbeam = { package = "crossbeam-channel", version = "0.5" }
+minijinja = { version = "2", features = ["serde"], optional = true }

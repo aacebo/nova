@@ -15,4 +15,3 @@ workspace = true
 [dependencies]
 nova-core = { workspace = true }
 nova-reflect = { workspace = true, features = ["serde"] }
-nova-template = { workspace = true }

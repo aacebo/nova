@@ -2,4 +2,4 @@
 mod json;
 
 #[cfg(feature = "minijinja")]
-mod minijinja;
+pub mod minijinja;

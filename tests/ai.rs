@@ -3,7 +3,7 @@
 mod common;
 
 use common::Recorder;
-use nova::ai::AI;
+use nova::AI;
 
 fn run(recorder: &Recorder, manifest: nova::Manifest) {
     let runtime = nova::new().observe(recorder.clone()).ai().routine(manifest).build().unwrap();

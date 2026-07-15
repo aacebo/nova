@@ -18,13 +18,13 @@ type_complexity = "allow"
 
 [workspace.dependencies]
 nova-core = { path = "crates/core", version = "0.0.0" }
+nova-runtime = { path = "crates/runtime", version = "0.0.0" }
 nova-ai = { path = "crates/ai", version = "0.0.0" }
 nova-fs = { path = "crates/fs", version = "0.0.0" }
 nova-codec = { path = "crates/codec", version = "0.0.0" }
 nova-http = { path = "crates/http", version = "0.0.0" }
 nova-macros = { path = "crates/macros", version = "0.0.0" }
 nova-schema = { path = "crates/schema", version = "0.0.0" }
-nova-template = { path = "crates/template", version = "0.0.0" }
 nova-reflect = { path = "crates/reflect", version = "0.0.0" }
 nova-reflect-macros = { path = "crates/reflect/macros", version = "0.0.0" }
 
@@ -72,13 +72,13 @@ json = ["nova-reflect/json"]
 
 [dependencies]
 nova-core = { workspace = true }
+nova-runtime = { workspace = true }
 nova-ai = { workspace = true, optional = true }
 nova-fs = { workspace = true, optional = true }
 nova-codec = { workspace = true, optional = true }
 nova-http = { workspace = true, optional = true }
 nova-macros = { workspace = true, optional = true }
 nova-schema = { workspace = true, optional = true }
-nova-template = { workspace = true }
 nova-reflect = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]

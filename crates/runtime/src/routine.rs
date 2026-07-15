@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use nova_core::{Action, Args, Binding, Call, Context, Error, Namespace, Step, event};
 use nova_reflect::Value;
-use nova_template::{Args, Pointer};
 
-use crate::{Action, Binding, Error, Scope, Step, event};
+use crate::Scope;
 
 #[derive(Clone)]
 pub struct Routine {
@@ -40,18 +40,12 @@ impl Routine {
         &self.steps
     }
 
-    pub fn get(&self, key: &str) -> Option<Pointer> {
+    pub fn get(&self, key: &str) -> Option<Binding> {
         let slot = self.scope.get(key)?;
-
-        match &*slot {
-            Binding::Value(value) => Some(Pointer::Value(value.clone())),
-            Binding::Pointer(ptr) => Some(ptr.clone()),
-            Binding::Func(func) => Some(Pointer::callable(func.clone())),
-            Binding::Routine(rt) => Some(Pointer::callable_namespace(rt.clone())),
-        }
+        Some((*slot).clone())
     }
 
-    fn validate(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+    fn validate(&self, args: &Args, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
         let Some(validator) = &self.validator else {
             return Ok(());
         };
@@ -67,7 +61,7 @@ impl Routine {
 
         if let Err(err) = nova_schema::Validate::validate(validator.as_ref(), &instance) {
             let message = format!("invalid args for `{}`: {}", self.name, err);
-            return Err(Box::new(Error::action(scope.trace_id().to_string(), &self.name, message)));
+            return Err(Box::new(Error::action(ctx.trace_id().to_string(), &self.name, message)));
         }
 
         Ok(())
@@ -80,40 +74,26 @@ impl std::fmt::Debug for Routine {
     }
 }
 
-impl nova_template::Namespace for Routine {
-    fn member(&self, name: &str) -> Option<Pointer> {
+impl Namespace for Routine {
+    fn member(&self, name: &str) -> Option<Binding> {
         self.get(name)
     }
 
     fn members(&self) -> Vec<String> {
-        nova_template::Context::names(&self.scope)
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+        Context::names(&self.scope)
     }
 }
 
-impl nova_template::Call for Routine {
-    fn call(&self, args: &Args) -> Result<Pointer, nova_template::Error> {
-        let caller = args
-            .caller_as::<Scope>()
-            .ok_or_else(|| nova_template::Error::message("no scope bound to template render"))?;
-
-        self.invoke(args, caller)
-            .map_err(|err| nova_template::Error::message(err.to_string()))?;
-
-        Ok(Pointer::new(Value::Null))
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+impl Call for Routine {
+    fn call(&self, args: &Args, ctx: &dyn Context) -> Result<Binding, Error> {
+        self.invoke(args, ctx).map_err(|err| Error::message(err.to_string()))?;
+        Ok(Binding::new(Value::Null))
     }
 }
 
 impl Action for Routine {
-    fn invoke(&self, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
-        self.validate(args, scope)?;
+    fn invoke(&self, args: &Args, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
+        self.validate(args, ctx)?;
 
         let child = self.scope.fork(&self.name, args.args().to_vec(), args.kargs().clone());
         let total = self.steps.len();
@@ -125,12 +105,7 @@ impl Action for Routine {
             let skipped = step
                 .cond
                 .as_ref()
-                .map(|cond| {
-                    !child
-                        .eval(cond)
-                        .map(|v| nova_template::is_truthy(&v.value()))
-                        .unwrap_or(false)
-                })
+                .map(|cond| !child.eval(cond).map(|v| v.is_truthy()).unwrap_or(false))
                 .unwrap_or(false);
 
             if skipped {
@@ -146,8 +121,7 @@ impl Action for Routine {
             }
 
             let started = std::time::Instant::now();
-            let step_args = Args::new(child.args().to_vec(), child.kargs().clone());
-            let result = step.invoke(&step_args, &child);
+            let result = crate::step::invoke(step, &child);
             let elapsed = started.elapsed();
             let status = if result.is_err() {
                 event::step::Status::Error
@@ -160,5 +134,11 @@ impl Action for Routine {
         }
 
         Ok(())
+    }
+}
+
+impl From<Routine> for Binding {
+    fn from(value: Routine) -> Self {
+        Binding::callable_namespace(value)
     }
 }

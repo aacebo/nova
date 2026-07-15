@@ -1,11 +1,11 @@
+use nova_core::{Args, Binding, Context, Diagnostic, Error, FromArgs, Severity};
 use nova_reflect::Value;
-use nova_template::{Args, FromArgs, Pointer};
 
-use crate::{Builder, Diagnostic, Error, Scope, Severity};
+use crate::Builder;
 
 pub struct EnvArgs {
     pub name: String,
-    pub default: Pointer,
+    pub default: Binding,
 }
 
 impl FromArgs for EnvArgs {
@@ -16,7 +16,7 @@ impl FromArgs for EnvArgs {
 
         Ok(Self {
             name,
-            default: Pointer::Value(args.key("default")),
+            default: Binding::Value(args.key("default")),
         })
     }
 }
@@ -53,38 +53,38 @@ impl FromArgs for FormatArgs {
 
 pub fn register(builder: Builder) -> Builder {
     builder
-        .func("env", |args: &Args, _scope: &Scope| {
+        .func("env", |args: &Args, _ctx: &dyn Context| {
             let args = EnvArgs::from_args(args)?;
 
             match std::env::var(&args.name) {
-                Ok(value) => Ok(Pointer::new(Value::from(value))),
+                Ok(value) => Ok(Binding::new(Value::from(value))),
                 Err(_) => Ok(args.default),
             }
         })
-        .func("info", |args: &Args, scope: &Scope| {
-            emit(Severity::Info, args, scope)?;
-            Ok(Pointer::new(Value::Null))
+        .func("info", |args: &Args, ctx: &dyn Context| {
+            emit(Severity::Info, args, ctx)?;
+            Ok(Binding::new(Value::Null))
         })
-        .func("warn", |args: &Args, scope: &Scope| {
-            emit(Severity::Warn, args, scope)?;
-            Ok(Pointer::new(Value::Null))
+        .func("warn", |args: &Args, ctx: &dyn Context| {
+            emit(Severity::Warn, args, ctx)?;
+            Ok(Binding::new(Value::Null))
         })
-        .func("error", |args: &Args, scope: &Scope| {
-            emit(Severity::Error, args, scope)?;
-            Ok(Pointer::new(Value::Null))
+        .func("error", |args: &Args, ctx: &dyn Context| {
+            emit(Severity::Error, args, ctx)?;
+            Ok(Binding::new(Value::Null))
         })
-        .func("print", |args: &Args, _scope: &Scope| {
+        .func("print", |args: &Args, _ctx: &dyn Context| {
             print!("{}", FormatArgs::from_args(args)?.text());
-            Ok(Pointer::new(Value::Null))
+            Ok(Binding::new(Value::Null))
         })
-        .func("println", |args: &Args, _scope: &Scope| {
+        .func("println", |args: &Args, _ctx: &dyn Context| {
             println!("{}", FormatArgs::from_args(args)?.text());
-            Ok(Pointer::new(Value::Null))
+            Ok(Binding::new(Value::Null))
         })
 }
 
-fn emit(severity: Severity, args: &Args, scope: &Scope) -> Result<(), Box<dyn std::error::Error>> {
+fn emit(severity: Severity, args: &Args, ctx: &dyn Context) -> Result<(), Box<dyn std::error::Error>> {
     let args = FormatArgs::from_args(args)?;
-    scope.emit(Diagnostic::new(*scope.trace_id()).sev(severity).message(args.text()));
+    ctx.emit(Diagnostic::new(ctx.trace_id()).sev(severity).message(args.text()));
     Ok(())
 }
