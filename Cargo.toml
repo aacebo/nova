@@ -40,10 +40,18 @@ homepage.workspace = true
 repository.workspace = true
 
 [profile.dev]
-incremental = false
+incremental = true
 
-# candle is unusable unoptimized: a BART summarization takes ~370s at opt-level 0 vs ~7s here.
-[profile.dev.package."*"]
+[profile.dev.package.candle-core]
+opt-level = 3
+
+[profile.dev.package.candle-nn]
+opt-level = 3
+
+[profile.dev.package.candle-transformers]
+opt-level = 3
+
+[profile.dev.package.nova-ai]
 opt-level = 3
 
 [lib]
